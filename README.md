@@ -20,7 +20,7 @@ npm install
 project mới. Chọn khu vực **Singapore** — gần Việt Nam nhất trong các khu vực
 miễn phí.
 
-**2. Chạy 6 file migration.**
+**2. Chạy 7 file migration.**
 
 Cách nhanh — một lệnh, không phải dán gì:
 
@@ -107,7 +107,7 @@ Ba bộ, tổng **253 phép kiểm tra**, không cần database thật và khôn
 
 | Lệnh | Kiểm tra gì | Số phép |
 |---|---|---|
-| `npm run verify:schema` | Chạy toàn bộ 6 migration trên **Postgres thật** (PGlite biên dịch sang WASM), rồi kiểm tra trigger kiểm duyệt, RLS, quyền cấp cột, và 20 set đồ mẫu | 62 |
+| `npm run verify:schema` | Chạy toàn bộ 7 migration trên **Postgres thật** (PGlite biên dịch sang WASM), rồi kiểm tra trigger kiểm duyệt, RLS, quyền cấp cột, và 20 set đồ mẫu | 62 |
 | `npm run verify:lib` | Module ngũ hành (âm lịch, nạp âm) và bộ chấm điểm gợi ý | 110 |
 | `npm run verify:helper` | Local Helper, và đối chiếu cấu hình tên miền giữa **bốn** nơi: Python / SQL / TypeScript / Edge Function | 81 |
 
@@ -452,7 +452,7 @@ src/
     format.ts                Định dạng VNĐ, ngày, slug tiếng Việt
 
 supabase/
-  migrations/                6 file, chạy theo thứ tự số
+  migrations/                7 file, chạy theo thứ tự số
   functions/                 Edge Function (Deno)
 
 local-helper/                Python + Playwright, chạy trên máy cá nhân
@@ -518,7 +518,7 @@ phải dự đoán vận mệnh.
 
 **Việc nên làm ngay, theo thứ tự:**
 
-1. Chạy 6 migration, điền `.env.local`, tự cấp quyền admin.
+1. Chạy 7 migration, điền `.env.local`, tự cấp quyền admin.
 2. Bật `keep-alive.yml` — nếu bỏ qua, một tuần sau website sẽ chết.
 3. Vào `/admin/san-pham`, thay 20 set đồ mẫu bằng link và ảnh thật.
 4. Bật đăng nhập Google.

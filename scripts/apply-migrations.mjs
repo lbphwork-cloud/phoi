@@ -1,10 +1,10 @@
 /**
- * Chay ca 6 migration vao Supabase bang mot lenh, roi tu kiem tra ket qua.
+ * Chay ca 7 migration vao Supabase bang mot lenh, roi tu kiem tra ket qua.
  *
  *     npm run db:apply
  *     npm run db:apply -- --self-test      (khong can database, chay tren PGlite)
  *
- * VI SAO CO FILE NAY THAY VI DAN TAY 6 LAN
+ * VI SAO CO FILE NAY THAY VI DAN TAY TUNG FILE
  *   File 0003_functions.sql dai 703 dong. Boi den bang chuot rat de thieu vai
  *   dong cuoi, va loi do KHONG bao loi ngay — no chi lam thieu mot trigger, roi
  *   ba tuan sau moi phat hien bai da dang sua anh ma khong bi dua ve cho duyet.

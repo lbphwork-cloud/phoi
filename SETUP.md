@@ -11,7 +11,7 @@ không làm thay được. Phần còn lại đã tự động hoá thành lện
 ## A. Đã làm sẵn, bạn không phải làm gì
 
 - [x] Toàn bộ mã nguồn website, 12 trang, 3 Edge Function, Local Helper, tiện ích Chrome
-- [x] 6 file migration, đã chạy thử trên Postgres thật
+- [x] 7 file migration, đã chạy thử trên Postgres thật
 - [x] 20 set đồ mẫu + 45 sản phẩm mẫu
 - [x] `npm run db:apply` — thay 6 lần dán tay bằng một lệnh
 - [x] `npm run db:grant-admin` — thay câu SQL cấp quyền admin
@@ -53,13 +53,13 @@ Mở file:
 open -e /Users/phug/Projects/fashion-affiliate/.env.local
 ```
 
-### 3. Chạy 6 migration bằng một lệnh
+### 3. Chạy 7 migration bằng một lệnh
 
 - [ ] ```bash
       npm run db:apply
       ```
 
-Script đọc nguyên 6 file từ đĩa, chạy đúng thứ tự, mỗi file trong một
+Script đọc nguyên 7 file từ đĩa, chạy đúng thứ tự, mỗi file trong một
 transaction, rồi tự kiểm tra 7 điểm. Chạy lại nhiều lần an toàn — file đã chạy sẽ
 bị bỏ qua.
 
@@ -68,7 +68,7 @@ Kết quả đúng là 7 dòng `[PASS]` và `>>> XONG. Database da san sang.`
 Nếu báo lỗi: **gửi nguyên văn cho tôi**, đừng chạy tiếp. File lỗi đã được hoàn
 tác hoàn toàn, không còn trạng thái nửa vời.
 
-Muốn dán tay 6 file thay vì dùng lệnh thì xem hướng dẫn trong `README.md`.
+Muốn dán tay 7 file thay vì dùng lệnh thì xem hướng dẫn trong `README.md`.
 
 ### 4. Tắt xác nhận email
 

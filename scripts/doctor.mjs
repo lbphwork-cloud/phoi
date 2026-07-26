@@ -176,7 +176,7 @@ async function main() {
   if (!dbUrl) {
     warn(
       'SUPABASE_DB_URL con trong',
-      'chua dien thi khong chay duoc npm run db:apply — van dan tay 6 file duoc',
+      'chua dien thi khong chay duoc npm run db:apply — van dan tay 7 file duoc',
     );
   } else {
     let parsed;

@@ -260,6 +260,21 @@ async function main() {
   report('profiles.display_name VAN sua duoc',
          (await colPriv('profiles', 'display_name', 'UPDATE')) > 0);
 
+  // Quyen rieng cho tung role, khong gop chung. Phat hien tren database that:
+  // 0002 chi thu hoi quyen SUA cot `role` chu khong thu hoi quyen DOC, nen khach
+  // vang lai goi duoc /rest/v1/profiles?select=role de biet ai la admin.
+  const colPrivFor = async (table, column, priv, grantee) => (await q(`
+    select count(*)::int n from information_schema.column_privileges
+     where table_name = '${table}' and column_name = '${column}'
+       and privilege_type = '${priv}' and grantee = '${grantee}'`))[0].n;
+
+  report('profiles.role KHONG doc duoc boi khach vang lai',
+         (await colPrivFor('profiles', 'role', 'SELECT', 'anon')) === 0);
+  report('profiles.display_name VAN doc duoc boi khach vang lai',
+         (await colPrivFor('profiles', 'display_name', 'SELECT', 'anon')) > 0);
+  report('profiles.role VAN doc duoc boi nguoi da dang nhap (giao dien can)',
+         (await colPrivFor('profiles', 'role', 'SELECT', 'authenticated')) > 0);
+
   console.log('\n=== 6. Kiem tra link affiliate ===');
 
   const [ud] = await q(`
