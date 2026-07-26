@@ -71,16 +71,16 @@ vì trang trắng.
 npm run verify
 ```
 
-Ba bộ, tổng **234 phép kiểm tra**, không cần database thật và không cần secret:
+Ba bộ, tổng **253 phép kiểm tra**, không cần database thật và không cần secret:
 
 | Lệnh | Kiểm tra gì | Số phép |
 |---|---|---|
 | `npm run verify:schema` | Chạy toàn bộ 6 migration trên **Postgres thật** (PGlite biên dịch sang WASM), rồi kiểm tra trigger kiểm duyệt, RLS, quyền cấp cột, và 20 set đồ mẫu | 62 |
 | `npm run verify:lib` | Module ngũ hành (âm lịch, nạp âm) và bộ chấm điểm gợi ý | 110 |
-| `npm run verify:helper` | Local Helper, và đối chiếu danh sách tên miền giữa **bốn** nơi: Python / SQL / TypeScript / Edge Function | 62 |
+| `npm run verify:helper` | Local Helper, và đối chiếu cấu hình tên miền giữa **bốn** nơi: Python / SQL / TypeScript / Edge Function | 81 |
 
 Bộ `verify:schema` là bộ đáng giá nhất: nó bắt lỗi SQL và lỗi logic **trước khi**
-bạn dán migration vào Supabase thật. Trong quá trình xây dựng, nó đã phát hiện sáu
+bạn dán migration vào Supabase thật. Trong quá trình xây dựng, nó đã phát hiện tám
 lỗi thật, gồm một lỗi bảo mật khiến API key vẫn đọc được qua REST API.
 
 Nếu bạn sửa schema hoặc sửa `src/lib/`, chạy lại `npm run verify` trước khi commit.
@@ -152,9 +152,26 @@ Hạn chế thứ hai: Edge Function chạy từ trung tâm dữ liệu, mà Sho
 đó. Bậc này vẫn sẽ thất bại khá thường xuyên. Đó là lý do có bậc 2.
 
 **Bậc 2 — Local Helper trên máy bạn.** Website chỉ ghi một dòng vào bảng
-`fetch_jobs`. Máy bạn tự đọc, tự quyết định làm, mở link bằng Chromium thật trên
-IP nhà mạng thật. Nếu gặp CAPTCHA thì cửa sổ hiện lên và **bạn** tự bấm — người
-thật giải CAPTCHA không phải là vượt rào. Xem `local-helper/README.md`.
+`fetch_jobs`. Máy bạn tự đọc, tự quyết định làm.
+
+Bên trong bậc 2 lại có **hai đường, thử đường rẻ trước**:
+
+| | Cách | Thời gian |
+|---|---|---|
+| Đường 1 | HTTP thuần từ IP nhà mạng | 0,6 – 1 giây |
+| Đường 2 | Trình duyệt thật (Playwright) | 5 – 15 giây |
+
+Nghịch lý đo được trên link thật: Shopee **chặn trình duyệt bị điều khiển tự
+động** — cả Chromium đi kèm Playwright lẫn Chrome thật của máy đều bị đẩy sang
+`/verify/traffic/error` — nhưng cho HTTP thuần đi qua. Lý do hợp lý: một yêu cầu
+HTTP không phải trình duyệt, nên không có dấu vết tự động hoá để phát hiện.
+
+Nên trình duyệt được khởi động **lười**, chỉ mở khi đường 1 thất bại. Nếu gặp
+CAPTCHA thì cửa sổ hiện lên và **bạn** tự bấm — người thật giải CAPTCHA không
+phải là vượt rào.
+
+Đã chạy thử thật với hai link `vn.shp.ee`: cả hai lấy được tên và ảnh dưới 1
+giây, không cần mở trình duyệt. Xem `local-helper/README.md`.
 
 **Bậc 3 — Nhập tay.** Luôn có sẵn. Đây không phải đường lui tạm bợ: bài của người
 dùng thường sẽ dùng bậc này là chính.
@@ -296,7 +313,7 @@ Ba workflow trong `.github/workflows/`:
 |---|---|---|
 | `keep-alive.yml` | mỗi 3 ngày | Gọi một truy vấn nhỏ để Supabase không tự tạm dừng |
 | `link-health.yml` | thứ Hai hàng tuần | Kiểm tra link affiliate còn sống không |
-| `ci.yml` | mỗi lần push | typecheck, lint, 234 phép kiểm tra, build |
+| `ci.yml` | mỗi lần push | typecheck, lint, 253 phép kiểm tra, build |
 
 **`keep-alive.yml` là bắt buộc, không phải tuỳ chọn.** Gói miễn phí của Supabase
 tự tạm dừng project sau khoảng 7 ngày không hoạt động, và khi bị tạm dừng thì

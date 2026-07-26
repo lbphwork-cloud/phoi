@@ -137,6 +137,61 @@ async function resolveRedirects(
   return { finalUrl: current, host: urlHost(current), hops: maxHops };
 }
 
+/**
+ * Duong dan cua trang chan bot.
+ *
+ * Shopee KHONG tra 403 ma CHUYEN HUONG sang /verify/traffic/error. Trang do tra
+ * HTTP 200 va co the og:title — nhung la tieu de TRANG CHU. Neu chi kiem tra
+ * res.ok roi doc the OG thi se tra ve "Shopee Viet Nam | Mua va Ban..." lam ten
+ * san pham. Day tung la mot bug that o Local Helper, phat hien khi chay thu link
+ * that cua nguoi dung.
+ */
+const BOT_CHECK_PATHS = [
+  '/verify/traffic',
+  '/verify/captcha',
+  '/captcha',
+  '/challenge',
+  '/cdn-cgi/challenge',
+];
+
+const isBotCheckUrl = (u: string): boolean => {
+  if (!u) return false;
+  const path = u.toLowerCase().replace(/^[a-z]+:\/\/[^/]*/, '').split('?')[0];
+  return BOT_CHECK_PATHS.some((m) => path.includes(m));
+};
+
+/**
+ * Tieu de trang chu cua san.
+ *
+ * PHAI so khop DAU CHUOI, va phai kiem tra SAU khi bo hau to. Moi tieu de san
+ * pham cua Shopee deu KET THUC bang "| Shopee Viet Nam" — dung includes() thi
+ * se tu choi dung MOI san pham that. Day cung tung la mot bug that.
+ */
+const GENERIC_TITLE_PREFIXES = [
+  'shopee viet nam',
+  'shopee vietnam',
+  'mua sam online',
+  'tiktok - lam quen',
+  'tiktok shop',
+];
+
+const MIN_PRODUCT_NAME_LEN = 8;
+
+/** Bo dau tieng Viet. NFD tach dau ra nhung khong xoa — phai loc them. */
+const stripAccents = (t: string): string =>
+  t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd');
+
+/** Bo hau to ' | Shopee Viet Nam' / ' | TikTok Shop' o cuoi tieu de. */
+const stripMarketplaceSuffix = (t: string): string =>
+  t.replace(/\s*\|\s*(Shopee[^|]*|TikTok[^|]*)$/, '').trim();
+
+const isGenericTitle = (title: string | undefined): boolean => {
+  if (!title) return true;
+  const flat = stripAccents(stripMarketplaceSuffix(title)).trim();
+  if (flat.length < MIN_PRODUCT_NAME_LEN) return true;
+  return GENERIC_TITLE_PREFIXES.some((g) => flat.startsWith(g));
+};
+
 /** Doc cac the meta Open Graph tu HTML. */
 function parseOpenGraph(html: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -279,6 +334,16 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Bi day sang trang chan bot: HTTP van la 200 nen res.ok khong bat duoc
+    if (isBotCheckUrl(res.url)) {
+      return json({
+        ok: false,
+        error:
+          'Sàn chuyển hướng sang trang chống bot. Thường là do chặn IP trung tâm ' +
+          'dữ liệu — đây là lúc Bậc 2 (Local Helper trên máy bạn) phát huy tác dụng.',
+      });
+    }
+
     html = await res.text();
   } catch (e) {
     return json({
@@ -288,9 +353,9 @@ Deno.serve(async (req) => {
   }
 
   const og = parseOpenGraph(html);
-  const name = og['og:title'] ?? og['twitter:title'] ?? '';
+  const rawTitle = og['og:title'] ?? og['twitter:title'] ?? '';
 
-  if (!name) {
+  if (!rawTitle) {
     return json({
       ok: false,
       error:
@@ -300,6 +365,18 @@ Deno.serve(async (req) => {
         'duyệt thật) hoặc nhập tay.',
     });
   }
+
+  if (isGenericTitle(rawTitle)) {
+    return json({
+      ok: false,
+      error:
+        'Đọc được thẻ Open Graph nhưng là của TRANG CHỦ, không phải trang sản phẩm. ' +
+        'Thường là do bị đẩy về trang chủ hoặc trang chặn bot. Chuyển sang Bậc 2 ' +
+        'hoặc nhập tay.',
+    });
+  }
+
+  const name = stripMarketplaceSuffix(rawTitle);
 
   // Gia co the nam o og:description hoac product:price:amount
   const priceVnd =

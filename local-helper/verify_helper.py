@@ -122,6 +122,70 @@ for title, body, expected in CAPTCHA_CASES:
           "" if got == expected else f"-> {got}")
 
 # =============================================================================
+print("\n=== 3b. Nhan dien trang chan bot va tieu de trang chu ===")
+
+# Ca hai nhom duoi day khoa lai BUG THAT phat hien khi chay thu link cua nguoi
+# dung. Neu ai sua lai thanh so khop chuoi con, test se do ngay.
+
+BOT_URL_CASES = [
+    # Shopee KHONG tra 403 ma chuyen huong sang day. HTTP van la 200.
+    ("https://shopee.vn/verify/traffic/error?home_url=x", True),
+    ("https://shopee.vn/verify/captcha", True),
+    ("https://example.com/cdn-cgi/challenge-platform/x", True),
+    # Trang san pham that
+    ("https://shopee.vn/product/1388112438/49358623905", False),
+    ("https://shopee.vn/Ao-Thun-i.123.456", False),
+    ("", False),
+]
+for url, expected in BOT_URL_CASES:
+    got = helper.is_bot_check_url(url)
+    check(f"is_bot_check_url({(url or '(rong)')[:46]}) -> {expected}", got == expected,
+          "" if got == expected else f"-> {got}")
+
+# Tieu de THAT lay tu hai link cua nguoi dung
+REAL_TITLES = [
+    "Áo Thun Len Dệt Kim Phối Cổ Tròn Cài 1 Cúc Tay Ngắn 𝐂𝐎𝐎𝐋𝐂𝐑𝐄𝐖 Phong Cách "
+    "Cleanfit Hàn Quốc - ALH05 ATN103 | Shopee Việt Nam",
+    "[BEST SELLER] Áo polo nam BASIC SYMBOL, POLO QUỐC DÂN vải cá sấu cotton "
+    "interlock - POLOMANOR | Shopee Việt Nam",
+]
+for t in REAL_TITLES:
+    got = helper.is_generic_title(t)
+    check(f"tieu de SAN PHAM that KHONG bi coi la trang chu: {t[:40]}…",
+          got is False,
+          "" if got is False else "BI TU CHOI NHAM — moi san pham Shopee deu ket "
+                                  "thuc bang '| Shopee Viet Nam'")
+
+GENERIC_TITLES_TEST = [
+    ("Shopee Việt Nam | Mua và Bán Trên Ứng Dụng Di Động Hoặc Website", True),
+    ("Shopee Việt Nam | Mua Sắm Online", True),
+    ("TikTok Shop", True),
+    ("", True),
+    ("Áo", True),          # qua ngan, khong the la ten san pham
+    ("Áo thun nam", False),
+]
+for t, expected in GENERIC_TITLES_TEST:
+    got = helper.is_generic_title(t)
+    check(f"is_generic_title({(t or '(rong)')[:44]}) -> {expected}", got == expected,
+          "" if got == expected else f"-> {got}")
+
+# Cat hau to
+SUFFIX_CASES = [
+    ("Áo polo nam - POLOMANOR | Shopee Việt Nam", "Áo polo nam - POLOMANOR"),
+    ("Quần jeans | TikTok Shop", "Quần jeans"),
+    ("Áo khoác | Cửa hàng ABC", "Áo khoác | Cửa hàng ABC"),   # khong phai hau to san
+    ("Áo thun", "Áo thun"),
+]
+for raw, expected in SUFFIX_CASES:
+    got = helper.strip_marketplace_suffix(raw)
+    check(f"strip_marketplace_suffix -> {expected[:40]}", got == expected,
+          "" if got == expected else f"-> {got}")
+
+check("strip_accents bo dau va doi d gach ngang",
+      helper.strip_accents("Áo Thun Đẹp") == "ao thun dep",
+      helper.strip_accents("Áo Thun Đẹp"))
+
+# =============================================================================
 print("\n=== 4. Khop ten mien theo ten mien goc ===")
 
 ALLOWED_CASES = [
