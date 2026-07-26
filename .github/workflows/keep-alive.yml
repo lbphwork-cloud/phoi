@@ -1,0 +1,69 @@
+# =============================================================================
+# Chong Supabase tu ngu
+#
+# VI SAO CAN FILE NAY
+#   Goi mien phi cua Supabase tu TAM DUNG project sau khoang 7 ngay khong co
+#   hoat dong. Khi bi tam dung, website chet ma khong co canh bao nao, va phai
+#   vao bang dieu khien bam khoi dong lai bang tay.
+#
+#   Day la cai bay pho bien nhat cua goi mien phi. Mot truy van nho moi 3 ngay
+#   la du de project luon duoc tinh la dang hoat dong.
+#
+# CHI PHI: 0. GitHub Actions mien phi khong gioi han cho repo public, va
+#          2.000 phut/thang cho repo private — job nay ton khoang 10 giay.
+#
+# CAI DAT
+#   GitHub -> repo -> Settings -> Secrets and variables -> Actions
+#   Them hai secret:
+#     SUPABASE_URL       (giong NEXT_PUBLIC_SUPABASE_URL)
+#     SUPABASE_ANON_KEY  (giong NEXT_PUBLIC_SUPABASE_ANON_KEY)
+#
+#   CO Y dung ANON key chu khong phai service role: job nay chi can doc mot
+#   bang cong khai. Khong bao gio dat service role key vao GitHub Actions neu
+#   khong that su can.
+# =============================================================================
+
+name: Chong Supabase tu ngu
+
+on:
+  schedule:
+    # 02:00 UTC = 09:00 gio Viet Nam, cac ngay 1, 4, 7, ... (moi 3 ngay)
+    - cron: '0 2 */3 * *'
+  # Cho phep bam chay tay de kiem tra ngay sau khi cai dat
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Goi mot truy van nho vao database
+        env:
+          URL: ${{ secrets.SUPABASE_URL }}
+          KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${URL:-}" ] || [ -z "${KEY:-}" ]; then
+            echo "::error::Thieu secret SUPABASE_URL hoac SUPABASE_ANON_KEY."
+            echo "Them o: Settings -> Secrets and variables -> Actions"
+            exit 1
+          fi
+
+          # Bang styles la bang tra cong khai, ai cung doc duoc theo RLS.
+          # Chi lay 1 dong: du de tinh la hoat dong, khong ton egress dang ke.
+          code=$(curl -sS -o /tmp/out.json -w '%{http_code}' \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/styles?select=slug&limit=1")
+
+          echo "HTTP $code"
+          cat /tmp/out.json
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Database khong tra ve 200. Project co the da bi tam dung — vao bang dieu khien Supabase kiem tra."
+            exit 1
+          fi
+
+          echo "Database dang hoat dong binh thuong."

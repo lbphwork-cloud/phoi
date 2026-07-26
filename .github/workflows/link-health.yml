@@ -1,0 +1,49 @@
+# =============================================================================
+# Kiem tra link affiliate con song khong — chay hang tuan
+#
+# Link chet la mat tien truc tiep: nguoi dung bam vao, thay trang loi, khong
+# quay lai nua. Khong co bao cao nao tu canh bao viec do.
+#
+# LUU Y VE DO TIN CAY
+#   Job nay chay tu IP trung tam du lieu cua GitHub, ma Shopee chan loai IP do
+#   rat gat. Script CO Y khong ket luan "chet" khi gap ma 403/429/timeout — chi
+#   ket luan khi thay 404 hoac 410. Nho vay ket qua it bao dong sai.
+#
+#   Neu muon ket qua dang tin hon, chay tu may ca nhan bang IP nha mang:
+#     SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/check-links.mjs
+#
+# CAI DAT
+#   Settings -> Secrets and variables -> Actions, them:
+#     SUPABASE_URL
+#     SUPABASE_SERVICE_ROLE_KEY
+#
+#   Day la job DUY NHAT trong repo can service role key, vi no phai GHI vao
+#   bang affiliate_links cua moi nguoi dung. Neu ban khong muon dat khoa nay
+#   len GitHub thi tat job nay va chay tay tu may ca nhan.
+# =============================================================================
+
+name: Kiem tra link affiliate
+
+on:
+  schedule:
+    # 01:00 UTC thu Hai = 08:00 gio Viet Nam
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Kiem tra tung link
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/check-links.mjs

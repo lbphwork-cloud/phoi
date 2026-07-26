@@ -1,0 +1,473 @@
+/**
+ * Edge Function: ai-generate
+ * Tao anh minh hoa cho set do bang API key cua chinh nguoi dung (BYOK).
+ *
+ * LUONG
+ *   1. Nhan { provider, prompt, outfitId? } tu trang /admin/ai.
+ *   2. Kiem tra nguoi goi la quan tri vien.
+ *   3. Ghi mot dong vao ai_jobs (status = 'claimed').
+ *   4. Giai ma API key cua nguoi do, goi nha cung cap.
+ *   5. Tai anh len Supabase Storage.
+ *   6. Cap nhat job -> 'done' kem duong dan anh.
+ *
+ * BA QUY TAC BAT BUOC VOI ANH AI — khong co cong tac tat
+ *   1. Anh chi duoc gan vao outfit o dang BAN NHAP, khong dang ngay.
+ *   2. Phai duoc quan tri vien duyet tay truoc khi cong khai.
+ *   3. Bai hien nhan "Anh tao boi AI" kem luu y rang anh khong dam bao giong
+ *      tuyet doi san pham that.
+ *   Function nay chi tao anh va danh dau ai_generated = true. Hai quy tac con
+ *   lai do may trang thai kiem duyet trong database dam nhiem.
+ *
+ * VE DO CHINH XAC CUA ANH AI — noi ro de khong ai ky vong sai
+ *   Anh sinh ra la anh MINH HOA PHONG CACH, khong phai anh san pham. No khong
+ *   giu duoc chinh xac logo, chu in, hoa tiet nho va thuong lech mau nhe. Do la
+ *   gioi han co huu cua mo hinh khuech tan, khong phai loi cau hinh. Vi vay:
+ *     - Anh san pham THAT (lay tu link) van la thu nguoi mua dua vao de quyet dinh.
+ *     - Anh AI chi de set do trong hap dan hon o trang danh sach.
+ *
+ * TRIEN KHAI
+ *   supabase secrets set AI_KEY_ENCRYPTION_SECRET="$(openssl rand -base64 32)"
+ *   supabase functions deploy ai-generate
+ */
+
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+// ---------------------------------------------------------------------------
+// Giai ma API key
+//
+// Phai giong y het cach ma hoa trong ai-credentials/index.ts. Neu doi mot ben
+// ma quen ben kia thi moi key da luu tro nen khong giai ma duoc — va vi
+// encrypted_key khong doc lai duoc, khong co cach nao khoi phuc ngoai nhap lai key.
+// ---------------------------------------------------------------------------
+
+async function aesKey(): Promise<CryptoKey> {
+  const secret = Deno.env.get('AI_KEY_ENCRYPTION_SECRET');
+  if (!secret) {
+    throw new Error(
+      'Thiếu biến môi trường AI_KEY_ENCRYPTION_SECRET. Đặt bằng: ' +
+        'supabase secrets set AI_KEY_ENCRYPTION_SECRET="$(openssl rand -base64 32)"',
+    );
+  }
+  const digest = await crypto.subtle.digest('SHA-256', enc.encode(secret));
+  return crypto.subtle.importKey('raw', digest, { name: 'AES-GCM' }, false, [
+    'encrypt',
+    'decrypt',
+  ]);
+}
+
+async function decryptSecret(stored: string): Promise<string> {
+  const key = await aesKey();
+  const bytes = Uint8Array.from(atob(stored), (c) => c.charCodeAt(0));
+  const iv = bytes.slice(0, 12);
+  const ct = bytes.slice(12);
+  return dec.decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct));
+}
+
+// ---------------------------------------------------------------------------
+// Adapter cho tung nha cung cap
+//
+// Moi adapter tra ve mang anh dang { mimeType, base64 }. Them nha cung cap moi
+// chi can viet mot ham cung dang, khong phai sua gi khac.
+// ---------------------------------------------------------------------------
+
+interface GeneratedImage {
+  mimeType: string;
+  base64: string;
+}
+
+/**
+ * Google Gemini.
+ *
+ * Vi sao uu tien nha cung cap nay: co goi mien phi cho tao anh (khoang 500 anh
+ * moi ngay), khong can the tin dung. Nhieu hon nhu cau cua mot nguoi van hanh
+ * gap nhieu lan.
+ *
+ * TEN MO HINH CO THE DOI. Google doi ten mo hinh anh kha thuong xuyen
+ * (gemini-2.0-flash-exp-image-generation -> gemini-2.5-flash-image-preview ->
+ * gemini-2.5-flash-image). Nen ten mo hinh nhan tu tham so `model` de doi duoc
+ * ngay trong giao dien, khong phai trien khai lai function.
+ */
+async function generateWithGemini(
+  apiKey: string,
+  prompt: string,
+  model: string,
+): Promise<GeneratedImage[]> {
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // Khoa o header, khong o query string: query string de lot vao log truy cap
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseModalities: ['IMAGE'] },
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+
+  const text = await res.text();
+
+  if (!res.ok) {
+    // Doc thong bao loi cua Google va dich sang cau nguoi dung hieu duoc
+    let detail = text.slice(0, 400);
+    try {
+      const j = JSON.parse(text);
+      detail = j?.error?.message ?? detail;
+    } catch { /* giu nguyen text tho */ }
+
+    if (res.status === 400 && /API key not valid/i.test(detail)) {
+      throw new Error('API key của Gemini không hợp lệ. Kiểm tra lại key trong trang AI.');
+    }
+    if (res.status === 429) {
+      throw new Error(
+        'Đã hết hạn mức Gemini cho hôm nay (gói miễn phí khoảng 500 ảnh/ngày, ' +
+          'reset theo giờ Thái Bình Dương). Thử lại sau, hoặc tải ảnh lên tay.',
+      );
+    }
+    if (res.status === 404) {
+      throw new Error(
+        `Không tìm thấy mô hình "${model}". Google đổi tên mô hình ảnh khá thường ` +
+          'xuyên — đổi tên mô hình trong trang AI rồi thử lại.',
+      );
+    }
+    throw new Error(`Gemini trả về lỗi ${res.status}: ${detail}`);
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    throw new Error('Gemini trả về dữ liệu không phải JSON.');
+  }
+
+  const parts =
+    (body as { candidates?: Array<{ content?: { parts?: Array<Record<string, unknown>> } }> })
+      ?.candidates?.[0]?.content?.parts ?? [];
+
+  const images: GeneratedImage[] = [];
+  for (const p of parts) {
+    const inline = (p.inlineData ?? p.inline_data) as
+      | { mimeType?: string; mime_type?: string; data?: string }
+      | undefined;
+    if (inline?.data) {
+      images.push({
+        mimeType: inline.mimeType ?? inline.mime_type ?? 'image/png',
+        base64: inline.data,
+      });
+    }
+  }
+
+  if (images.length === 0) {
+    // Thuong xay ra khi bo loc noi dung cua Google tu choi cau lenh
+    const reason =
+      (body as { candidates?: Array<{ finishReason?: string }> })?.candidates?.[0]
+        ?.finishReason ?? 'không rõ';
+    throw new Error(
+      `Gemini không trả về ảnh nào (lý do: ${reason}). ` +
+        'Thường là do bộ lọc nội dung — thử diễn đạt lại mô tả, tránh nhắc tên ' +
+        'thương hiệu thật hoặc người thật.',
+    );
+  }
+
+  return images;
+}
+
+/**
+ * OpenAI. Tao anh la dich vu TRA TIEN, tinh theo tung anh — khong co goi mien phi.
+ * Giu adapter nay de ban co lua chon, nhung Gemini nen la mac dinh.
+ */
+async function generateWithOpenAI(
+  apiKey: string,
+  prompt: string,
+  model: string,
+): Promise<GeneratedImage[]> {
+  const res = await fetch('https://api.openai.com/v1/images/generations', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      n: 1,
+      size: '1024x1024',
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  const text = await res.text();
+
+  if (!res.ok) {
+    let detail = text.slice(0, 400);
+    try {
+      detail = JSON.parse(text)?.error?.message ?? detail;
+    } catch { /* giu nguyen */ }
+
+    if (res.status === 401) throw new Error('API key của OpenAI không hợp lệ.');
+    if (res.status === 429) {
+      throw new Error('OpenAI báo vượt hạn mức hoặc hết tín dụng trong tài khoản.');
+    }
+    throw new Error(`OpenAI trả về lỗi ${res.status}: ${detail}`);
+  }
+
+  const data = (JSON.parse(text) as { data?: Array<{ b64_json?: string; url?: string }> })
+    ?.data ?? [];
+
+  const images: GeneratedImage[] = [];
+  for (const d of data) {
+    if (d.b64_json) {
+      images.push({ mimeType: 'image/png', base64: d.b64_json });
+    } else if (d.url) {
+      // Mot so mo hinh tra URL thay vi base64 — tai ve roi luu lai o storage cua
+      // minh, vi URL cua OpenAI het han sau vai gio.
+      const img = await fetch(d.url, { signal: AbortSignal.timeout(30_000) });
+      const buf = new Uint8Array(await img.arrayBuffer());
+      let bin = '';
+      for (const b of buf) bin += String.fromCharCode(b);
+      images.push({
+        mimeType: img.headers.get('content-type') ?? 'image/png',
+        base64: btoa(bin),
+      });
+    }
+  }
+
+  if (images.length === 0) throw new Error('OpenAI không trả về ảnh nào.');
+  return images;
+}
+
+const DEFAULT_MODEL: Record<string, string> = {
+  gemini: 'gemini-2.5-flash-image',
+  openai: 'gpt-image-1',
+};
+
+// ---------------------------------------------------------------------------
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS, 'Content-Type': 'application/json' },
+    });
+
+  if (req.method !== 'POST') return json({ ok: false, error: 'Chỉ nhận POST.' }, 405);
+
+  // --- Xac thuc nguoi goi -------------------------------------------------
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const userClient = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
+
+  const { data: auth } = await userClient.auth.getUser();
+  if (!auth?.user) return json({ ok: false, error: 'Chưa đăng nhập.' }, 401);
+  const uid = auth.user.id;
+
+  const { data: profile } = await userClient
+    .from('profiles')
+    .select('role')
+    .eq('id', uid)
+    .maybeSingle();
+
+  if (profile?.role !== 'admin') {
+    return json(
+      { ok: false, error: 'Giai đoạn này chỉ quản trị viên được tạo ảnh bằng AI.' },
+      403,
+    );
+  }
+
+  // --- Doc tham so --------------------------------------------------------
+  let body: {
+    provider?: string;
+    prompt?: string;
+    outfitId?: string | null;
+    model?: string;
+  };
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: 'Body không phải JSON hợp lệ.' }, 400);
+  }
+
+  const provider = String(body.provider ?? 'gemini');
+  const prompt = String(body.prompt ?? '').trim();
+  const outfitId = body.outfitId ?? null;
+  const model = String(body.model ?? DEFAULT_MODEL[provider] ?? '');
+
+  if (!['gemini', 'openai'].includes(provider)) {
+    return json(
+      {
+        ok: false,
+        error:
+          `Nhà cung cấp "${provider}" chưa được hỗ trợ ở đây. ` +
+          'ComfyUI trên máy cá nhân đi qua hàng đợi ai_jobs, không qua function này.',
+      },
+      400,
+    );
+  }
+  if (prompt.length < 20) {
+    return json(
+      { ok: false, error: 'Mô tả quá ngắn. Viết rõ phong cách, bối cảnh và bố cục.' },
+      400,
+    );
+  }
+  if (prompt.length > 4000) {
+    return json({ ok: false, error: 'Mô tả quá dài (giới hạn 4000 ký tự).' }, 400);
+  }
+
+  // Service role cho cac buoc ghi: cot encrypted_key da bi thu hoi quyen doc
+  // cua role authenticated, va bang ai_jobs can ghi ke ca khi phien het han
+  // giua luc tao anh.
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  // --- Tao job de co dau vet, ke ca khi that bai --------------------------
+  const { data: job, error: jobErr } = await admin
+    .from('ai_jobs')
+    .insert({
+      requested_by: uid,
+      outfit_id: outfitId,
+      provider,
+      prompt,
+      params: { model },
+      status: 'claimed',
+      claimed_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (jobErr || !job) {
+    return json({ ok: false, error: `Không tạo được yêu cầu: ${jobErr?.message}` }, 500);
+  }
+
+  const fail = async (message: string, status = 400) => {
+    await admin
+      .from('ai_jobs')
+      .update({
+        status: 'failed',
+        error: message.slice(0, 1000),
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', job.id);
+    return json({ ok: false, jobId: job.id, error: message }, status);
+  };
+
+  try {
+    // --- Lay va giai ma key ----------------------------------------------
+    const { data: cred } = await admin
+      .from('ai_credentials')
+      .select('encrypted_key, is_active')
+      .eq('owner_id', uid)
+      .eq('provider', provider)
+      .maybeSingle();
+
+    if (!cred) {
+      return await fail(
+        `Chưa có API key cho ${provider}. Vào trang AI để nhập key của bạn.`,
+        400,
+      );
+    }
+    if (!cred.is_active) {
+      return await fail(`API key cho ${provider} đang bị tắt. Bật lại trong trang AI.`, 400);
+    }
+
+    let apiKey: string;
+    try {
+      apiKey = await decryptSecret(cred.encrypted_key as string);
+    } catch {
+      return await fail(
+        'Không giải mã được API key. Thường là do AI_KEY_ENCRYPTION_SECRET đã bị ' +
+          'thay đổi sau khi lưu key. Xoá key cũ trong trang AI rồi nhập lại.',
+        500,
+      );
+    }
+
+    // --- Goi nha cung cap -------------------------------------------------
+    const images =
+      provider === 'gemini'
+        ? await generateWithGemini(apiKey, prompt, model)
+        : await generateWithOpenAI(apiKey, prompt, model);
+
+    // --- Tai anh len storage ----------------------------------------------
+    // Duong dan phai bat dau bang user id de khop policy trong 0004_storage.sql.
+    const urls: string[] = [];
+
+    for (const [i, img] of images.entries()) {
+      const ext = img.mimeType.includes('jpeg') ? 'jpg'
+        : img.mimeType.includes('webp') ? 'webp' : 'png';
+      const path = `${uid}/ai-${job.id}-${i}.${ext}`;
+
+      const bytes = Uint8Array.from(atob(img.base64), (c) => c.charCodeAt(0));
+
+      const { error: upErr } = await admin.storage
+        .from('outfit-images')
+        .upload(path, bytes, {
+          contentType: img.mimeType,
+          cacheControl: '31536000',
+          upsert: true,
+        });
+
+      if (upErr) return await fail(`Không lưu được ảnh: ${upErr.message}`, 500);
+
+      urls.push(
+        admin.storage.from('outfit-images').getPublicUrl(path).data.publicUrl,
+      );
+    }
+
+    // --- Hoan tat ---------------------------------------------------------
+    await admin
+      .from('ai_jobs')
+      .update({
+        status: 'done',
+        result_urls: urls,
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', job.id);
+
+    await admin
+      .from('ai_credentials')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('owner_id', uid)
+      .eq('provider', provider);
+
+    // CO Y khong tu gan anh vao outfit. Quan tri vien phai xem roi tu chon —
+    // day la mot phan cua quy tac "anh AI luon qua kiem duyet tay".
+    await admin.from('admin_audit_log').insert({
+      actor_id: uid,
+      action: 'ai.generate',
+      entity_type: 'ai_job',
+      entity_id: job.id,
+      // Khong ghi API key vao nhat ky, chi ghi nha cung cap va mo hinh
+      detail: { provider, model, images: urls.length, outfit_id: outfitId },
+    });
+
+    return json({
+      ok: true,
+      jobId: job.id,
+      urls,
+      note:
+        'Ảnh đã lưu ở dạng bản nháp. Xem rồi tự chọn gán vào set đồ — ảnh AI luôn ' +
+        'phải qua kiểm duyệt tay.',
+    });
+  } catch (e) {
+    return await fail((e as Error).message, 502);
+  }
+});

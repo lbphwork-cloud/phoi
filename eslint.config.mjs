@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Ket qua bien dich cua scripts/verify-*.ts (tsconfig.verify.json xuat ra
+    // CommonJS de node chay truc tiep). Day la ma sinh tu dong, khong phai ma
+    // nguon — lint no chi tao tieng on.
+    ".verify-out/**",
   ]),
 ]);
 

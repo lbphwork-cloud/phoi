@@ -30,5 +30,18 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    ".verify-out",
+
+    "// supabase/functions chay tren Deno, khong phai Node:",
+    "// chung dung 'Deno.serve' va import kieu 'jsr:@supabase/supabase-js@2',",
+    "// hai thu ma tsconfig cua Next khong biet. Kiem tra rieng bang:",
+    "//   npx supabase functions serve   (hoac deno check)",
+    "supabase/functions/**/*",
+
+    "// scripts/verify-*.ts co tsconfig rieng (tsconfig.verify.json) vi chung",
+    "// bien dich ra CommonJS de node chay truc tiep duoc.",
+    "scripts/**/*"
+  ]
 }

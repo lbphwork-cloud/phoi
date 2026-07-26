@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    width: 320px;
+    margin: 0;
+    padding: 16px;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: Canvas;
+    color: CanvasText;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+  }
+  p.sub { margin: 0 0 14px; font-size: 12px; opacity: 0.6; }
+  .row { margin-bottom: 10px; }
+  label {
+    display: block;
+    margin-bottom: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.6;
+  }
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 8px;
+    font: inherit;
+    font-size: 13px;
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid color-mix(in srgb, CanvasText 25%, transparent);
+    border-radius: 0;
+  }
+  button {
+    width: 100%;
+    padding: 10px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    background: CanvasText;
+    color: Canvas;
+    border: none;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary {
+    margin-top: 6px;
+    background: transparent;
+    color: CanvasText;
+    border: 1px solid CanvasText;
+  }
+  #status {
+    margin-top: 12px;
+    padding: 9px 10px;
+    font-size: 12px;
+    border-left: 3px solid color-mix(in srgb, CanvasText 40%, transparent);
+    background: color-mix(in srgb, CanvasText 6%, transparent);
+    white-space: pre-wrap;
+  }
+  #preview { margin-top: 12px; display: none; }
+  #preview img {
+    width: 64px; height: 64px; object-fit: cover;
+    float: left; margin-right: 10px;
+    background: color-mix(in srgb, CanvasText 10%, transparent);
+  }
+  #preview .name { font-weight: 600; font-size: 13px; }
+  #preview .price { font-size: 12px; opacity: 0.7; }
+  details { margin-top: 14px; font-size: 12px; }
+  summary { cursor: pointer; opacity: 0.6; }
+  details p { margin: 8px 0 0; opacity: 0.7; line-height: 1.5; }
+</style>
+</head>
+<body>
+  <h1>PHỐI</h1>
+  <p class="sub">Gửi sản phẩm đang xem sang trang tạo bài</p>
+
+  <div class="row">
+    <label for="site">Địa chỉ PHỐI của bạn</label>
+    <input id="site" type="url" placeholder="https://phoi.pages.dev" />
+  </div>
+
+  <button id="send" disabled>Đọc trang và gửi</button>
+  <button id="copy" class="secondary">Chỉ sao chép JSON</button>
+
+  <div id="preview">
+    <img id="pimg" alt="" />
+    <div class="name" id="pname"></div>
+    <div class="price" id="pprice"></div>
+  </div>
+
+  <div id="status">Đang kiểm tra trang…</div>
+
+  <details>
+    <summary>Tiện ích này làm gì</summary>
+    <p>
+      Nó đọc thẻ Open Graph và một vài phần tử trên trang sản phẩm bạn
+      <em>đang tự mở</em>, rồi mở trang tạo bài của PHỐI kèm dữ liệu đó.
+    </p>
+    <p>
+      Nó không lưu mật khẩu, không đọc cookie đăng nhập, không gửi gì tới máy chủ
+      nào ngoài địa chỉ PHỐI bạn tự điền, và chỉ chạy khi bạn bấm vào nó.
+    </p>
+  </details>
+
+  <script src="popup.js"></script>
+</body>
+</html>

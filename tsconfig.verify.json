@@ -1,0 +1,20 @@
+{
+  "//": "Chi dung cho scripts/verify-*.ts. Bien dich ra CommonJS de node chay",
+  "//2": "duoc truc tiep — CommonJS phan giai import khong duoi, giong Next.js,",
+  "//3": "nen source khong phai them '.ts' vao moi import chi de test chay duoc.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": ".verify-out",
+    "rootDir": ".",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmitOnError": true,
+    "types": ["node"]
+  },
+  "include": ["src/lib/nguhanh/**/*.ts", "src/lib/scoring.ts", "src/lib/affiliate.ts", "scripts/verify-nguhanh.ts", "scripts/verify-scoring.ts"]
+}

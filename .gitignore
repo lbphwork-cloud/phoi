@@ -30,12 +30,36 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# =============================================================================
+# BIEN MOI TRUONG — quan trong nhat trong file nay
+#
+# .env* chan MOI file env, ke ca local-helper/.env chua SERVICE ROLE KEY.
+# Khoa do bo qua toan bo Row Level Security; ro ri no la mat toan bo du lieu.
+#
+# Ngoai le duy nhat: cac file .env.example (khong chua gia tri that) duoc commit
+# de nguoi moi biet phai dien nhung bien nao.
+# =============================================================================
 .env*
-
-# vercel
-.vercel
+!.env.example
+!**/.env.example
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# =============================================================================
+# Local Helper (Python, chay tren may ca nhan)
+# =============================================================================
+local-helper/.venv/
+local-helper/__pycache__/
+local-helper/*.pyc
+# Phien trinh duyet: chua cookie cua chinh ban tren Shopee/TikTok.
+# TUYET DOI khong commit — de bai muc 9: "khong dua cookie dang nhap len cloud".
+local-helper/.browser-profile/
+
+# Ket qua bien dich cua scripts/verify-*.ts
+.verify-out/
+
+# Thu muc tam cua Supabase CLI
+supabase/.branches/
+supabase/.temp/

@@ -1,0 +1,14 @@
+# PHOI Local Helper
+#
+# Chi hai thu vien. Co y giu it phu thuoc: cang it thu vien thi cang it thu
+# hong khi cap nhat, va cang de doc lai khi can go loi sau nay.
+#
+#   httpx      — goi REST API cua Supabase
+#   playwright — dieu khien Chromium that de mo trang san pham
+#
+# Cai dat:
+#   pip install -r requirements.txt
+#   playwright install chromium
+
+httpx>=0.27,<1.0
+playwright>=1.44,<2.0

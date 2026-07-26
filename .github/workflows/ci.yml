@@ -1,0 +1,62 @@
+# =============================================================================
+# Kiem tra tu dong moi lan day ma len
+#
+# Bon buoc, xep theo thu tu tu nhanh tori cham de biet loi som nhat co the:
+#   1. typecheck   — vai giay
+#   2. lint        — vai giay
+#   3. verify      — chay toan bo migration tren Postgres that (PGlite/WASM),
+#                    kiem tra trigger, RLS, quyen cap cot, module ngu hanh,
+#                    bo cham diem, va doi chieu danh sach ten mien giua bon noi
+#   4. build       — dung san toan bo trang tinh
+#
+# Buoc 3 la buoc dang gia nhat: no bat duoc loi SQL va loi logic TRUOC khi ban
+# dan migration vao Supabase that. Khong can database that, khong can secret.
+# =============================================================================
+
+name: Kiem tra
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: npm ci
+
+      - name: Kiem tra kieu du lieu
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Kiem chung schema, RLS va trigger tren Postgres that
+        run: npm run verify:schema
+
+      - name: Kiem chung module ngu hanh va bo cham diem
+        run: npm run verify:lib
+
+      - name: Kiem chung Local Helper va doi chieu danh sach ten mien
+        run: npm run verify:helper
+
+      - name: Build
+        # KHONG truyen bien Supabase o day. Muc dich la kiem tra build chay duoc
+        # ma khong can database — neu build vo khi thieu bien moi truong thi do
+        # la mot loi can sua, khong phai chuyen binh thuong.
+        run: npm run build:static
