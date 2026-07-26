@@ -19,6 +19,8 @@
     "verify:lib": "tsc -p tsconfig.verify.json && node .verify-out/scripts/verify-nguhanh.js && node .verify-out/scripts/verify-scoring.js",
     "//verify:helper": "Kiểm chứng Local Helper và đối chiếu danh sách tên miền giữa Python / SQL / TypeScript / Edge Function.",
     "verify:helper": "python3 local-helper/verify_helper.py",
+    "//doctor": "Kiem tra .env.local dien dung chua, bang cach goi that vao Supabase.",
+    "doctor": "node scripts/doctor.mjs",
     "//db:apply": "Chay ca 6 migration vao Supabase bang mot lenh, roi tu kiem tra. Can SUPABASE_DB_URL.",
     "db:apply": "node scripts/apply-migrations.mjs",
     "//db:apply:self-test": "Kiem chung chinh script db:apply tren PGlite. Khong can database, khong can secret.",
