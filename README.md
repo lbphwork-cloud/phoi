@@ -10,6 +10,8 @@ Sản phẩm trong khoảng 150.000 – 700.000đ. Đối tượng: nam 20–30 
 
 ## Bắt đầu trong 5 bước
 
+Danh sách việc cần làm dạng tích từng ô: **[SETUP.md](SETUP.md)**.
+
 ```bash
 npm install
 ```
@@ -18,8 +20,28 @@ npm install
 project mới. Chọn khu vực **Singapore** — gần Việt Nam nhất trong các khu vực
 miễn phí.
 
-**2. Chạy 6 file migration.** Mở SQL Editor của Supabase, dán và chạy **lần lượt
-theo đúng thứ tự số**:
+**2. Chạy 6 file migration.**
+
+Cách nhanh — một lệnh, không phải dán gì:
+
+```bash
+# Điền SUPABASE_DB_URL vào .env.local trước
+# (Supabase → Project Settings → Database → Connection string → URI, tab Session pooler)
+npm run db:apply
+```
+
+Script đọc nguyên file từ đĩa, chạy đúng thứ tự, **mỗi file trong một
+transaction** (vào hết hoặc không vào gì), rồi tự kiểm tra 7 điểm. Chạy lại nhiều
+lần an toàn: file đã chạy sẽ bị bỏ qua nhờ bảng theo dõi kèm mã băm SHA-256.
+
+Muốn kiểm tra chính script đó mà chưa có database:
+
+```bash
+npm run db:apply:self-test
+```
+
+Cách dán tay — mở SQL Editor của Supabase, dán và chạy **lần lượt theo đúng thứ
+tự số**:
 
 | File | Nội dung |
 |---|---|
@@ -46,8 +68,18 @@ NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 ```
 
-**4. Tự cấp quyền quản trị.** Đăng ký một tài khoản trên website trước, rồi chạy
-trong SQL Editor:
+**4. Tự cấp quyền quản trị.** Đăng ký một tài khoản trên website trước, rồi:
+
+```bash
+npm run db:grant-admin -- --email=email-cua-ban@gmail.com
+```
+
+Bước này cố ý **không** dùng hàm `set_user_role()` có trong database, vì hàm đó
+chặn người gọi không phải admin — mà lúc này chưa có admin nào. Đây là bước phá
+vòng lặp "muốn có admin phải có admin", và nó vẫn được ghi vào `admin_audit_log`
+với nhãn `bootstrap`.
+
+Hoặc dán tay trong SQL Editor:
 
 ```sql
 update profiles set role = 'admin'
