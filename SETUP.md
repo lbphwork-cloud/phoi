@@ -28,18 +28,18 @@ không làm thay được. Phần còn lại đã tự động hoá thành lện
 
 Cần trình duyệt và email của bạn, tôi không làm thay được.
 
-- [ ] Vào supabase.com → đăng ký → **New project**
-- [ ] **Region: Singapore (ap-southeast-1)** — gần Việt Nam nhất, và **không đổi
+- [x] Vào supabase.com → đăng ký → **New project**
+- [x] **Region: Singapore (ap-southeast-1)** — gần Việt Nam nhất, và **không đổi
       được sau này**, chọn sai thì phải tạo project mới
-- [ ] Đặt mật khẩu database, lưu lại. Bước 2 cần nó.
-- [ ] Chờ khoảng 2 phút cho project khởi tạo xong
+- [x] Đặt mật khẩu database, lưu lại. Bước 2 cần nó.
+- [x] Chờ khoảng 2 phút cho project khởi tạo xong
 
 ### 2. Lấy 3 giá trị và điền vào `.env.local`
 
-- [ ] **Project Settings → API**, lấy 2 giá trị:
+- [x] **Project Settings → API**, lấy 2 giá trị:
       - `Project URL` → điền vào `NEXT_PUBLIC_SUPABASE_URL`
       - `anon` / `public` key → điền vào `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- [ ] **Project Settings → Database → Connection string → URI**, chọn tab
+- [x] **Project Settings → Database → Connection string → URI**, chọn tab
       **Session pooler** (cổng 5432), thay `[YOUR-PASSWORD]` bằng mật khẩu ở
       bước 1 → bỏ dấu `#` ở dòng cuối `.env.local` rồi điền vào `SUPABASE_DB_URL`
 
@@ -53,9 +53,9 @@ Mở file:
 open -e /Users/phug/Projects/fashion-affiliate/.env.local
 ```
 
-### 3. Chạy 7 migration bằng một lệnh
+### 3. Chạy 7 migration bằng một lệnh — XONG (region Singapore, PostgreSQL 17.6)
 
-- [ ] ```bash
+- [x] ```bash
       npm run db:apply
       ```
 
