@@ -83,6 +83,31 @@ function Home() {
     })
     .filter((s): s is NonNullable<typeof s> => s !== null);
 
+  /**
+   * Cum nut CTA, dung san mot lan.
+   *
+   * Tach ra vi no duoc dat o HAI cho khac nhau tuy kieu bo cuc — viet hai lan
+   * la kieu ma sua mot ben quen ben kia. Nhung la mot GIA TRI JSX chu khong
+   * phai mot component: khai bao component ngay trong than ham render se lam
+   * React coi no la mot loai component moi sau moi lan render, va vut bo toan
+   * bo trang thai ben trong no.
+   */
+  const heroCta = (
+    <div className={`flex flex-wrap gap-3 ${hero.splitCta ? 'justify-center' : 'mt-9'}`}>
+      <Link
+        href={c.t('home.hero.cta_href', '/kham-pha')}
+        className={`btn ${hero.buttonClass}`}
+      >
+        {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
+      </Link>
+      {!ctxLoading && !personalised && (
+        <Link href="/ho-so" className="btn btn-ghost-onmedia">
+          Thiết lập gu của bạn
+        </Link>
+      )}
+    </div>
+  );
+
   return (
     <>
       {/* ================================================================== */}
@@ -109,50 +134,64 @@ function Home() {
             />
           )}
 
-          <div className="hero-body shell w-full pb-14 md:pb-20" style={hero.textStyle}>
-            <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : ''}
-                 style={hero.boxStyle}>
-              <p className="eyebrow mb-5" style={{ color: hero.dimColor }}>
-                {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
-              </p>
-
-              {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
-              <h1 className="display mb-7 max-w-3xl whitespace-pre-line">{heroTitle}</h1>
-
-              <p className="max-w-xl text-base leading-relaxed md:text-lg">
-                {c.t(
-                  'home.hero.subtitle',
-                  'Những set đồ hoàn chỉnh trong khoảng 150.000 – 700.000đ mỗi món. ' +
-                    'Chọn gu của bạn, hệ thống xếp lại thứ tự cho riêng bạn.',
-                )}
-              </p>
-
-              <div className="mt-9 flex flex-wrap gap-3">
-                <Link
-                  href={c.t('home.hero.cta_href', '/kham-pha')}
-                  className={`btn ${hero.buttonClass}`}
-                >
-                  {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
-                </Link>
-                {!ctxLoading && !personalised && (
-                  <Link href="/ho-so" className="btn btn-ghost-onmedia">
-                    Thiết lập gu của bạn
-                  </Link>
-                )}
-              </div>
-
-              {privateData?.element && privateData.element_enabled && (
-                <p className="mt-7 text-sm" style={{ color: hero.dimColor }}>
-                  Đang ưu tiên màu hợp mệnh {NGU_HANH_LABEL[privateData.element]}
-                  {privateData.element_label && ` (${privateData.element_label})`}.{' '}
-                  <Link href="/ho-so" className="underline">
-                    Tắt gợi ý theo mệnh
-                  </Link>
+          {/* Khi nut duoc tach xuong day, khoi chu phai chiem het chieu cao
+              de con canh giua that su — neu khong no chi giua phan con lai. */}
+          <div
+            className={`hero-body shell flex w-full flex-col ${
+              hero.splitCta ? 'h-full py-14 md:py-20' : 'pb-14 md:pb-20'
+            }`}
+            style={hero.textStyle}
+          >
+            <div className={hero.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
+              <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : ''}
+                   style={hero.boxStyle}>
+                <p className="eyebrow mb-5" style={{ color: hero.dimColor }}>
+                  {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
                 </p>
-              )}
+
+                {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
+                <h1 className="display max-w-3xl whitespace-pre-line">{heroTitle}</h1>
+
+                {!hero.hideSubtitle && (
+                  <p className="mt-7 max-w-xl text-base leading-relaxed md:text-lg">
+                    {c.t(
+                      'home.hero.subtitle',
+                      'Những set đồ hoàn chỉnh trong khoảng 150.000 – 700.000đ mỗi món. ' +
+                        'Chọn gu của bạn, hệ thống xếp lại thứ tự cho riêng bạn.',
+                    )}
+                  </p>
+                )}
+
+                {/* O ba kieu cu, nut di lien voi chu. */}
+                {!hero.splitCta && heroCta}
+              </div>
             </div>
+
+            {/* O kieu 'giua-nut-day', nut nam rieng o day khung. */}
+            {hero.splitCta && (
+              <div className="flex justify-center">{heroCta}</div>
+            )}
           </div>
         </div>
+
+        {/*
+          DONG VE MENH DA RA KHOI KHUNG ANH.
+          Truoc day no nam duoi nut CTA ben trong anh. Khi nut dinh xuong day
+          thi dong nay het cho, va no cung khong phai mot cau quang cao — no la
+          mot ghi chu ve trang thai ca nhan. Dat ngay duoi anh thi van thay,
+          ma khong phai chen vao mot bo cuc dang can bang.
+        */}
+        {privateData?.element && privateData.element_enabled && (
+          <div className="shell pt-4">
+            <p className="muted-2 text-sm">
+              Đang ưu tiên màu hợp mệnh {NGU_HANH_LABEL[privateData.element]}
+              {privateData.element_label && ` (${privateData.element_label})`}.{' '}
+              <Link href="/ho-so" className="underline">
+                Tắt gợi ý theo mệnh
+              </Link>
+            </p>
+          </div>
+        )}
       </section>
 
       {/* ================================================================== */}

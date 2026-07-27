@@ -2,7 +2,10 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAuth, useTheme } from '@/lib/hooks';
+import { useContent } from '@/lib/content';
+import { typographyCss } from '@/lib/typography';
 
 const NAV = [
   { href: '/kham-pha', label: 'Khám phá' },
@@ -10,9 +13,28 @@ const NAV = [
   { href: '/bai-cua-toi', label: 'Bài của tôi' },
 ];
 
+/**
+ * Kieu chu do quan tri vien chon, do vao bien CSS o cap goc.
+ *
+ * VI SAO LA MOT THE <style> CHU KHONG PHAI THUOC TINH style
+ *   Cac bien nay phai nam tren :root de moi quy tac trong globals.css doc
+ *   duoc — ke ca quy tac cua nhung component chua ai viet. React khong dat
+ *   duoc bien CSS len :root bang thuoc tinh style, nen phai di duong nay.
+ *
+ * Chua tai xong thi khong do gi ca, va globals.css tu dung gia tri mac dinh
+ * viet cung trong tung quy tac. Khong bao gio co khoanh khac chu mat kieu.
+ */
+export function TypographyStyle() {
+  const c = useContent();
+  if (c.loading) return null;
+  return <style dangerouslySetInnerHTML={{ __html: typographyCss(c.t) }} />;
+}
+
 export function SiteHeader() {
   const { session, profile, isAdmin, loading, signOut } = useAuth();
   const { theme, cycle } = useTheme();
+  const c = useContent();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   // Dong menu khi doi trang bang nut back/forward cua trinh duyet
@@ -24,52 +46,110 @@ export function SiteHeader() {
 
   const themeLabel = theme === 'system' ? 'Tự động' : theme === 'light' ? 'Sáng' : 'Tối';
 
+  /**
+   * Logo. Hai o anh rieng cho nen sang va nen toi.
+   *
+   * VI SAO HAI O CHU KHONG PHAI MOT
+   *   Logo PNG tach nen chi co mot mau. Logo trang thi tang hinh o che do sang,
+   *   logo den thi tang hinh o che do toi — website nay co ca hai che do. O thu
+   *   hai de trong thi tu dung lai anh thu nhat, nen ai khong quan tam khong
+   *   phai lam gi.
+   *
+   *   Ca hai duoc dat trong DOM cung luc va an/hien bang CSS theo che do. Chon
+   *   bang JavaScript se lam logo nhay mot cai luc trang vua tai xong.
+   */
+  const logoLight = c.t('site.logo.light', '');
+  const logoDark = c.t('site.logo.dark', '') || logoLight;
+  const logoHeight = c.t('site.logo.height', '28');
+
+  const brand = (
+    <Link href="/" className="shrink-0" aria-label="PHỐI — về trang chủ">
+      {logoLight ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoLight}
+            alt="PHỐI"
+            className="logo-light block w-auto"
+            style={{ height: `${logoHeight}px` }}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={logoDark}
+            alt="PHỐI"
+            className="logo-dark w-auto"
+            style={{ height: `${logoHeight}px` }}
+          />
+        </>
+      ) : (
+        <span className="display-xs" style={{ letterSpacing: '0.28em' }}>
+          PHỐI
+        </span>
+      )}
+    </Link>
+  );
+
+  const navItems = [
+    ...NAV,
+    ...(isAdmin ? [{ href: '/admin', label: 'Quản trị' }] : []),
+  ];
+
   return (
     <header
-      className="sticky top-0 z-50 border-b backdrop-blur-md"
-      style={{ borderColor: 'var(--line)', background: 'color-mix(in srgb, var(--bg) 88%, transparent)' }}
+      className="header-rule sticky top-0 z-50 backdrop-blur-md"
+      style={{ background: 'color-mix(in srgb, var(--bg) 88%, transparent)' }}
     >
-      <div className="shell flex items-center justify-between gap-4 py-4">
-        <Link href="/" className="display-xs shrink-0" style={{ letterSpacing: '0.28em' }}>
-          PHỐI
-        </Link>
+      {/*
+        BA CO T: menu trai — logo GIUA — tai khoan phai.
 
+        Dung grid ba cot bang nhau chu khong phai flex voi justify-between:
+        voi flex, logo chi nam giua khi hai ben tinh co dai bang nhau, ma ben
+        phai doi do dai theo ten nguoi dang nhap. Grid thi cot giua luon dung
+        giua khung, bat ke hai ben dai ngan the nao.
+      */}
+      <div className="shell grid grid-cols-[1fr_auto_1fr] items-center gap-4 py-4">
         <nav className="hidden items-center gap-1 md:flex">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="btn btn-quiet">
+          {navItems.map((n) => (
+            <Link
+              key={n.href}
+              href={n.href}
+              className="navlink"
+              aria-current={pathname === n.href ? 'page' : undefined}
+            >
               {n.label}
             </Link>
           ))}
-          {isAdmin && (
-            <Link href="/admin" className="btn btn-quiet">
-              Quản trị
-            </Link>
-          )}
         </nav>
 
-        <div className="flex items-center gap-2">
+        {/* Tren dien thoai khong du cho cho ca ba cot: cot trai bo trong, nut
+            Menu ben phai mo ra danh sach day du. */}
+        <div className="md:hidden" />
+
+        <div className="flex justify-center">{brand}</div>
+
+        <div className="flex items-center justify-end gap-1">
           <button
             type="button"
             onClick={cycle}
-            className="btn btn-quiet btn-sm hidden sm:inline-flex"
+            className="navlink hidden sm:inline-flex"
             title="Đổi chế độ sáng / tối"
           >
             {themeLabel}
           </button>
 
           {loading ? (
-            <span className="eyebrow hidden sm:block">…</span>
+            <span className="navlink hidden sm:inline-flex">…</span>
           ) : session ? (
             <>
-              <Link href="/ho-so" className="btn btn-quiet btn-sm hidden sm:inline-flex">
+              <Link href="/ho-so" className="navlink hidden sm:inline-flex">
                 {profile?.display_name ?? 'Hồ sơ'}
               </Link>
-              <button type="button" onClick={signOut} className="btn btn-sm hidden sm:inline-flex">
+              <button type="button" onClick={signOut} className="navlink hidden sm:inline-flex">
                 Thoát
               </button>
             </>
           ) : (
-            <Link href="/dang-nhap" className="btn btn-solid btn-sm">
+            <Link href="/dang-nhap" className="navlink">
               Đăng nhập
             </Link>
           )}
@@ -77,7 +157,7 @@ export function SiteHeader() {
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="btn btn-quiet btn-sm md:hidden"
+            className="navlink md:hidden"
             aria-expanded={open}
             aria-label="Mở menu"
           >
@@ -89,32 +169,27 @@ export function SiteHeader() {
       {open && (
         <div className="border-t md:hidden" style={{ borderColor: 'var(--line)' }}>
           <div className="shell flex flex-col py-2">
-            {NAV.map((n) => (
+            {navItems.map((n) => (
               <Link
                 key={n.href}
                 href={n.href}
                 onClick={() => setOpen(false)}
-                className="btn btn-quiet justify-start"
+                className="navlink justify-start"
               >
                 {n.label}
               </Link>
             ))}
-            {isAdmin && (
-              <Link href="/admin" onClick={() => setOpen(false)} className="btn btn-quiet justify-start">
-                Quản trị
-              </Link>
-            )}
             {session ? (
               <>
-                <Link href="/ho-so" onClick={() => setOpen(false)} className="btn btn-quiet justify-start">
+                <Link href="/ho-so" onClick={() => setOpen(false)} className="navlink justify-start">
                   Hồ sơ
                 </Link>
-                <button type="button" onClick={signOut} className="btn btn-quiet justify-start">
+                <button type="button" onClick={signOut} className="navlink justify-start">
                   Đăng xuất
                 </button>
               </>
             ) : null}
-            <button type="button" onClick={cycle} className="btn btn-quiet justify-start">
+            <button type="button" onClick={cycle} className="navlink justify-start">
               Chế độ: {themeLabel}
             </button>
           </div>

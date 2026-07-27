@@ -64,6 +64,10 @@ export const HERO_ALIGN: Record<string, string> = {
   'duoi-trai': 'items-end justify-start text-left',
   'giua': 'items-center justify-center text-center',
   'duoi-giua': 'items-end justify-center text-center',
+  // Kieu thu tu: chu nam GIUA khung anh, nut CTA dinh DAY. Khac ba kieu tren o
+  // cho chu va nut khong con di lien mot khoi — chung duoc tach ra hai dau cua
+  // khung. Xem `splitCta` trong heroAppearance.
+  'giua-nut-day': 'items-center justify-center text-center',
 };
 
 export interface Content {
@@ -128,6 +132,7 @@ export function heroAppearance(t: (k: string, f: string) => string) {
   const boxBg = HERO_BOX[boxKey] ?? '';
 
   const buttonKey = t('home.hero.button_style', 'sang');
+  const alignKey = t('home.hero.align', 'duoi-trai');
 
   return {
     /** Mau chu chinh. Ap cho ca tieu de va doan mo ta. */
@@ -147,7 +152,25 @@ export function heroAppearance(t: (k: string, f: string) => string) {
       ? ({ background: boxBg, backdropFilter: 'blur(2px)' } as React.CSSProperties)
       : undefined,
 
-    alignClass: HERO_ALIGN[t('home.hero.align', 'duoi-trai')] ?? HERO_ALIGN['duoi-trai'],
+    alignClass: HERO_ALIGN[alignKey] ?? HERO_ALIGN['duoi-trai'],
+
+    /**
+     * Nut CTA co bi tach ra khoi khoi chu de dinh xuong day khung khong.
+     *
+     * Chi dung o kieu 'giua-nut-day'. Ba kieu con lai giu nut ngay duoi chu —
+     * gan nhau thi cau chu va hanh dong con doc duoc nhu mot y; tach ra chi
+     * hop khi chu da nam giua va con nhieu khoang trong ben duoi.
+     */
+    splitCta: alignKey === 'giua-nut-day',
+
+    /**
+     * Co an doan mo ta khong.
+     *
+     * Kieu 'giua-nut-day' co y chi de HAI HANG CHU o tren. Doan mo ta la hang
+     * thu ba, nen o kieu nay no khong duoc dung. KHONG xoa noi dung cua no
+     * trong database — doi lai kieu khac la no hien lai nguyen ven.
+     */
+    hideSubtitle: alignKey === 'giua-nut-day',
 
     buttonClass:
       buttonKey === 'toi' ? 'btn-solid'

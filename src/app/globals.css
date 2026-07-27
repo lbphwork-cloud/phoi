@@ -103,8 +103,9 @@ html {
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: 16px;
+  font-family: var(--type-body-font, var(--font-sans));
+  font-weight: var(--type-body-weight, 400);
+  font-size: calc(16px * var(--type-body-scale, 1));
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -144,25 +145,38 @@ body {
 
    Gian chu duong nhe thay vi am. Serif co the bop lai cho chat; sans hinh hoc
    bop lai thi cac chu tron dinh nhau, va tieng Viet co dau chong len nhau.  */
+/* Bon dong bien duoi day do trang Quan tri > Kieu chu quyet dinh. Chua ai bam
+   gi thi chung bang dung cac gia tri viet cung truoc day, nen mac dinh khong
+   doi mot ly nao. Xem src/lib/typography.ts.
+
+   calc() nhan he so vao clamp() chu khong thay clamp() bang so pixel: co chu
+   van phai tu co gian theo be ngang man hinh, neu khong thi tieu de tran ra
+   ngoai tren dien thoai. */
 .display {
-  font-family: var(--font-display);
-  font-weight: 300;
+  font-family: var(--type-display-font, var(--font-display));
+  font-weight: var(--type-display-weight, 300);
+  color: var(--type-display-color, inherit);
+  text-transform: var(--type-display-case, none);
   letter-spacing: -0.005em;
   line-height: 1.08;
-  font-size: clamp(2.25rem, 6vw, 4.5rem);
+  font-size: calc(clamp(2.25rem, 6vw, 4.5rem) * var(--type-display-scale, 1));
 }
 .display-sm {
-  font-family: var(--font-display);
-  font-weight: 300;
+  font-family: var(--type-heading-font, var(--font-display));
+  font-weight: var(--type-heading-weight, 300);
+  color: var(--type-heading-color, inherit);
+  text-transform: var(--type-heading-case, none);
   letter-spacing: 0;
   line-height: 1.2;
-  font-size: clamp(1.5rem, 3.2vw, 2.25rem);
+  font-size: calc(clamp(1.5rem, 3.2vw, 2.25rem) * var(--type-heading-scale, 1));
 }
 .display-xs {
-  font-family: var(--font-display);
-  font-weight: 400;
+  font-family: var(--type-heading-font, var(--font-display));
+  font-weight: var(--type-heading-weight, 400);
+  color: var(--type-heading-color, inherit);
+  text-transform: var(--type-heading-case, none);
   line-height: 1.3;
-  font-size: 1.125rem;
+  font-size: calc(1.125rem * var(--type-heading-scale, 1));
 }
 
 /* Nhan nho chu hoa dan cach rong. Dung cho muc luc, trang thai, danh muc. */
@@ -185,10 +199,11 @@ body {
   justify-content: center;
   gap: 0.5rem;
   padding: 0.8125rem 1.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-family: var(--type-button-font, inherit);
+  font-size: calc(0.8125rem * var(--type-button-scale, 1));
+  font-weight: var(--type-button-weight, 600);
   letter-spacing: 0.08em;
-  text-transform: uppercase;
+  text-transform: var(--type-button-case, uppercase);
   border: 1px solid var(--fg);
   background: transparent;
   color: var(--fg);
@@ -217,7 +232,68 @@ body {
 .btn-danger { border-color: var(--color-danger); color: var(--color-danger); }
 .btn-danger:hover:not(:disabled) { background: var(--color-danger); color: #fff; }
 
-.btn-sm { padding: 0.5rem 0.875rem; font-size: 0.6875rem; min-height: 36px; }
+/* --- Logo hai phien ban --------------------------------------------------
+
+   Ca hai anh deu nam trong trang, an/hien bang CSS. Chon bang JavaScript se
+   lam logo nhay mot cai ngay sau khi trang tai xong, vi luc do moi biet nguoi
+   dung dang o che do nao.
+
+   Ba dieu kien chu khong phai mot, va thu tu quan trong:
+     1. Mac dinh   — hien ban sang, an ban toi
+     2. @media     — may dang dat che do toi thi doi lai
+     3. data-theme — nut "Tu dong / Sang / Toi" phai thang duoc media query, o
+                     CA HAI chieu, nen phai co du hai khoi cuoi                */
+.logo-dark { display: none; }
+.logo-light { display: block; }
+
+@media (prefers-color-scheme: dark) {
+  .logo-dark { display: block; }
+  .logo-light { display: none; }
+}
+
+:root[data-theme="dark"] .logo-dark { display: block; }
+:root[data-theme="dark"] .logo-light { display: none; }
+:root[data-theme="light"] .logo-dark { display: none; }
+:root[data-theme="light"] .logo-light { display: block; }
+
+/* --- Thanh menu dau trang ------------------------------------------------
+
+   MOT LOP CHO MOI MUC TREN THANH MENU. Truoc day cac muc dung .btn-quiet voi
+   .btn-sm lan lon: "Kham pha" mot co, "Tu dong" va "Thoat" mot co khac, va
+   nut "Thoat" con co vien bao quanh trong khi cac muc khac thi khong. Nhin
+   thanh mot hang chu khong deu nhau, chu khong phai mot thanh menu.
+
+   Cung co, cung mau, cung font, khong vien — de mat luot qua mot hang chu
+   dong nhat. Trang thai dang o trang nao thi bao bang do dam, khong bao bang
+   khung. */
+.navlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 40px;
+  transition: opacity 0.2s ease;
+}
+.navlink:hover:not(:disabled) { opacity: 0.55; }
+.navlink[aria-current="page"] { font-weight: 600; }
+
+/* Duong ke duoi thanh menu. Dam hon --line rat nhieu: --line la duong phan
+   cach mo giua cac khoi noi dung, con day la ranh gioi giua thanh dieu huong
+   va noi dung — no can duoc nhin thay, nhat la khi ben duoi la mot buc anh
+   tran het chieu ngang. */
+.header-rule { border-bottom: 1px solid var(--fg); }
+
+.btn-sm { padding: 0.5rem 0.875rem; font-size: calc(0.6875rem * var(--type-button-scale, 1)); min-height: 36px; }
 
 /* --- O nhap ----------------------------------------------------------- */
 

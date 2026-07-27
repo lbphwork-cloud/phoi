@@ -26,6 +26,7 @@ import { useContent, heroAppearance, type ContentRow } from '@/lib/content';
 import { uploadImage } from '@/lib/storage';
 import { IMAGE_LIMITS } from '@/lib/format';
 import { UploadButton } from '@/components/UploadButton';
+import { FONT_LABEL } from '@/lib/typography';
 import { Spinner, EmptyState } from '@/components/site';
 
 /** Nhan tieng Viet cho cac gia tri cua o `choice`. */
@@ -36,7 +37,16 @@ const CHOICE_LABELS: Record<string, string> = {
   'duoi-trai': 'Dưới, canh trái',
   'giua': 'Giữa khung',
   'duoi-giua': 'Dưới, canh giữa',
+  'giua-nut-day': 'Giữa khung, nút dưới đáy',
   vien: 'Chỉ viền',
+
+  // Kieu chu
+  ...FONT_LABEL,
+  'rat-nho': 'Rất nhỏ', nho: 'Nhỏ', lon: 'Lớn', 'rat-lon': 'Rất lớn',
+  manh: 'Mảnh', thuong: 'Thường', 'rat-dam': 'Rất đậm',
+  'theo-giao-dien': 'Theo giao diện (tự đổi sáng/tối)',
+  xam: 'Xám', 'xam-nhat': 'Xám nhạt', nau: 'Nâu',
+  'nhu-go': 'Như bạn gõ', 'in-hoa': 'IN HOA TOÀN BỘ',
 };
 
 /** Ten nhom hien cho nguoi dung. Khoa la cot `page` trong database. */
@@ -192,21 +202,37 @@ export default function ContentAdminPage() {
             {look.overlay !== 'none' && (
               <div className="absolute inset-0" style={{ background: look.overlay }} aria-hidden="true" />
             )}
-            <div className="hero-body w-full p-8" style={look.textStyle}>
-              <div className={look.boxStyle ? 'inline-block p-6' : ''} style={look.boxStyle}>
-                {hero.eyebrow && (
-                  <p className="eyebrow mb-3" style={{ color: look.dimColor }}>
-                    {val(hero.eyebrow)}
-                  </p>
-                )}
-                <p className="display-sm mb-4 whitespace-pre-line">{val(hero.title)}</p>
-                {hero.subtitle && (
-                  <p className="max-w-lg text-sm leading-relaxed">{val(hero.subtitle)}</p>
-                )}
-                {hero.cta && (
-                  <span className={`btn btn-sm mt-6 ${look.buttonClass}`}>{val(hero.cta)}</span>
-                )}
+            {/* Ban xem truoc phai theo DUNG ca kieu bo cuc, khong chi mau sac.
+                Neu no bo qua splitCta thi doi sang kieu "nut duoi day" se thay
+                mot dang, ma trang that lai ra mot dang khac — luc do ban xem
+                truoc noi doi, va do la kieu loi lam nguoi ta het tin trang
+                quan tri. */}
+            <div
+              className={`hero-body flex w-full flex-col p-8 ${look.splitCta ? 'h-full' : ''}`}
+              style={look.textStyle}
+            >
+              <div className={look.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
+                <div className={look.boxStyle ? 'inline-block p-6' : ''} style={look.boxStyle}>
+                  {hero.eyebrow && (
+                    <p className="eyebrow mb-3" style={{ color: look.dimColor }}>
+                      {val(hero.eyebrow)}
+                    </p>
+                  )}
+                  <p className="display-sm whitespace-pre-line">{val(hero.title)}</p>
+                  {hero.subtitle && !look.hideSubtitle && (
+                    <p className="mt-4 max-w-lg text-sm leading-relaxed">{val(hero.subtitle)}</p>
+                  )}
+                  {hero.cta && !look.splitCta && (
+                    <span className={`btn btn-sm mt-6 ${look.buttonClass}`}>{val(hero.cta)}</span>
+                  )}
+                </div>
               </div>
+
+              {look.splitCta && hero.cta && (
+                <div className="flex justify-center">
+                  <span className={`btn btn-sm ${look.buttonClass}`}>{val(hero.cta)}</span>
+                </div>
+              )}
             </div>
           </div>
           <p className="muted-2 mt-3 text-xs">
