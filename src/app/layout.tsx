@@ -97,18 +97,35 @@ const FONT_VARS = [
  */
 const META_FALLBACK = {
   title: 'PHỐI — Phối đồ nam theo gu và theo mệnh',
+  name: 'PHỐI',
   description:
     'Gợi ý phối đồ nam trong khoảng 150.000 – 700.000đ, cá nhân hoá theo phong cách, ' +
     'màu sắc và niên mệnh ngũ hành. Mua trên Shopee và TikTok Shop.',
 };
 
-async function readSiteMeta(): Promise<{ description: string; image: string }> {
+type SiteMeta = {
+  title: string;
+  name: string;
+  description: string;
+  image: string;
+  favicon: string;
+};
+
+async function readSiteMeta(): Promise<SiteMeta> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
+  const blank: SiteMeta = {
+    title: META_FALLBACK.title,
+    name: META_FALLBACK.name,
+    description: META_FALLBACK.description,
+    image: '',
+    favicon: '',
+  };
+
   if (!url || !key) {
     console.warn('[PHOI] Luc build khong co bien Supabase — dung mo ta viet san.');
-    return { description: META_FALLBACK.description, image: '' };
+    return blank;
   }
 
   try {
@@ -127,7 +144,9 @@ async function readSiteMeta(): Promise<{ description: string; image: string }> {
     const { data, error } = await sb
       .from('site_content')
       .select('key, value')
-      .in('key', ['site.description', 'site.share_image']);
+      .in('key', [
+        'site.title', 'site.name', 'site.description', 'site.share_image', 'site.favicon',
+      ]);
 
     if (error) throw new Error(error.message);
 
@@ -135,12 +154,15 @@ async function readSiteMeta(): Promise<{ description: string; image: string }> {
       (data ?? []).find((r) => r.key === k)?.value?.trim() ?? '';
 
     return {
+      title: get('site.title') || META_FALLBACK.title,
+      name: get('site.name') || META_FALLBACK.name,
       description: get('site.description') || META_FALLBACK.description,
       image: get('site.share_image'),
+      favicon: get('site.favicon'),
     };
   } catch (e) {
     console.warn('[PHOI] Khong doc duoc mo ta website luc build:', (e as Error).message);
-    return { description: META_FALLBACK.description, image: '' };
+    return blank;
   }
 }
 
@@ -158,13 +180,22 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     title: {
-      default: META_FALLBACK.title,
-      template: '%s · PHỐI',
+      default: meta.title,
+      // Cac trang con tu dat tieu de rieng cua chung; mau nay noi them ten
+      // website vao sau. Ten lay tu o "Ten website" chu khong viet cung nua —
+      // doi ten ma tab van hien ten cu la mot kieu sai rat kho phat hien.
+      template: `%s · ${meta.name}`,
     },
     description: meta.description,
-    applicationName: 'PHỐI',
+    applicationName: meta.name,
+    // Bieu tuong tab ghi thang vao HTML luc dung trang. Component <Favicon />
+    // van dat lai luc chay — hai duong cho hai doi tuong khac nhau: may tim
+    // kiem doc HTML va khong chay JavaScript, con nguoi dung thi can thay doi
+    // ngay sau khi sua chu khong phai doi mot lan trien khai.
+    ...(meta.favicon ? { icons: { icon: meta.favicon } } : {}),
     openGraph: {
-      title: META_FALLBACK.title,
+      title: meta.title,
+      siteName: meta.name,
       description: meta.description,
       type: 'website',
       ...(meta.image ? { images: [{ url: meta.image }] } : {}),

@@ -310,6 +310,24 @@ export function SiteHeader() {
   );
 }
 
+/**
+ * Chan trang.
+ *
+ * BO CUC MOT COT DOC, KHONG PHAI BA COT NGANG
+ *   Logo va cau dinh vi len tren cung. Ben duoi la khoi cong bo, dan ngang het
+ *   be ngang — dung bang be ngang cua khoi "Cach hoat dong" ngay phia tren, va
+ *   chia dung ba cot khop cot voi 01 / 02 / 03. Hai khoi lien nhau ma le cot
+ *   khac nhau se nhin nhu hai trang bi dan vao nhau.
+ *
+ * KHONG CON COT "TRANG"
+ *   Bon duong dan o do lap y nguyen thanh menu ngay phia tren dau trang. Mot
+ *   danh sach duong dan chi de lap lai mot danh sach khac la cho chiem cho.
+ *
+ * DUONG KE DEN CHU KHONG PHAI XAM NHAT
+ *   Thanh menu dung `--fg` (den dam), chan trang truoc day dung `--line` (xam
+ *   rat nhat). Hai duong ke gioi han tren va duoi cua ca trang ma khac hin
+ *   nhau thi trang nhin nhu chua dong lai. Gio ca hai giong nhau.
+ */
 export function SiteFooter() {
   const c = useContent();
 
@@ -318,22 +336,32 @@ export function SiteFooter() {
   const logoLight = c.t('site.logo.light', '');
   const logoDark = c.t('site.logo.dark', '') || logoLight;
   const logoHeight = c.t('site.logo.height', '28');
+  const logoPx = `${Number(logoHeight) * 1.4 || 40}px`;
 
   return (
-    <footer className="mt-24 border-t py-12" style={{ borderColor: 'var(--line)' }}>
-      <div className="shell grid gap-10 md:grid-cols-3">
-        <div>
-          {/* Dung chung hai o logo voi thanh menu — mot logo, mot cho thay doi.
-              Chua tai anh thi van hien chu, nhu truoc. */}
+    <footer className="py-14" style={{ borderTop: '1px solid var(--fg)' }}>
+      <div className="shell">
+        {/*
+          CANH GIUA TREN MAY TINH, SAT LE TRAI TREN DIEN THOAI.
+
+          Man hinh rong thi logo dung giua la mot dau cham het — mat di het mot
+          hang roi dung lai o giua. Man hinh hep thi khong con "giua" de noi:
+          moi thu deu gan giua, va canh giua chi lam logo lech so voi cac dong
+          chu canh trai ngay ben duoi no.
+
+          `md:mx-auto` dat tren chinh the anh chu khong chi text-center: anh la
+          mot khoi co be ngang rieng, `text-center` khong dieu khien duoc no.
+        */}
+        <div className="text-left md:text-center">
           <div className="mb-3">
             {logoLight ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoLight} alt="PHỐI" className="logo-light block w-auto"
-                     style={{ height: `${Number(logoHeight) * 1.4 || 40}px` }} />
+                <img src={logoLight} alt="PHỐI" className="logo-light w-auto md:mx-auto"
+                     style={{ height: logoPx }} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoDark} alt="PHỐI" className="logo-dark w-auto"
-                     style={{ height: `${Number(logoHeight) * 1.4 || 40}px` }} />
+                <img src={logoDark} alt="PHỐI" className="logo-dark w-auto md:mx-auto"
+                     style={{ height: logoPx }} />
               </>
             ) : (
               <p className="display-xs" style={{ letterSpacing: '0.28em' }}>
@@ -341,7 +369,7 @@ export function SiteFooter() {
               </p>
             )}
           </div>
-          <p className="muted text-sm">
+          <p className="muted text-sm leading-relaxed">
             <span style={c.s('site.tagline')}>
               {c.t(
                 'site.tagline',
@@ -352,46 +380,52 @@ export function SiteFooter() {
           </p>
         </div>
 
-        <div>
-          <p className="eyebrow mb-3">Trang</p>
-          <ul className="flex flex-col gap-1 text-sm">
-            <li><Link href="/kham-pha" className="muted hover:underline">Khám phá outfit</Link></li>
-            <li><Link href="/gio-hang" className="muted hover:underline">Giỏ hàng</Link></li>
-            <li><Link href="/tao-bai" className="muted hover:underline">Tạo bài phối đồ</Link></li>
-            <li><Link href="/ho-so" className="muted hover:underline">Hồ sơ và quyền dữ liệu</Link></li>
-          </ul>
-        </div>
-
         {/*
           Cong bo affiliate. Day khong phai phan trang tri — day la thong le
           minh bach voi nguoi tieu dung, va la thu can co truoc khi website mo
           cho nguoi that vao.
+
+          Ca ba doan cung 14px voi phan doc cua khoi "Cach hoat dong" ngay tren.
+          Truoc day chung la 12px va mau nhat hon — tuc la thong tin phap ly
+          duoc trinh bay nhu mot thu dang co giau di. Neu da noi la minh bach
+          thi phai doc duoc.
         */}
-        <div>
-          <p className="eyebrow mb-3">Công bố</p>
-          <p className="muted-2 text-xs leading-relaxed">
-            <span style={c.s('footer.affiliate')}>
-              {c.t(
-                'footer.affiliate',
-                'Các liên kết mua hàng trên PHỐI là liên kết tiếp thị. Người đăng bài ' +
-                  'có thể nhận hoa hồng từ sàn khi bạn mua qua liên kết của họ. ' +
-                  'Giá bạn trả không thay đổi.',
-              )}
+        <div className="mt-14">
+          <p className="eyebrow mb-6">
+            <span style={c.s('footer.disclosure_heading')}>
+              {c.t('footer.disclosure_heading', 'Công bố')}
             </span>
           </p>
-          <p className="muted-2 mt-3 text-xs leading-relaxed">
-            <span style={c.s('footer.about')}>
-              {c.t(
-                'footer.about',
-                'Nội dung về ngũ hành chỉ là gợi ý màu sắc mang tính tham khảo trong ' +
-                  'phối đồ, không phải dự đoán vận mệnh.',
-              )}
-            </span>
-          </p>
-          <p className="muted-2 mt-3 text-xs leading-relaxed">
-            Giá sản phẩm do sàn quyết định và có thể đã thay đổi so với thời điểm
-            chúng tôi ghi nhận. Vui lòng kiểm tra lại trên sàn trước khi mua.
-          </p>
+          <div className="grid gap-10 md:grid-cols-3">
+            <p className="muted text-sm leading-relaxed">
+              <span style={c.s('footer.affiliate')}>
+                {c.t(
+                  'footer.affiliate',
+                  'Các liên kết mua hàng trên PHỐI là liên kết tiếp thị. Người đăng bài ' +
+                    'có thể nhận hoa hồng từ sàn khi bạn mua qua liên kết của họ. ' +
+                    'Giá bạn trả không thay đổi.',
+                )}
+              </span>
+            </p>
+            <p className="muted text-sm leading-relaxed">
+              <span style={c.s('footer.about')}>
+                {c.t(
+                  'footer.about',
+                  'Nội dung về ngũ hành chỉ là gợi ý màu sắc mang tính tham khảo trong ' +
+                    'phối đồ, không phải dự đoán vận mệnh.',
+                )}
+              </span>
+            </p>
+            <p className="muted text-sm leading-relaxed">
+              <span style={c.s('footer.price_note')}>
+                {c.t(
+                  'footer.price_note',
+                  'Giá sản phẩm do sàn quyết định và có thể đã thay đổi so với thời điểm ' +
+                    'chúng tôi ghi nhận. Vui lòng kiểm tra lại trên sàn trước khi mua.',
+                )}
+              </span>
+            </p>
+          </div>
         </div>
       </div>
     </footer>

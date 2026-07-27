@@ -179,13 +179,26 @@ body {
   font-size: calc(1.125rem * var(--type-heading-scale, 1));
 }
 
-/* Nhan nho chu hoa dan cach rong. Dung cho muc luc, trang thai, danh muc. */
+/* Nhan chu hoa dan cach rong. Dung cho muc luc, trang thai, danh muc.
+
+   TRUOC DAY 11px, DAM 600, MAU XAM NHAT — va do la mot lua chon sai.
+   Day la NHAN CUA CA MOT KHOI ("Cach hoat dong", "01", "Cong bo"). Mot cai
+   nhan mo hon chinh phan noi dung ma no dat ten thi mat khong biet bat dau doc
+   tu dau: khoi nao cung nhin nhu bat dau giua chung. Nhan phai la thu doc
+   truoc, nen no phai la thu DAM NHAT va TO NHAT trong khoi.
+
+   15px chu khong phai 13px: phan doc trong cac khoi do la 14px, ma nhan phai
+   to hon phan doc thi moi ra thu bac. Dan cach rong giam tu 0.14em xuong 0.1em
+   — chu cang to thi dan cang rong cang de vo thanh tung ky tu roi rac.
+
+   Cho nao can nhan mo (chu tren anh o dau trang chu) thi doi mau tai cho bang
+   thuoc tinh style — no thang quy tac nay. */
 .eyebrow {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--fg-3);
+  color: var(--fg);
 }
 
 .muted   { color: var(--fg-2); }

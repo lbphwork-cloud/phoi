@@ -53,8 +53,13 @@ const CHOICE_LABELS: Record<string, string> = {
 
 /** Ten nhom hien cho nguoi dung. Khoa la cot `page` trong database. */
 const PAGE_LABELS: Record<string, string> = {
+  // Nhom nay dung dau vi no chua nhung thu nguoi ngoai nhin thay TRUOC KHI mo
+  // trang: tieu de tren tab, bieu tuong tab, doan mo ta trong ket qua Google.
+  // Truoc day chung nam lan trong nhom "Dung chung" cung 60 o khac va chu
+  // website tuong la chua co — mot tinh nang khong tim thay thi bang khong co.
+  'nhan-dien': 'Nhận diện website — tiêu đề, biểu tượng tab, mô tả, logo',
   'kieu-chu': 'Kiểu chữ — font, cỡ, màu cho toàn website',
-  'chung': 'Dùng chung — logo, tên trang, chân trang',
+  'chung': 'Dùng chung — chữ trên thanh menu và chân trang',
   'trang-chu': 'Trang chủ',
   'kham-pha': 'Trang khám phá',
   'ho-so': 'Trang hồ sơ',

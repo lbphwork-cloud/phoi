@@ -211,11 +211,14 @@ function Home() {
       {/* 2. Cac khoi phong cach — moi khoi mot anh, mot nut                 */}
       {/* ================================================================== */}
       {styles.length > 0 && (
-        <section className={c.isMobile ? 'pt-10' : 'pt-20 md:pt-28'}>
+        <section className={c.isMobile ? 'pt-5' : 'pt-20 md:pt-28'}>
           {/* Tren dien thoai: chu nho canh GIUA va lay mau chu cua trang thay
-              vi mau xam nhat. Khoang trang tren duoi cung rut lai — o khung
-              hep, mot khoang trang bang nua man hinh khong con la "thoang" ma
-              thanh mot cho nguoi ta phai cuon qua. */}
+              vi mau xam nhat.
+
+              KHOANG TRANG PHAI DEU HAI BEN. Truoc day tren 40px, duoi 20px —
+              mat rat nhay voi kieu lech nay: dai trang nhin nhu bi day len chu
+              khong nhu mot nhip nghi giua hai khoi anh. Gio 20px deu ca hai,
+              va dai trang ngan lai con mot nua. */}
           <div className={c.isMobile ? 'mb-5 text-center' : 'shell mb-12 md:mb-16'}>
             <p className="eyebrow" style={c.isMobile ? { color: 'var(--fg)' } : undefined}>
               <span style={c.s('home.styles.eyebrow')}>
@@ -280,12 +283,25 @@ function Home() {
       {/* ================================================================== */}
       {/* 3. Ba buoc — giai thich cach website hoat dong                     */}
       {/* ================================================================== */}
+      {/*
+        KHONG CON KHOANG TRANG THUA O DAY.
+
+        Truoc day khoi nay co `py-20` roi chan trang lai co `mt-24` — cong lai
+        la 176px trang khong o giua ba cot va duong ke chan trang, nen khoi nay
+        nhin nhu dang lung lo giua trang chu khong phai dang ket lai. Chan trang
+        gio khong con le tren; duong ke den la thu ngan cach, khong phai khoang
+        trang.
+
+        MOT CO CHU CHO CA KHOI. Ten buoc va mo ta buoc cung 14px — chi khac mau,
+        khong khac co. Nhan ("Cach hoat dong", "01") la thu duy nhat to hon, va
+        do la ca y do: nhin vao biet ngay dau la muc luc, dau la phan doc.
+      */}
       <section
-        className="mt-24 border-t py-20 md:mt-32"
+        className="mt-24 border-t pb-16 pt-14 md:mt-32"
         style={{ borderColor: 'var(--line)' }}
       >
         <div className="shell">
-          <p className="eyebrow mb-10">
+          <p className="eyebrow mb-8">
             <span style={c.s('home.steps.heading')}>
               {c.t('home.steps.heading', 'Cách hoạt động')}
             </span>
@@ -294,7 +310,7 @@ function Home() {
             {[1, 2, 3].map((n) => (
               <div key={n}>
                 <p className="eyebrow mb-3">{String(n).padStart(2, '0')}</p>
-                <p className="display-xs mb-2">
+                <p className="mb-2 text-sm font-medium leading-relaxed">
                   <span style={c.s(`home.step${n}.title`)}>
                   {c.t(
                     `home.step${n}.title`,
