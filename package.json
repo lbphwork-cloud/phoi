@@ -28,7 +28,9 @@
     "//db:apply:self-test": "Kiem chung chinh script db:apply tren PGlite. Khong can database, khong can secret.",
     "db:apply:self-test": "node scripts/apply-migrations.mjs --self-test",
     "//db:grant-admin": "Cap quyen admin cho tai khoan da dang ky: npm run db:grant-admin -- --email=ban@gmail.com",
-    "db:grant-admin": "node scripts/grant-admin.mjs"
+    "db:grant-admin": "node scripts/grant-admin.mjs",
+    "//seed:images": "Tao anh minh hoa cho du lieu mau, tai len Storage, gan vao bai.",
+    "seed:images": "node scripts/seed-images.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",
