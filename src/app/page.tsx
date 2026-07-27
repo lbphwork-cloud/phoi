@@ -326,7 +326,15 @@ function StyleBlock({
     return (
       <div ref={ref} className="reveal bleed">
         <Link href={href} className="group block">
-          <div className="hero-media drift" style={{ aspectRatio: '3 / 4' }}>
+          {/* `flex items-end` nam o DAY chu khong phai o hero-body.
+              .hero-media la `position: relative` va cac con cua no chay theo
+              luong binh thuong — mot khoi `justify-end` khong co chieu cao thi
+              khong day duoc gi xuong day. Phai de chinh khung anh lam viec canh
+              chinh, giong het cach phan mo dau trang chu dang lam. */}
+          <div
+            className="hero-media drift flex items-end"
+            style={{ aspectRatio: '3 / 4' }}
+          >
             {style.image && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={style.image} alt={style.label} loading="lazy" />
@@ -344,7 +352,7 @@ function StyleBlock({
             />
 
             <div
-              className="hero-body flex w-full flex-col items-center justify-end px-6 pb-10 text-center"
+              className="hero-body flex w-full flex-col items-center px-6 pb-12 text-center"
               style={{ color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.35), 0 2px 14px rgba(0,0,0,0.4)' }}
             >
               <p className="display-sm mb-3">{style.label}</p>

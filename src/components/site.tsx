@@ -119,7 +119,12 @@ export function SiteHeader() {
       style={{ background: 'color-mix(in srgb, var(--bg) 88%, transparent)' }}
     >
       {/*
-        BA CO T: menu trai — logo GIUA — tai khoan phai.
+        BA COT: menu trai — logo GIUA — tai khoan phai.
+
+        MOC CHUYEN LA 1024px CHU KHONG PHAI 768px.
+        O 768px, nam muc menu cong ba muc tai khoan cong logo khong du cho —
+        da nhin bang trinh duyet that va thay "Bai cua toi" dam vao chu PHOI.
+        Duoi 1024px thi toan bo dieu huong nam trong nut ba gach.
 
         Dung grid ba cot bang nhau chu khong phai flex voi justify-between:
         voi flex, logo chi nam giua khi hai ben tinh co dai bang nhau, ma ben
@@ -127,7 +132,7 @@ export function SiteHeader() {
         giua khung, bat ke hai ben dai ngan the nao.
       */}
       <div className="shell grid grid-cols-[1fr_auto_1fr] items-center gap-4 py-4">
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-1 lg:flex">
           {navItems.map((n) => (
             <Link
               key={n.href}
@@ -144,7 +149,7 @@ export function SiteHeader() {
             cua cac trang thoi trang: dieu huong ben trai, ten thuong hieu o
             giua. Ba gach ve bang SVG chu khong dung ky tu "≡": ky tu do hien
             khac nhau tren tung he dieu hanh va thuong bi lech tam. */}
-        <div className="flex items-center gap-1 md:hidden">
+        <div className="flex items-center gap-1 lg:hidden">
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
@@ -172,28 +177,43 @@ export function SiteHeader() {
 
         <div className="flex justify-center">{brand}</div>
 
-        <div className="flex items-center justify-end gap-1">
-          <span className="hidden md:inline-flex">
-            <SearchBox />
-          </span>
+        {/*
+          LOP `hidden` DAT TREN THE BOC, KHONG TREN TUNG MUC.
+
+          Ly do la mot cai bay ve thu tu CSS: cac lop tu viet trong globals.css
+          (.navlink, .btn, .chip...) khong nam trong tang nao ca, con cac lop
+          tien ich cua Tailwind thi nam trong tang `utilities`. CSS cho phep moi
+          quy tac KHONG THUOC TANG NAO thang moi quy tac co tang, bat ke do manh
+          yeu ra sao. Nen `.navlink { display: inline-flex }` an dut
+          `.hidden { display: none }`, va cac muc nay van hien tren dien thoai
+          du da ghi `hidden`.
+
+          Da kiem chung bang trinh duyet that: mot the mang ca hai lop tra ve
+          display = flex chu khong phai none.
+
+          Dat `hidden` len mot the boc khong mang lop tu viet nao thi khong con
+          gi de tranh chap.
+        */}
+        <div className="hidden items-center justify-end gap-1 lg:flex">
+          <SearchBox />
 
           <button
             type="button"
             onClick={cycle}
-            className="navlink hidden sm:inline-flex"
+            className="navlink"
             title="Đổi chế độ sáng / tối"
           >
             {themeLabel}
           </button>
 
           {loading ? (
-            <span className="navlink hidden sm:inline-flex">…</span>
+            <span className="navlink">…</span>
           ) : session ? (
             <>
-              <Link href="/ho-so" className="navlink hidden sm:inline-flex">
+              <Link href="/ho-so" className="navlink">
                 {profile?.display_name ?? 'Hồ sơ'}
               </Link>
-              <button type="button" onClick={signOut} className="navlink hidden sm:inline-flex">
+              <button type="button" onClick={signOut} className="navlink">
                 Thoát
               </button>
             </>
@@ -202,12 +222,11 @@ export function SiteHeader() {
               Đăng nhập
             </Link>
           )}
-
         </div>
       </div>
 
       {open && (
-        <div className="border-t md:hidden" style={{ borderColor: 'var(--line)' }}>
+        <div className="border-t lg:hidden" style={{ borderColor: 'var(--line)' }}>
           <div className="shell flex flex-col py-2">
             {navItems.map((n) => (
               <Link
@@ -228,7 +247,11 @@ export function SiteHeader() {
                   Đăng xuất
                 </button>
               </>
-            ) : null}
+            ) : (
+              <Link href="/dang-nhap" onClick={() => setOpen(false)} className="navlink justify-start">
+                Đăng nhập
+              </Link>
+            )}
             <button type="button" onClick={cycle} className="navlink justify-start">
               Chế độ: {themeLabel}
             </button>

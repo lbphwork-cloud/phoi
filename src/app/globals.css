@@ -292,6 +292,23 @@ body {
 :root[data-theme="light"] .logo-dark { display: none; }
 :root[data-theme="light"] .logo-light { display: block; }
 
+/* CANH BAO VE THU TU CSS — doc truoc khi them lop moi vao file nay.
+
+   Moi lop trong file nay deu KHONG THUOC TANG (@layer) nao. CSS cho phep quy
+   tac khong thuoc tang nao thang moi quy tac co tang, bat ke do manh yeu. Cac
+   lop tien ich cua Tailwind v4 thi nam trong tang `utilities`.
+
+   He qua: `class="navlink hidden"` KHONG an di, vi `.navlink { display: ... }`
+   o day thang `.hidden { display: none }` cua Tailwind. Da mac dung loi nay
+   mot lan — cac muc ben phai thanh menu van hien tren dien thoai.
+
+   Cach lam dung: dat `hidden` / `block` / `flex` len mot the BOC khong mang
+   lop tu viet nao. Dung sua thanh `!important`: no chua trieu chung va de lai
+   mot quy tac khong ai ghi de duoc nua.
+
+   Chi cac thuoc tinh CO DAT o day moi bi anh huong. `w-full`, `mt-4`, `gap-2`
+   van chay binh thuong vi khong lop nao duoi day dat chung.                  */
+
 /* --- Thanh menu dau trang ------------------------------------------------
 
    MOT LOP CHO MOI MUC TREN THANH MENU. Truoc day cac muc dung .btn-quiet voi
