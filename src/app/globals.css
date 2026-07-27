@@ -436,28 +436,19 @@ table.data th {
   height: 100%;
   object-fit: cover;
 }
-.hero-media::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to top,
-    rgba(0, 0, 0, 0.62) 0%,
-    rgba(0, 0, 0, 0.34) 42%,
-    rgba(0, 0, 0, 0.06) 78%
-  );
-}
 .hero-body {
   position: relative;
   z-index: 1;
   color: #fff;
 }
-/* Chu trang tren anh: bong do rat nhe de tach khoi vung anh sang.           */
+/* Mau chu va bong do KHONG dat cung o day nua: chung do quan tri vien chon
+   trong /admin/noi-dung, va duoc truyen vao bang style. Xem heroAppearance()
+   trong src/lib/content.ts. Anh nen do nguoi dung tu chon nen khong co mot
+   mau chu nao dung cho moi anh.                                            */
 .hero-body .display,
 .hero-body .display-sm,
 .hero-body p {
-  color: #fff;
-  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.4);
+  color: inherit;
 }
 
 /* Nut sang tren nen anh toi. */
@@ -474,3 +465,34 @@ table.data th {
   border-color: rgba(255, 255, 255, 0.7);
 }
 .btn-ghost-onmedia:hover { background: rgba(255, 255, 255, 0.14); }
+
+/* Nut "khong thich" o goc the outfit.
+   Mo dan khi tro chuot vao the, nhung tren thiet bi cam ung thi luon hien —
+   khong co su kien hover nao de kich hoat no, va mot nut vo hinh la mot nut
+   khong ton tai. */
+.btn-dismiss {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--fg);
+  background: rgba(250, 249, 246, 0.9);
+  border: 1px solid var(--line-2);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+.group\/card:hover .btn-dismiss,
+.btn-dismiss:focus-visible { opacity: 1; }
+.btn-dismiss:hover { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
+
+@media (hover: none) {
+  .btn-dismiss { opacity: 1; }
+}

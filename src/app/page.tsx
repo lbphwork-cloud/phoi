@@ -26,7 +26,7 @@ import Link from 'next/link';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useTaxonomy, useUserContext, useReveal } from '@/lib/hooks';
 import { useOutfits } from '@/lib/useOutfits';
-import { useContent } from '@/lib/content';
+import { useContent, heroAppearance } from '@/lib/content';
 import { SetupNotice } from '@/components/site';
 import { NGU_HANH_LABEL } from '@/lib/nguhanh';
 
@@ -48,6 +48,7 @@ function Home() {
 
   const heroImage = c.t('home.hero.image', '') || outfits[0]?.hero_image_url || '';
   const heroTitle = c.t('home.hero.title', 'Mặc gì hôm nay,\nđã có người phối sẵn.');
+  const hero = heroAppearance(c.t);
 
   // Danh sach phong cach hien o trang chu, do quan tri vien quyet dinh.
   const styleSlugs = c.list(
@@ -80,7 +81,7 @@ function Home() {
       <section className="bleed">
         <div
           ref={heroRef}
-          className="hero-media reveal flex items-end"
+          className={`hero-media reveal flex ${hero.alignClass}`}
           style={{ minHeight: 'clamp(30rem, 82vh, 48rem)' }}
         >
           {heroImage && (
@@ -88,45 +89,58 @@ function Home() {
             <img src={heroImage} alt="" aria-hidden="true" />
           )}
 
-          <div className="hero-body shell w-full pb-14 md:pb-20">
-            <p className="eyebrow mb-5" style={{ color: 'rgba(255,255,255,0.72)' }}>
-              {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
-            </p>
+          {/* Lop phu do quan tri vien chon, de len tren anh va duoi chu. Dat
+              bang style thay vi ::after cua .hero-media de doi duoc luc chay. */}
+          {hero.overlay !== 'none' && (
+            <div
+              className="absolute inset-0"
+              style={{ background: hero.overlay }}
+              aria-hidden="true"
+            />
+          )}
 
-            {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
-            <h1 className="display mb-7 max-w-3xl whitespace-pre-line">{heroTitle}</h1>
+          <div className="hero-body shell w-full pb-14 md:pb-20" style={hero.textStyle}>
+            <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : ''}
+                 style={hero.boxStyle}>
+              <p className="eyebrow mb-5" style={{ color: hero.dimColor }}>
+                {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
+              </p>
 
-            <p className="max-w-xl text-base leading-relaxed md:text-lg">
-              {c.t(
-                'home.hero.subtitle',
-                'Những set đồ hoàn chỉnh trong khoảng 150.000 – 700.000đ mỗi món. ' +
-                  'Chọn gu của bạn, hệ thống xếp lại thứ tự cho riêng bạn.',
-              )}
-            </p>
+              {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
+              <h1 className="display mb-7 max-w-3xl whitespace-pre-line">{heroTitle}</h1>
 
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Link
-                href={c.t('home.hero.cta_href', '/kham-pha')}
-                className="btn btn-onmedia"
-              >
-                {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
-              </Link>
-              {!ctxLoading && !personalised && (
-                <Link href="/ho-so" className="btn btn-ghost-onmedia">
-                  Thiết lập gu của bạn
+              <p className="max-w-xl text-base leading-relaxed md:text-lg">
+                {c.t(
+                  'home.hero.subtitle',
+                  'Những set đồ hoàn chỉnh trong khoảng 150.000 – 700.000đ mỗi món. ' +
+                    'Chọn gu của bạn, hệ thống xếp lại thứ tự cho riêng bạn.',
+                )}
+              </p>
+
+              <div className="mt-9 flex flex-wrap gap-3">
+                <Link
+                  href={c.t('home.hero.cta_href', '/kham-pha')}
+                  className={`btn ${hero.buttonClass}`}
+                >
+                  {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
                 </Link>
+                {!ctxLoading && !personalised && (
+                  <Link href="/ho-so" className="btn btn-ghost-onmedia">
+                    Thiết lập gu của bạn
+                  </Link>
+                )}
+              </div>
+
+              {privateData?.element && privateData.element_enabled && (
+                <p className="mt-7 text-sm" style={{ color: hero.dimColor }}>
+                  Đang ưu tiên màu hợp mệnh {NGU_HANH_LABEL[privateData.element]}
+                  {privateData.element_label && ` (${privateData.element_label})`}.{' '}
+                  <Link href="/ho-so" className="underline">
+                    Tắt gợi ý theo mệnh
+                  </Link>
+                </p>
               )}
             </div>
-
-            {privateData?.element && privateData.element_enabled && (
-              <p className="mt-7 text-sm" style={{ color: 'rgba(255,255,255,0.78)' }}>
-                Đang ưu tiên màu hợp mệnh {NGU_HANH_LABEL[privateData.element]}
-                {privateData.element_label && ` (${privateData.element_label})`}.{' '}
-                <Link href="/ho-so" className="underline">
-                  Tắt gợi ý theo mệnh
-                </Link>
-              </p>
-            )}
           </div>
         </div>
       </section>

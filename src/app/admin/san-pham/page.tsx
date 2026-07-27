@@ -94,6 +94,8 @@ export default function AdminProductsPage() {
         // de trang cong khai hien dung "gia kiem tra X ngay truoc".
         price_checked_at: new Date().toISOString(),
         image_url: r.image_url || null,
+        description: r.description?.trim() || null,
+        source_url: r.source_url?.trim() || null,
         // Da sua tay thi khong con la du lieu mau nua.
         is_seed: false,
       })
@@ -301,6 +303,26 @@ export default function AdminProductsPage() {
                       placeholder="Giá VNĐ"
                     />
                   </div>
+
+                  {/* Mo ta va dia chi nguon: hai truong con lai cua bang
+                      products. Truoc day chi sua duoc ten, loai, mau, gia va
+                      anh — nen mot so thuoc tinh chi doi duoc bang SQL. */}
+                  <label className="label">Mô tả sản phẩm</label>
+                  <textarea
+                    value={r.description ?? ''}
+                    onChange={(e) => patchLocal(r.id, { description: e.target.value })}
+                    className="field mb-3"
+                    rows={2}
+                    placeholder="Chất liệu, form dáng, lưu ý khi chọn size…"
+                  />
+
+                  <label className="label">Địa chỉ gốc của sản phẩm</label>
+                  <input
+                    value={r.source_url ?? ''}
+                    onChange={(e) => patchLocal(r.id, { source_url: e.target.value })}
+                    className="field mb-3"
+                    placeholder="Trang sản phẩm trên sàn. Khác link affiliate bên dưới."
+                  />
 
                   {/* O thay link — day la ly do chinh trang nay ton tai */}
                   <label className="label">Link affiliate</label>

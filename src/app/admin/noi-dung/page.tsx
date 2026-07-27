@@ -22,9 +22,20 @@
 import { useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks';
-import { useContent, type ContentRow } from '@/lib/content';
+import { useContent, heroAppearance, type ContentRow } from '@/lib/content';
 import { uploadImage } from '@/lib/storage';
 import { Spinner, EmptyState } from '@/components/site';
+
+/** Nhan tieng Viet cho cac gia tri cua o `choice`. */
+const CHOICE_LABELS: Record<string, string> = {
+  trang: 'Trắng', den: 'Đen',
+  khong: 'Không', nhe: 'Nhẹ', vua: 'Vừa', dam: 'Đậm',
+  toi: 'Nền tối', sang: 'Nền sáng', mo: 'Mờ nhẹ',
+  'duoi-trai': 'Dưới, canh trái',
+  'giua': 'Giữa khung',
+  'duoi-giua': 'Dưới, canh giữa',
+  vien: 'Chỉ viền',
+};
 
 /** Ten nhom hien cho nguoi dung. Khoa la cot `page` trong database. */
 const PAGE_LABELS: Record<string, string> = {
@@ -35,6 +46,8 @@ const PAGE_LABELS: Record<string, string> = {
   'dang-nhap': 'Trang đăng nhập',
   'tao-bai': 'Trang tạo bài',
   'du-lieu': 'Trang dữ liệu cá nhân',
+  'outfit': 'Trang chi tiết set đồ',
+  'bai-cua-toi': 'Trang bài của tôi',
 };
 
 export default function ContentAdminPage() {
@@ -46,6 +59,9 @@ export default function ContentAdminPage() {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [savedKey, setSavedKey] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  // Mac dinh hien TAT CA trang. 47 khoa chia 9 nhom van cuon duoc, va thay
+  // het mot luot thi de nhan ra cho nao con bo trong.
+  const [activePage, setActivePage] = useState<string>('tat-ca');
 
   if (c.loading) return <Spinner label="Đang tải nội dung" />;
   if (c.rows.length === 0) {
@@ -111,6 +127,16 @@ export default function ContentAdminPage() {
   };
 
   const pages = [...new Set(c.rows.map((r) => r.page))];
+  const shown = activePage === 'tat-ca' ? pages : pages.filter((p) => p === activePage);
+
+  // Dien mao tinh tu gia tri DANG GO: doi o chon la ban xem truoc doi ngay.
+  // Dung chung ham voi trang chu nen hai noi khong the lech nhau.
+  const look = heroAppearance((k, f) => {
+    const row = c.rows.find((r) => r.key === k);
+    if (!row) return f;
+    const v = draft[row.key] ?? row.value;
+    return v.trim() === '' ? f : v;
+  });
 
   // Gom cac khoa cua phan mo dau de dung khoi xem truoc.
   const hero = {
@@ -133,6 +159,20 @@ export default function ContentAdminPage() {
 
       {err && <div className="notice notice-danger mb-8">{err}</div>}
 
+      {/* Chon trang de sua. Mac dinh hien tat ca. */}
+      <div className="mb-10 flex flex-wrap gap-2">
+        <button type="button" className="chip" aria-pressed={activePage === 'tat-ca'}
+                onClick={() => setActivePage('tat-ca')}>
+          Tất cả ({c.rows.length})
+        </button>
+        {pages.map((p) => (
+          <button key={p} type="button" className="chip" aria-pressed={activePage === p}
+                  onClick={() => setActivePage(p)}>
+            {PAGE_LABELS[p] ?? p} ({c.rows.filter((r) => r.page === p).length})
+          </button>
+        ))}
+      </div>
+
       {/* ------------------------------------------------------------------ */}
       {/* Xem truoc phan mo dau trang chu, dung gia tri DANG GO              */}
       {/* ------------------------------------------------------------------ */}
@@ -140,26 +180,31 @@ export default function ContentAdminPage() {
         <div className="mb-12">
           <p className="eyebrow mb-4">Xem trước phần mở đầu trang chủ</p>
           <div
-            className="hero-media flex items-end"
+            className={`hero-media flex ${look.alignClass}`}
             style={{ minHeight: '24rem' }}
           >
             {hero.image && val(hero.image) && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={val(hero.image)} alt="" aria-hidden="true" />
             )}
-            <div className="hero-body w-full p-8">
-              {hero.eyebrow && (
-                <p className="eyebrow mb-3" style={{ color: 'rgba(255,255,255,0.72)' }}>
-                  {val(hero.eyebrow)}
-                </p>
-              )}
-              <p className="display-sm mb-4 whitespace-pre-line">{val(hero.title)}</p>
-              {hero.subtitle && (
-                <p className="max-w-lg text-sm leading-relaxed">{val(hero.subtitle)}</p>
-              )}
-              {hero.cta && (
-                <span className="btn btn-onmedia btn-sm mt-6">{val(hero.cta)}</span>
-              )}
+            {look.overlay !== 'none' && (
+              <div className="absolute inset-0" style={{ background: look.overlay }} aria-hidden="true" />
+            )}
+            <div className="hero-body w-full p-8" style={look.textStyle}>
+              <div className={look.boxStyle ? 'inline-block p-6' : ''} style={look.boxStyle}>
+                {hero.eyebrow && (
+                  <p className="eyebrow mb-3" style={{ color: look.dimColor }}>
+                    {val(hero.eyebrow)}
+                  </p>
+                )}
+                <p className="display-sm mb-4 whitespace-pre-line">{val(hero.title)}</p>
+                {hero.subtitle && (
+                  <p className="max-w-lg text-sm leading-relaxed">{val(hero.subtitle)}</p>
+                )}
+                {hero.cta && (
+                  <span className={`btn btn-sm mt-6 ${look.buttonClass}`}>{val(hero.cta)}</span>
+                )}
+              </div>
             </div>
           </div>
           <p className="muted-2 mt-3 text-xs">
@@ -171,7 +216,7 @@ export default function ContentAdminPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Cac o nhap, gom theo trang                                         */}
       {/* ------------------------------------------------------------------ */}
-      {pages.map((page) => (
+      {shown.map((page) => (
         <section key={page} className="mb-14">
           <h2 className="display-xs mb-6 border-b pb-3" style={{ borderColor: 'var(--line)' }}>
             {PAGE_LABELS[page] ?? page}
@@ -220,6 +265,17 @@ export default function ContentAdminPage() {
                           )}
                         </div>
                       </div>
+                    ) : r.kind === 'choice' ? (
+                      <select
+                        id={r.key}
+                        className="field"
+                        value={val(r)}
+                        onChange={(e) => set(r.key, e.target.value)}
+                      >
+                        {r.options.map((o) => (
+                          <option key={o} value={o}>{CHOICE_LABELS[o] ?? o}</option>
+                        ))}
+                      </select>
                     ) : r.kind === 'textarea' ? (
                       <textarea
                         id={r.key}

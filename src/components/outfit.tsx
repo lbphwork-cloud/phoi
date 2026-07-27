@@ -40,6 +40,7 @@ export function OutfitCard({
   outfit,
   score,
   href,
+  onDislike,
 }: {
   outfit: Pick<
     Outfit,
@@ -48,12 +49,73 @@ export function OutfitCard({
   >;
   score?: ScoreBreakdown;
   href?: string;
+  /**
+   * Bat nut "khong thich" ngay tren the.
+   *
+   * VI SAO O DAY CHU KHONG PHAI CHI O TRANG CHI TIET
+   *   Nguoi dung loai tru nhanh hon nhieu so voi chon. Luot qua mot luoi va
+   *   thay ngay ba bo do khong hop gu minh — bat ho mo tung bai roi quay lai
+   *   chi de noi "khong thich" thi khong ai lam. Cho phan hoi ngay tai cho thi
+   *   thu tu goi y sua duoc trong vai giay.
+   */
+  onDislike?: () => void;
 }) {
   const ref = useReveal<HTMLDivElement>();
   const tax = useTaxonomy();
+  const [dismissing, setDismissing] = useState(false);
+  const [dismissError, setDismissError] = useState<string | null>(null);
+
+  /**
+   * Ghi mot phan hoi 'dislike_pairing' cho ca set.
+   *
+   * Chon 'dislike_pairing' chu khong phai 'hide': an han thi bai bien mat khoi
+   * moi ket qua ve sau, ma mot cu bam nhanh tren luoi khong nen co hau qua nang
+   * den vay. dislike_pairing chi day bai xuong duoi (trong so -100 trong
+   * src/lib/scoring.ts) — van tim lai duoc neu bam nham.
+   */
+  const dislike = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const { data: s } = await sb.auth.getSession();
+    if (!s.session) {
+      setDismissError('Cần đăng nhập để phản hồi.');
+      return;
+    }
+
+    setDismissing(true);
+    setDismissError(null);
+
+    const { error } = await sb.from('feedback_events').insert({
+      user_id: s.session.user.id,
+      outfit_id: outfit.id,
+      kind: 'dislike_pairing',
+      target_value: null,
+    });
+
+    setDismissing(false);
+    if (error) { setDismissError(error.message); return; }
+    onDislike?.();
+  };
 
   return (
-    <div ref={ref} className="reveal">
+    <div ref={ref} className="reveal group/card relative">
+      {onDislike && (
+        <button
+          type="button"
+          onClick={dislike}
+          disabled={dismissing}
+          title="Không thích set này — đẩy xuống cuối danh sách"
+          aria-label={`Không thích ${outfit.title}`}
+          className="btn-dismiss"
+        >
+          {dismissing ? '…' : '✕'}
+        </button>
+      )}
+
       <Link href={href ?? `/outfit/${outfit.slug}`} className="group block">
         <div className="frame mb-3">
           {outfit.hero_image_url ? (
@@ -91,6 +153,8 @@ export function OutfitCard({
           ))}
         </div>
       </Link>
+
+      {dismissError && <p className="hint-error">{dismissError}</p>}
 
       {/* Giai thich vi sao outfit nay duoc goi y. Minh bach quan trong hon
           cam giac "he thong thong minh": nguoi dung sua duoc so thich khi
@@ -163,7 +227,11 @@ export function AffiliateButton({
       className={className}
       {...AFFILIATE_LINK_ATTRS}
     >
-      {children ?? `Mua trên ${link.platform === 'shopee' ? 'Shopee' : 'TikTok'}`}
+      {/* CO Y khong ghi ten san vao nut. Mot set do co the tron ca link Shopee
+          lan TikTok Shop, nen mot nut ghi "Mua tren Shopee" nam canh mot nut
+          "Mua tren TikTok" trong roi va de bam nham. Ten san van hien o the
+          nho ben canh, do la cho dung de noi no. */}
+      {children ?? 'Xem sản phẩm'}
     </a>
   );
 }

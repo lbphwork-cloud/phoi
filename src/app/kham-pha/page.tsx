@@ -62,7 +62,7 @@ function Discover() {
   const [priceStep, setPriceStep] = useState(0);
   const [menhOnly, setMenhOnly] = useState(false);
 
-  const { outfits, loading, error, total } = useOutfits(filters, ctx, tax.colorElements, 120);
+  const { outfits, loading, error, total, reload } = useOutfits(filters, ctx, tax.colorElements, 120);
 
   const element = privateData?.element ?? null;
   const menhEnabled = privateData?.element_enabled ?? true;
@@ -265,7 +265,14 @@ function Discover() {
         <>
           <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-x-6 lg:grid-cols-4">
             {visible.map((o) => (
-              <OutfitCard key={o.id} outfit={o} score={o.score} />
+              <OutfitCard
+                key={o.id}
+                outfit={o}
+                score={o.score}
+                // Sau khi ghi phan hoi, tai lai danh sach de bo cham diem
+                // xep lai thu tu ngay — set vua bam se tut xuong cuoi.
+                onDislike={reload}
+              />
             ))}
           </div>
 

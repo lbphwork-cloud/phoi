@@ -54,7 +54,7 @@ export function useOutfits(
   const now = useStableNow();
   const key = JSON.stringify(filters) + '|' + limit;
 
-  const { data, loading, error } = useAsyncData<Outfit[]>(key, (sb) => {
+  const { data, loading, error, reload } = useAsyncData<Outfit[]>(key, (sb) => {
     let q = sb
       .from('outfits')
       .select('*')
@@ -98,6 +98,11 @@ export function useOutfits(
     /** Da sap xep theo diem, da loai outfit bi an */
     outfits: ranked.map((r) => ({ ...r.raw, score: r.score })),
     total: rows.length,
+    /**
+     * Tai lai danh sach. Dung sau khi nguoi dung gui phan hoi: bo cham diem
+     * doc feedback_events, nen phai lay lai moi thay thu tu doi.
+     */
+    reload,
   };
 }
 
