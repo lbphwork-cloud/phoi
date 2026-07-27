@@ -50,7 +50,44 @@ export interface PromptInput {
   items: Array<{ roleLabel: string; name: string; colorLabel?: string }>;
   sceneId: string;
   modelTypeId: string;
+  /** Co gui anh tung mon lam mau tham chieu khong. Doi cach viet cau lenh. */
+  hasReferences?: boolean;
+  /**
+   * So lan bam "tao lai". Moi lan doi nhe cau lenh — gui y het thi mo hinh hay
+   * tra ve anh gan giong anh cu, bam ba lan van thay nhu mot.
+   */
+  variation?: number;
 }
+
+/** Vai tro can co de mot bo do trong hoan chinh trong anh. */
+const CORE_ROLES: Array<{ key: string; match: RegExp; filler: string }> = [
+  { key: 'top',    match: /áo|ao/i,          filler: 'a plain well-fitted top in a neutral tone' },
+  { key: 'bottom', match: /quần|quan/i,      filler: 'plain straight-leg trousers in a neutral tone' },
+  { key: 'shoes',  match: /giày|giay/i,      filler: 'simple low-profile sneakers in a neutral tone' },
+];
+
+/**
+ * Nhung vai tro chua co trong set, de cau lenh tu bu vao.
+ *
+ * VI SAO PHAI BU
+ *   Nguoi dang co the moi nhap ao va quan. Neu cau lenh chi noi hai mon do thi
+ *   mo hinh tu bia ra giay — thuong la mot doi loe loet pha het tong mau. Noi
+ *   ro "giay tron, mau trung tinh" thi phan bu do khong cuop mat su chu y khoi
+ *   nhung mon that su co trong set.
+ */
+function fillersFor(items: PromptInput['items']): string[] {
+  const have = items.map((i) => i.roleLabel).join(' ');
+  return CORE_ROLES.filter((r) => !r.match.test(have)).map((r) => r.filler);
+}
+
+/** Cach dien dat khac nhau cho tung lan bam "tao lai". */
+const VARIATIONS = [
+  '',
+  ' Slightly different camera angle and pose from a typical catalogue shot.',
+  ' Three-quarter view, weight on one leg, hands relaxed.',
+  ' Slightly wider framing with more headroom and floor visible.',
+  ' Softer directional light from one side.',
+];
 
 /**
  * Dung cau lenh. Viet bang tieng Anh vi cac mo hinh tao anh hieu tieng Anh tot
@@ -64,10 +101,23 @@ export function buildImagePrompt(input: PromptInput): string {
     .map((it) => `${it.roleLabel.toLowerCase()}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`)
     .join('; ');
 
+  const fillers = fillersFor(input.items);
+  const variation = VARIATIONS[(input.variation ?? 0) % VARIATIONS.length];
+
   return [
     'Editorial menswear fashion photograph.',
+    // Khi co anh mau, phai noi RO rang cac anh dau vao la quan ao can tai hien.
+    // Khong noi thi mo hinh hay coi chung la "anh tham khao phong cach" va ve
+    // ra mot bo do khac han.
+    input.hasReferences
+      ? 'The attached images are the actual garments to depict. Reproduce their ' +
+        'colour, cut and material faithfully. Do not substitute different garments.'
+      : '',
     `Subject: one Southeast Asian man, mid-twenties, ${model.en}, natural expression, standing.`,
     `Outfit to depict — ${garments}.`,
+    fillers.length
+      ? `Complete the look with ${fillers.join(', ')} — keep these secondary and unobtrusive.`
+      : '',
     `Overall colour palette: ${input.colorLabels.join(', ')}.`,
     `Style direction: ${input.styleLabel}. Suited for: ${input.occasionLabel}.`,
     `Setting: ${scene.en}.`,
@@ -78,7 +128,7 @@ export function buildImagePrompt(input: PromptInput): string {
     'Must not resemble any real or identifiable person.',
     'Must not look like an illustration, painting, 3D render or cartoon.',
     'No collage, no split frames, no multiple people.',
-  ].join(' ');
+  ].filter(Boolean).join(' ') + variation;
 }
 
 /**
@@ -173,6 +223,8 @@ export async function requestAiImage(args: {
   outfitId?: string | null;
   /** Ten mo hinh. De trong thi function dung mac dinh cua nha cung cap. */
   model?: string;
+  /** Anh tung mon, gui kem lam mau tham chieu. */
+  referenceUrls?: string[];
 }): Promise<GenerateResult> {
   const sb = getSupabase();
   if (!sb) {
@@ -185,6 +237,7 @@ export async function requestAiImage(args: {
         provider: args.provider,
         prompt: args.prompt,
         outfitId: args.outfitId ?? null,
+        ...(args.referenceUrls?.length ? { referenceUrls: args.referenceUrls } : {}),
         ...(args.model ? { model: args.model } : {}),
       },
     });

@@ -221,3 +221,36 @@ export function roleFromCategory(cat: string): string {
 export function platformFromUrl(url: string): Platform | null {
   return checkAffiliateUrl(url).platform;
 }
+
+/**
+ * Doan mau san pham tu ten.
+ *
+ * Nguoi ban tren Shopee gan nhu luon ghi mau trong ten san pham ("Ao thun nam
+ * mau den", "Quan chinos be"), nen day la nguon du lieu san co ma truoc gio bo
+ * khong. Doan duoc thi do cho nguoi dang mot lan chon.
+ *
+ * CO Y TRA VE null KHI KHONG CHAC. Dien sai mau con te hon de trong: mau la
+ * dau vao cua ca bo loc lan goi y theo menh, nen mot mau sai lam lech ket qua
+ * cua nguoi dung ma ho khong biet vi sao.
+ *
+ * Danh sach bam theo cot `slug` cua bang colors.
+ */
+const COLOR_HINTS: Array<[RegExp, string]> = [
+  [/\btrắng\b|\btrang\b|\bwhite\b/i, 'trang'],
+  [/\bđen\b|\bden\b|\bblack\b/i, 'den'],
+  [/\bxám\b|\bxam\b|\bghi\b|\bgrey\b|\bgray\b/i, 'xam-nhat'],
+  [/\bkem\b|\bcream\b|\boff.?white\b/i, 'kem'],
+  [/\bbe\b|\bbeige\b/i, 'be'],
+  [/\bnavy\b|xanh\s*navy|xanh\s*than/i, 'navy'],
+  [/\bolive\b|\brêu\b|\breu\b/i, 'olive'],
+  [/\bnâu\b|\bnau\b|\bbrown\b/i, 'nau-nhat'],
+  [/xanh\s*dương|xanh\s*duong|\bblue\b/i, 'xanh-duong'],
+  [/xanh\s*lá|xanh\s*la|\bgreen\b/i, 'xanh-la'],
+  [/\bđỏ\b|\bdo\b|\bred\b/i, 'do'],
+  [/\bvàng\b|\bvang\b|\byellow\b/i, 'vang'],
+];
+
+export function guessColorSlug(name: string): string | null {
+  for (const [re, slug] of COLOR_HINTS) if (re.test(name)) return slug;
+  return null;
+}

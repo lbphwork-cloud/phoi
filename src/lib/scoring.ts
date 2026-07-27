@@ -131,6 +131,16 @@ export function scoreOutfit(
   }
 
   // --- Menh (diem cong mem, khong phai bo loc cung) ----------------------
+  //
+  // PHONG CACH "PHA CACH" DUOC MIEN PHAN TRU DIEM.
+  //   Ca y do cua phong cach do la tron mau lech nhau co chu dich. Tru diem no
+  //   vi "co mau nen han che theo menh" la dung mot he quy chieu de phat mot
+  //   phong cach duoc dinh nghia bang viec pha he quy chieu do.
+  //
+  //   Phan CONG diem thi van giu: mot set pha cach ma tinh co hop menh thi van
+  //   dang duoc uu tien hon, khong co ly do gi bo.
+  const isPhaCach = outfit.styleSlug === 'pha-cach';
+
   if (ctx.element && ctx.elementEnabled) {
     const g = colorGuidanceFor(ctx.element);
     let pos = 0;
@@ -148,7 +158,7 @@ export function scoreOutfit(
     neg = clamp(neg, ELEM_NEGATIVE_CAP, 0);
 
     add('Màu hợp mệnh của bạn', pos);
-    add('Có màu nên hạn chế theo mệnh', neg);
+    if (!isPhaCach) add('Có màu nên hạn chế theo mệnh', neg);
   }
 
   // --- Phan hoi tieu cuc -------------------------------------------------

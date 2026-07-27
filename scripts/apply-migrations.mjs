@@ -142,8 +142,8 @@ async function runChecks(db) {
              (select count(*) from occasions)::int as occasions
     `);
     report(
-      '0005 — 8 phong cach / 17 mau / 8 dip',
-      r.styles === 8 && r.colors === 17 && r.occasions === 8,
+      '0005+0010 — 9 phong cach / 17 mau / 8 dip',
+      r.styles === 9 && r.colors === 17 && r.occasions === 8,
       `${r.styles} / ${r.colors} / ${r.occasions}`,
     );
   }

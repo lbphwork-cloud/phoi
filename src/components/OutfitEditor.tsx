@@ -22,7 +22,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useAuth, useTaxonomy, useRateLimit } from '@/lib/hooks';
 import { checkAffiliateUrl } from '@/lib/affiliate';
 import {
-  fetchProductFromUrl, guessCategory, platformFromUrl, roleFromCategory,
+  fetchProductFromUrl, guessCategory, guessColorSlug, platformFromUrl, roleFromCategory,
 } from '@/lib/fetchProduct';
 import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
@@ -153,6 +153,9 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   const [aiMessage, setAiMessage] = useState<string | null>(null);
   const [aiUrls, setAiUrls] = useState<string[]>([]);
   const [heroUrlDirect, setHeroUrlDirect] = useState<string>('');
+  // Moi lan bam "Tao lai" tang len 1 de cau lenh doi nhe — xem VARIATIONS
+  // trong src/lib/aiImage.ts.
+  const [aiRound, setAiRound] = useState(0);
   const [descBusy, setDescBusy] = useState(false);
   const [descMessage, setDescMessage] = useState<string | null>(null);
   const [showPromptVi, setShowPromptVi] = useState(false);
@@ -220,6 +223,31 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
    * Cau lenh duoc dung tu ten cac mon, mau, phong cach va dip — nen anh ra bam
    * theo bai nay chu khong phai mot anh thoi trang chung chung.
    */
+  /**
+   * Du kien tao anh AI duoc chua, va con thieu gi.
+   *
+   * DIEU KIEN COT LOI: moi mon DA NHAP deu phai co anh. Set khong can du
+   * ao-quan-giay — thieu vai tro nao thi cau lenh tu bu mot mon trung tinh
+   * (xem fillersFor trong src/lib/aiImage.ts). Nhung mon da nhap ma khong co
+   * anh thi mo hinh phai tu bia, va cai no bia se khong giong mon that.
+   */
+  const aiReady = (() => {
+    const named = items.filter((i) => i.name.trim());
+    const missing: string[] = [];
+
+    if (named.length === 0) {
+      missing.push('Chưa nhập món nào. AI cần biết dựng gì.');
+    }
+    for (const i of named) {
+      if (!i.imageUrl.trim()) {
+        missing.push(`"${i.name.trim()}" chưa có ảnh — lấy từ link hoặc tự tải lên.`);
+      }
+    }
+    if (!styleSlug) missing.push('Chưa chọn phong cách cho set.');
+
+    return { ok: missing.length === 0, missing };
+  })();
+
   /** Du lieu dung chung cho ca cau lenh tao anh lan cau lenh viet mo ta. */
   const promptInput = () => ({
     outfitTitle: title,
@@ -235,6 +263,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       })),
     sceneId,
     modelTypeId,
+    hasReferences: true,
+    variation: aiRound,
   });
 
   /** AI viet mo ta bang tieng Viet. Ket qua la BAN NHAP, nguoi dung sua lai. */
@@ -256,7 +286,13 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
     const prompt = buildImagePrompt(promptInput());
 
-    const r = await requestAiImage({ provider: aiProvider, prompt });
+    const r = await requestAiImage({
+      provider: aiProvider,
+      prompt,
+      // Anh cua tung mon lam mau tham chieu. Day la ly do nut nay bi khoa
+      // cho den khi moi mon deu co anh.
+      referenceUrls: items.map((i) => i.imageUrl).filter(Boolean),
+    });
     setAiBusy(false);
     setAiMessage(r.message);
 
@@ -310,6 +346,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       name: it.name || d.name || '',
       priceVnd: it.priceVnd || (d.price_vnd ? String(d.price_vnd) : ''),
       imageUrl: it.imageUrl || d.image_url || '',
+      // Chi dien mau khi nguoi dung CHUA chon: khong ghi de lua chon cua ho.
+      colorSlug: it.colorSlug || guessColorSlug(d.name ?? '') || '',
       category: it.name ? it.category : guessedCat,
       role: it.name ? it.role : (roleFromCategory(guessedCat) as ItemRole),
       platform: d.platform ?? check.platform,
@@ -614,17 +652,40 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={aiBusy || items.every((i) => !i.name.trim())}
-            onClick={() => void generateAiImage()}
-          >
-            {aiBusy ? 'Đang tạo ảnh…' : 'Tạo ảnh set đồ bằng AI'}
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={aiBusy || !aiReady.ok}
+              onClick={() => { setAiRound(0); void generateAiImage(); }}
+            >
+              {aiBusy ? 'Đang tạo ảnh…' : 'Tạo ảnh set đồ bằng AI'}
+            </button>
 
-          {items.every((i) => !i.name.trim()) && (
-            <p className="hint">Nhập tên ít nhất một món trước đã — AI cần biết dựng gì.</p>
+            {aiUrls.length > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm btn-quiet"
+                disabled={aiBusy || !aiReady.ok}
+                onClick={() => { setAiRound((n) => n + 1); void generateAiImage(); }}
+              >
+                Tạo lại (khác đi)
+              </button>
+            )}
+          </div>
+
+          {/* Noi RO con thieu gi, thay vi chi khoa nut roi de nguoi dung tu doan. */}
+          {!aiReady.ok && (
+            <div className="notice mt-3">
+              <p className="text-sm">Chưa tạo được ảnh vì:</p>
+              <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+                {aiReady.missing.map((m) => <li key={m}>{m}</li>)}
+              </ul>
+              <p className="hint mt-2">
+                AI dùng chính ảnh của từng món làm mẫu, nên món nào chưa có ảnh thì
+                nó phải tự bịa ra — và cái nó bịa sẽ không giống món bạn bán.
+              </p>
+            </div>
           )}
 
           <button

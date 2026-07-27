@@ -96,10 +96,70 @@ interface GeneratedImage {
  * gemini-2.5-flash-image). Nen ten mo hinh nhan tu tham so `model` de doi duoc
  * ngay trong giao dien, khong phai trien khai lai function.
  */
+/**
+ * Cac ten mien duoc phep tai anh mau ve.
+ *
+ * KHONG cho tai anh tu dia chi tuy y. Function nay chay tren may chu cua
+ * Supabase; neu no chiu tai bat ky URL nao nguoi dung gui len thi no thanh mot
+ * cong cu do quet mang noi bo (SSRF) — go dia chi 169.254.169.254 vao la doc
+ * duoc thong tin may chu.
+ *
+ * Chi hai nhom: Storage cua chinh project nay, va CDN anh cua hai san. Ca hai
+ * deu la noi anh san pham that su nam.
+ */
+function isAllowedImageHost(u: URL): boolean {
+  const host = u.hostname.toLowerCase();
+  const own = new URL(Deno.env.get('SUPABASE_URL') ?? 'https://invalid').hostname;
+  if (host === own) return true;
+  return [
+    'down-vn.img.susercontent.com',
+    'cf.shopee.vn',
+    'p16-oec-va.ibyteimg.com',
+    'p16-oec-sg.ibyteimg.com',
+  ].some((d) => host === d || host.endsWith('.' + d));
+}
+
+/**
+ * Tai anh mau ve va doi sang dang inline cho Gemini.
+ *
+ * Anh nao tai khong duoc thi BO QUA chu khong lam hong ca lan tao: mat mot anh
+ * tham chieu chi lam ket qua kem chinh xac hon, con bao loi thi nguoi dung
+ * khong tao duoc gi ca.
+ */
+async function loadReferenceImages(
+  urls: string[],
+): Promise<Array<{ inline_data: { mime_type: string; data: string } }>> {
+  const out: Array<{ inline_data: { mime_type: string; data: string } }> = [];
+
+  for (const raw of urls.slice(0, 6)) {
+    try {
+      const u = new URL(raw);
+      if (u.protocol !== 'https:' || !isAllowedImageHost(u)) continue;
+
+      const res = await fetch(u.toString(), { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) continue;
+
+      const type = res.headers.get('content-type') ?? '';
+      if (!type.startsWith('image/')) continue;
+
+      const buf = new Uint8Array(await res.arrayBuffer());
+      // Bo anh qua lon: moi anh vao thang so token cua lan goi.
+      if (buf.byteLength > 4 * 1024 * 1024) continue;
+
+      let bin = '';
+      for (const b of buf) bin += String.fromCharCode(b);
+      out.push({ inline_data: { mime_type: type.split(';')[0], data: btoa(bin) } });
+    } catch { /* bo qua anh nay */ }
+  }
+
+  return out;
+}
+
 async function generateWithGemini(
   apiKey: string,
   prompt: string,
   model: string,
+  referenceUrls: string[] = [],
 ): Promise<GeneratedImage[]> {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -112,7 +172,10 @@ async function generateWithGemini(
       'x-goog-api-key': apiKey,
     },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      // Anh mau di TRUOC cau lenh. Gemini doc cac phan theo thu tu, va dat anh
+      // truoc giup mo hinh coi chung la tham chieu cho cau lenh phia sau chu
+      // khong phai mot yeu cau roi rac.
+      contents: [{ parts: [...(await loadReferenceImages(referenceUrls)), { text: prompt }] }],
       generationConfig: { responseModalities: ['IMAGE'] },
     }),
     signal: AbortSignal.timeout(90_000),
@@ -356,6 +419,8 @@ Deno.serve(async (req) => {
     model?: string;
     /** 'image' (mac dinh) hoac 'text' de viet mo ta bang tieng Viet. */
     mode?: string;
+    /** Anh cua tung mon, dung lam mau tham chieu cho mo hinh anh. */
+    referenceUrls?: string[];
   };
   try {
     body = await req.json();
@@ -367,6 +432,9 @@ Deno.serve(async (req) => {
   const prompt = String(body.prompt ?? '').trim();
   const outfitId = body.outfitId ?? null;
   const mode = body.mode === 'text' ? 'text' : 'image';
+  const referenceUrls = Array.isArray(body.referenceUrls)
+    ? body.referenceUrls.filter((x): x is string => typeof x === 'string')
+    : [];
   const model = String(
     body.model ?? (mode === 'text' ? DEFAULT_TEXT_MODEL[provider] : DEFAULT_MODEL[provider]) ?? '',
   );
@@ -474,7 +542,7 @@ Deno.serve(async (req) => {
     // --- Goi nha cung cap -------------------------------------------------
     const images =
       provider === 'gemini'
-        ? await generateWithGemini(apiKey, prompt, model)
+        ? await generateWithGemini(apiKey, prompt, model, referenceUrls)
         : await generateWithOpenAI(apiKey, prompt, model);
 
     // --- Tai anh len storage ----------------------------------------------

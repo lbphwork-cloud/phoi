@@ -50,7 +50,7 @@ async function main() {
   const [{ n: nItems }]     = await q(`select count(*)::int n from outfit_items`);
   const [{ n: nLinks }]     = await q(`select count(*)::int n from affiliate_links where is_seed`);
 
-  report('8 phong cach',  nStyles === 8,  `co ${nStyles}`);
+  report('9 phong cach (8 goc + Pha cach)', nStyles === 9, `co ${nStyles}`);
   report('17 mau',        nColors === 17, `co ${nColors}`);
   report('8 dip su dung', nOcc === 8,     `co ${nOcc}`);
   report('45 san pham',   nProducts === 45, `co ${nProducts}`);
