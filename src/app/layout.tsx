@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
+import { createClient } from '@supabase/supabase-js';
 import {
   Be_Vietnam_Pro, Inter, Manrope, Montserrat, Playfair_Display, EB_Garamond, Oswald,
 } from 'next/font/google';
 import './globals.css';
-import { PageTransition, SiteFooter, SiteHeader, TypographyStyle } from '@/components/site';
+import { Favicon, PageTransition, SiteFooter, SiteHeader, TypographyStyle } from '@/components/site';
 
 /**
  * next/font TAI FONT VE VA TU LUU TAI MAY CHU luc build, roi phuc vu tu chinh
@@ -77,18 +78,102 @@ const FONT_VARS = [
   playfair.variable, garamond.variable, oswald.variable,
 ].join(' ');
 
-export const metadata: Metadata = {
-  title: {
-    default: 'PHỐI — Phối đồ nam theo gu và theo mệnh',
-    template: '%s · PHỐI',
-  },
+/**
+ * Doc phan nhan dien website tu database LUC DUNG TRANG.
+ *
+ * VI SAO PHAI LA LUC DUNG TRANG CHU KHONG PHAI LUC CHAY
+ *   Google, Facebook, Zalo doc the <meta> trong HTML tra ve. Phan lon chung
+ *   KHONG chay JavaScript truoc khi doc. Nen mot doan mo ta chi duoc dat luc
+ *   trang chay se khong bao gio den duoc ket qua tim kiem.
+ *
+ *   Doi lai: sua o quan tri xong phai trien khai lai trang thi chung moi thay.
+ *   Su that nay duoc viet thang vao goi y cua o nhap, khong giau trong code.
+ *
+ * KHONG DOC DUOC THI DUNG BAN VIET SAN
+ *   Luc build tren Cloudflare co the thieu bien moi truong, hoac database co
+ *   the khong tra loi. Trong ca hai truong hop trang van phai co mo ta —
+ *   khong co mo ta thi ket qua tim kiem hien mot doan chu bat ky lay tu than
+ *   trang, thuong la vo nghia.
+ */
+const META_FALLBACK = {
+  title: 'PHỐI — Phối đồ nam theo gu và theo mệnh',
   description:
     'Gợi ý phối đồ nam trong khoảng 150.000 – 700.000đ, cá nhân hoá theo phong cách, ' +
     'màu sắc và niên mệnh ngũ hành. Mua trên Shopee và TikTok Shop.',
-  applicationName: 'PHỐI',
-  // Khong dat metadataBase o day: ten mien chua co (dang dung *.pages.dev).
-  // Khi co ten mien that thi them metadataBase de anh og: co duong dan tuyet doi.
 };
+
+async function readSiteMeta(): Promise<{ description: string; image: string }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    console.warn('[PHOI] Luc build khong co bien Supabase — dung mo ta viet san.');
+    return { description: META_FALLBACK.description, image: '' };
+  }
+
+  try {
+    // DUNG THU VIEN SUPABASE CHU KHONG DUNG fetch() TRAN.
+    //
+    // Next thay the fetch() toan cuc bang ban cua no de quan ly bo nho dem. Mot
+    // loi goi fetch() co `cache: 'no-store'` bien ca trang thanh trang DONG —
+    // dieu bi cam trong che do xuat tinh, va build bao loi cho MOI trang. Da
+    // mac dung loi do: mo ta khong bao gio duoc doc, va trang lang le dung ban
+    // viet san.
+    //
+    // Thu vien supabase-js goi mang bang duong khac nen khong bi Next dem,
+    // cung khong lam trang thanh dong. Day cung la cach generateStaticParams
+    // cua trang outfit dang lam.
+    const sb = createClient(url, key);
+    const { data, error } = await sb
+      .from('site_content')
+      .select('key, value')
+      .in('key', ['site.description', 'site.share_image']);
+
+    if (error) throw new Error(error.message);
+
+    const get = (k: string) =>
+      (data ?? []).find((r) => r.key === k)?.value?.trim() ?? '';
+
+    return {
+      description: get('site.description') || META_FALLBACK.description,
+      image: get('site.share_image'),
+    };
+  } catch (e) {
+    console.warn('[PHOI] Khong doc duoc mo ta website luc build:', (e as Error).message);
+    return { description: META_FALLBACK.description, image: '' };
+  }
+}
+
+/**
+ * BO NHO DEM CUA BAN DUNG.
+ *   Next luu lai trang da dung trong .next/cache. Doi mo ta trong database ma
+ *   khong doi mot dong ma nguon nao thi lan dung tiep theo se dung lai trang cu
+ *   — HTML van mang mo ta cu. Da mac dung loi do luc thu.
+ *
+ *   Vi vay lenh `build:static` xoa .next/cache truoc moi lan dung. Tren
+ *   Cloudflare thi moi lan dung deu la may moi nen khong co van de nay.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const meta = await readSiteMeta();
+
+  return {
+    title: {
+      default: META_FALLBACK.title,
+      template: '%s · PHỐI',
+    },
+    description: meta.description,
+    applicationName: 'PHỐI',
+    openGraph: {
+      title: META_FALLBACK.title,
+      description: meta.description,
+      type: 'website',
+      ...(meta.image ? { images: [{ url: meta.image }] } : {}),
+    },
+    // Khong dat metadataBase o day: ten mien chua co (dang dung *.pages.dev).
+    // Khi co ten mien that thi them metadataBase de anh og: co duong dan tuyet doi.
+  };
+}
+
 
 export const viewport = {
   width: 'device-width',
@@ -106,6 +191,7 @@ export default function RootLayout({
         {/* Kieu chu do quan tri vien chon, do vao bien CSS o goc tai luc chay.
             Dat TRUOC moi thu khac de chu khong nhay kieu sau khi tai xong. */}
         <TypographyStyle />
+        <Favicon />
         <SiteHeader />
         <main className="flex-1">
           <PageTransition>{children}</PageTransition>

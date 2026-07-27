@@ -7,7 +7,7 @@
     "//build": "Build thường, để kiểm tra nhanh. Không tạo thư mục out/.",
     "build": "next build",
     "//build:static": "Build để triển khai lên Cloudflare Pages. Kết quả ở out/.",
-    "build:static": "BUILD_STATIC=1 next build",
+    "build:static": "rm -rf .next/cache && BUILD_STATIC=1 next build",
     "//deploy": "Build lai roi day len Cloudflare Pages. Can CLOUDFLARE_API_TOKEN trong .env.local.",
     "deploy": "npm run build:static && node scripts/deploy-pages.mjs",
     "start": "next start",

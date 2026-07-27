@@ -8,11 +8,19 @@ import { useContent } from '@/lib/content';
 import { typographyCss } from '@/lib/typography';
 import { SearchBox } from '@/components/SearchBox';
 
+/**
+ * Cac muc tren thanh menu.
+ *
+ * `key` la khoa trong bang noi dung, `fallback` la chu viet cung trong ma nguon
+ * de trang van du chu khi database khong goi duoc. Duong dan thi KHONG sua duoc
+ * tu trang quan tri: doi duong dan la lam hong lien ket, va do phai la mot thay
+ * doi co y trong ma nguon chu khong phai mot cu bam nham.
+ */
 const NAV = [
-  { href: '/kham-pha', label: 'Khám phá' },
-  { href: '/gio-hang', label: 'Giỏ hàng' },
-  { href: '/tao-bai', label: 'Tạo bài' },
-  { href: '/bai-cua-toi', label: 'Bài của tôi' },
+  { href: '/kham-pha', key: 'nav.discover', fallback: 'Discover' },
+  { href: '/gio-hang', key: 'nav.cart', fallback: 'Cart' },
+  { href: '/tao-bai', key: 'nav.create', fallback: 'Create' },
+  { href: '/bai-cua-toi', key: 'nav.my_posts', fallback: 'My posts' },
 ];
 
 /**
@@ -48,8 +56,40 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
   return <div key={pathname} className="page-in">{children}</div>;
 }
 
+/**
+ * Dat bieu tuong tab trinh duyet tu o noi dung, luc trang dang chay.
+ *
+ * VI SAO CAN CA HAI DUONG
+ *   Bieu tuong trong the <head> duoc ghi luc DUNG TRANG. Do la ban ma Google va
+ *   Facebook doc. Nhung sua o quan tri xong ma phai doi mot lan trien khai moi
+ *   thay bieu tuong moi thi rat kho hieu — nen component nay dat lai the <link>
+ *   ngay khi trang tai xong, de trinh duyet thay lien.
+ *
+ *   Hai duong nay khong mau thuan: mot cho may tim kiem, mot cho nguoi dung.
+ *   Cau giai thich do da duoc viet vao goi y cua chinh o nhap.
+ */
+export function Favicon() {
+  const c = useContent();
+  const href = c.t('site.favicon', '');
+
+  useEffect(() => {
+    if (!href) return;
+
+    // Xoa cac the icon co san roi dat lai mot cai. Chi doi `href` cua the cu
+    // thi mot so trinh duyet khong ve lai — chung chi doc the icon mot lan.
+    for (const el of document.querySelectorAll('link[rel~="icon"]')) el.remove();
+
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.href = href;
+    document.head.appendChild(link);
+  }, [href]);
+
+  return null;
+}
+
 export function SiteHeader() {
-  const { session, profile, isAdmin, loading, signOut } = useAuth();
+  const { session, isAdmin, loading, signOut } = useAuth();
   const { theme, cycle } = useTheme();
   const c = useContent();
   const pathname = usePathname();
@@ -62,7 +102,10 @@ export function SiteHeader() {
     return () => window.removeEventListener('popstate', close);
   }, []);
 
-  const themeLabel = theme === 'system' ? 'Tự động' : theme === 'light' ? 'Sáng' : 'Tối';
+  const themeLabel =
+    theme === 'system' ? c.t('nav.theme_auto', 'Auto')
+    : theme === 'light' ? c.t('nav.theme_light', 'Light')
+    : c.t('nav.theme_dark', 'Dark');
 
   /**
    * Logo. Hai o anh rieng cho nen sang va nen toi.
@@ -110,7 +153,7 @@ export function SiteHeader() {
 
   const navItems = [
     ...NAV,
-    ...(isAdmin ? [{ href: '/admin', label: 'Quản trị' }] : []),
+    ...(isAdmin ? [{ href: '/admin', key: 'nav.admin', fallback: 'Admin' }] : []),
   ];
 
   return (
@@ -140,7 +183,7 @@ export function SiteHeader() {
               className="navlink"
               aria-current={pathname === n.href ? 'page' : undefined}
             >
-              {n.label}
+              <span style={c.s(n.key)}>{c.t(n.key, n.fallback)}</span>
             </Link>
           ))}
         </nav>
@@ -210,16 +253,21 @@ export function SiteHeader() {
             <span className="navlink">…</span>
           ) : session ? (
             <>
+              {/* CHU CHUNG cho moi tai khoan, khong phai ten nguoi dang nhap.
+                  Ten nguoi dung dai ngan khac nhau nen thanh menu doi be ngang
+                  theo tung nguoi — va cot logo o giua bi xe dich theo. Ten cua
+                  minh thi nguoi dung da biet roi; cai ho can biet la bam vao
+                  day thi di dau. */}
               <Link href="/ho-so" className="navlink">
-                {profile?.display_name ?? 'Hồ sơ'}
+                <span style={c.s('nav.profile')}>{c.t('nav.profile', 'Profile')}</span>
               </Link>
               <button type="button" onClick={signOut} className="navlink">
-                Thoát
+                <span style={c.s('nav.sign_out')}>{c.t('nav.sign_out', 'Log out')}</span>
               </button>
             </>
           ) : (
             <Link href="/dang-nhap" className="navlink">
-              Đăng nhập
+              <span style={c.s('nav.sign_in')}>{c.t('nav.sign_in', 'Sign in')}</span>
             </Link>
           )}
         </div>
@@ -235,25 +283,25 @@ export function SiteHeader() {
                 onClick={() => setOpen(false)}
                 className="navlink justify-start"
               >
-                {n.label}
+                <span style={c.s(n.key)}>{c.t(n.key, n.fallback)}</span>
               </Link>
             ))}
             {session ? (
               <>
                 <Link href="/ho-so" onClick={() => setOpen(false)} className="navlink justify-start">
-                  Hồ sơ
+                  {c.t('nav.profile', 'Profile')}
                 </Link>
                 <button type="button" onClick={signOut} className="navlink justify-start">
-                  Đăng xuất
+                  {c.t('nav.sign_out', 'Log out')}
                 </button>
               </>
             ) : (
               <Link href="/dang-nhap" onClick={() => setOpen(false)} className="navlink justify-start">
-                Đăng nhập
+                {c.t('nav.sign_in', 'Sign in')}
               </Link>
             )}
             <button type="button" onClick={cycle} className="navlink justify-start">
-              Chế độ: {themeLabel}
+              {themeLabel}
             </button>
           </div>
         </div>
@@ -265,13 +313,34 @@ export function SiteHeader() {
 export function SiteFooter() {
   const c = useContent();
 
+  // Cung hai o anh voi thanh menu. Chan trang de logo to hon mot chut vi o do
+  // no la dau moc dong trang chu khong phai mot muc dieu huong.
+  const logoLight = c.t('site.logo.light', '');
+  const logoDark = c.t('site.logo.dark', '') || logoLight;
+  const logoHeight = c.t('site.logo.height', '28');
+
   return (
     <footer className="mt-24 border-t py-12" style={{ borderColor: 'var(--line)' }}>
       <div className="shell grid gap-10 md:grid-cols-3">
         <div>
-          <p className="display-xs mb-3" style={{ letterSpacing: '0.28em' }}>
-            <span style={c.s('site.name')}>{c.t('site.name', 'PHỐI')}</span>
-          </p>
+          {/* Dung chung hai o logo voi thanh menu — mot logo, mot cho thay doi.
+              Chua tai anh thi van hien chu, nhu truoc. */}
+          <div className="mb-3">
+            {logoLight ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoLight} alt="PHỐI" className="logo-light block w-auto"
+                     style={{ height: `${Number(logoHeight) * 1.4 || 40}px` }} />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={logoDark} alt="PHỐI" className="logo-dark w-auto"
+                     style={{ height: `${Number(logoHeight) * 1.4 || 40}px` }} />
+              </>
+            ) : (
+              <p className="display-xs" style={{ letterSpacing: '0.28em' }}>
+                <span style={c.s('site.name')}>{c.t('site.name', 'PHỐI')}</span>
+              </p>
+            )}
+          </div>
           <p className="muted text-sm">
             <span style={c.s('site.tagline')}>
               {c.t(
