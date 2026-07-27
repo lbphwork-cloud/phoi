@@ -20,7 +20,7 @@
  */
 
 import { useMemo } from 'react';
-import { useAsyncData } from './hooks';
+import { useAsyncData, useIsMobile } from './hooks';
 import { fieldStyleCss, parseFieldStyle } from './typography';
 
 export interface ContentRow {
@@ -92,9 +92,16 @@ export interface Content {
   rows: ContentRow[];
   loading: boolean;
   reload: () => void;
+  /** Dang hien o khung hep. De cho goi doi bo cuc chu khong chi doi noi dung. */
+  isMobile: boolean;
 }
 
 export function useContent(): Content {
+  // Khung dien thoai dung o ".mobile" khi o do co noi dung. Doc o day, mot lan
+  // cho ca trang, thay vi de tung component tu hoi — hai component hoi hai luc
+  // co the ra hai cau tra loi khac nhau ngay giua mot lan xoay may.
+  const isMobile = useIsMobile();
+
   const { data, loading, reload } = useAsyncData<ContentRow[]>('site-content', (sb) =>
     sb
       .from('site_content')
@@ -115,7 +122,22 @@ export function useContent(): Content {
     // Chuoi rong trong database cung tinh la "chua dat" -> dung ban du phong.
     // Nguoi dung xoa het chu trong o nhap thuong la muon quay ve mac dinh,
     // khong phai muon mot khoang trong.
+    /**
+     * BA TANG, theo dung thu tu:
+     *   1. o ban dien thoai (chi khi dang o khung hep, va chi khi co noi dung)
+     *   2. o ban may tinh
+     *   3. ban du phong viet trong ma nguon
+     *
+     * O dien thoai de trong nghia la "khong co gi rieng", khong phai "de trong
+     * tren dien thoai". Do la lua chon co y: neu rong tren dien thoai la an
+     * that thi moi lan them mot o chu moi, ai do lai phai nho di dien ca hai
+     * ban — va se co ngay quen.
+     */
     const t = (key: string, fallback: string) => {
+      if (isMobile) {
+        const m = map.get(`${key}.mobile`);
+        if (m !== undefined && m.trim() !== '') return m;
+      }
       const v = map.get(key);
       return v === undefined || v.trim() === '' ? fallback : v;
     };
@@ -131,8 +153,8 @@ export function useContent(): Content {
     const s = (key: string): React.CSSProperties =>
       fieldStyleCss(parseFieldStyle(map.get(`${key}.style`) ?? ''));
 
-    return { t, list, s, rows, loading, reload };
-  }, [map, rows, loading, reload]);
+    return { t, list, s, rows, loading, reload, isMobile };
+  }, [map, rows, loading, reload, isMobile]);
 }
 
 /**

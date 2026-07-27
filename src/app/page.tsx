@@ -220,9 +220,9 @@ function Home() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-20 md:gap-28">
+          <div className={`flex flex-col ${c.isMobile ? "gap-0" : "gap-20 md:gap-28"}`}>
             {styles.slice(0, BIG_BLOCKS).map((s, i) => (
-              <StyleBlock key={s.slug} style={s} flip={i % 2 === 1} />
+              <StyleBlock key={s.slug} style={s} flip={i % 2 === 1} isMobile={c.isMobile} />
             ))}
           </div>
 
@@ -302,12 +302,62 @@ function Home() {
 function StyleBlock({
   style,
   flip,
+  isMobile,
 }: {
   style: { slug: string; label: string; desc: string; image: string };
   flip: boolean;
+  isMobile: boolean;
 }) {
   const ref = useReveal<HTMLDivElement>();
   const href = `/kham-pha?style=${encodeURIComponent(style.slug)}`;
+
+  /*
+    HAI BO CUC HOAN TOAN KHAC NHAU, khong phai mot bo cuc co gian.
+
+    Man hinh rong: anh mot ben, chu mot ben, doi ben theo hang. Bo cuc nay can
+    be ngang — dat no tren dien thoai thi anh teo lai con mot nua man hinh va
+    chu bi ep thanh cot hep.
+
+    Dien thoai: anh tran het chieu ngang, chu va nut nam GIUA anh. Man hinh doc
+    thi chieu cao la thu doi dao nhat, va mot buc anh cao tran vien manh hon
+    han mot cap anh-chu nam canh nhau.
+  */
+  if (isMobile) {
+    return (
+      <div ref={ref} className="reveal bleed">
+        <Link href={href} className="group block">
+          <div className="hero-media drift" style={{ aspectRatio: '3 / 4' }}>
+            {style.image && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={style.image} alt={style.label} loading="lazy" />
+            )}
+
+            {/* Lop phu tu duoi len: chu nam o nua duoi anh nen chi can dim
+                phan do. Dim ca buc anh se lam mat chinh thu dang ban. */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  'linear-gradient(to top, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.22) 46%, rgba(0,0,0,0) 72%)',
+              }}
+              aria-hidden="true"
+            />
+
+            <div
+              className="hero-body flex w-full flex-col items-center justify-end px-6 pb-10 text-center"
+              style={{ color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.35), 0 2px 14px rgba(0,0,0,0.4)' }}
+            >
+              <p className="display-sm mb-3">{style.label}</p>
+              {style.desc && (
+                <p className="mb-6 max-w-xs text-sm leading-relaxed">{style.desc}</p>
+              )}
+              <span className="btn btn-onmedia">Khám phá</span>
+            </div>
+          </div>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="reveal shell">

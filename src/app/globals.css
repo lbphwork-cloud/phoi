@@ -481,30 +481,43 @@ img { max-width: 100%; height: auto; }
    lai: phong to dan lam anh nhu bi keo vao mat nguoi xem, con thu nho lai tao
    cam giac anh dang lang xuong dung cho. */
 @keyframes hero-settle {
-  from { transform: scale(1.06) translateY(-0.8%); }
+  from { transform: scale(1.12) translateY(-1.6%); }
   to   { transform: scale(1) translateY(0); }
 }
 .hero-media > img {
-  animation: hero-settle 1.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: hero-settle 2.1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Chu trong anh mo dau hien sau anh mot nhip. Do tre 0.25s la co y: mat nguoi
    bam vao chuyen dong lon truoc, chu hien cung luc se bi anh nuot mat. */
 @keyframes rise-in {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .hero-body {
-  animation: rise-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+  animation: rise-in 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
 }
+
+/* Cac dong chu trong anh mo dau hien LAN LUOT chu khong cung mot luc.
+   Do tre tang dan 90ms cho tung dong. Mat doc theo thu tu chu nho -> tieu de ->
+   nut, va do tre nho nay dan mat di dung thu tu do. Nhieu hon 90ms thi thanh
+   cho doi; it hon thi khong con cam thay gi. */
+.hero-body > * > * > *,
+.hero-body > * > * {
+  animation: rise-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-body > * > * > *:nth-child(1) { animation-delay: 0.35s; }
+.hero-body > * > * > *:nth-child(2) { animation-delay: 0.44s; }
+.hero-body > * > * > *:nth-child(3) { animation-delay: 0.53s; }
+.hero-body > * > * > *:nth-child(4) { animation-delay: 0.62s; }
 
 /* Chuyen trang: noi dung moi mo dan hien len va nhich len mot chut.
    Chi 8px va 0.45s — du de bao "day la trang khac" ma khong bat ai phai cho. */
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(22px) scale(0.994); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
-.page-in { animation: page-in 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.page-in { animation: page-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 /* Anh troi nhe nguoc chieu cuon.
    Dung animation-timeline cua CSS chu khong phai su kien cuon trong JavaScript:
@@ -514,8 +527,21 @@ img { max-width: 100%; height: auto; }
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     @keyframes drift {
-      from { transform: translateY(-2.5%) scale(1.05); }
-      to   { transform: translateY(2.5%) scale(1.05); }
+      from { transform: translateY(-7%) scale(1.16); }
+      to   { transform: translateY(7%) scale(1.16); }
+    }
+
+    /* Khoi noi dung phong nhe va sang dan khi cuon vao khung nhin.
+       Chay theo tien do cuon chu khong theo dong ho, nen no bam sat tay nguoi
+       dung — do la thu tao cam giac "manh" ma khong can bien do lon. */
+    @keyframes settle-in {
+      from { opacity: 0.55; transform: translateY(36px) scale(0.97); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .reveal {
+      animation: settle-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 65%;
     }
     /* Chi ap cho anh trong cac khoi phong cach, KHONG cho anh mo dau: anh mo
        dau da co hieu ung rieng, chong hai hieu ung len nhau se giat. */
@@ -541,6 +567,9 @@ img { max-width: 100%; height: auto; }
      nhay, va cu nhay do chinh la thu gay kho chiu. */
   .hero-media > img,
   .hero-body,
+  .hero-body > * > *,
+  .hero-body > * > * > *,
+  .reveal,
   .page-in,
   .drift > img {
     animation: none !important;

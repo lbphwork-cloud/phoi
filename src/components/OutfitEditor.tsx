@@ -190,6 +190,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   const [descBusy, setDescBusy] = useState(false);
   const [descMessage, setDescMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [showPromptVi, setShowPromptVi] = useState(false);
+  const [showRawPrompt, setShowRawPrompt] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Key AI cua chinh nguoi dang dang nhap. Quyet dinh nut tao anh co bam duoc
   // hay khong — xem aiReady ben duoi.
@@ -332,6 +334,28 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     }
     if (items.every((i) => !i.name.trim())) {
       missing.push('Chưa nhập món nào. AI cần biết viết về cái gì.');
+    }
+    if (!styleSlug) missing.push('Chưa chọn phong cách cho set.');
+    return { ok: missing.length === 0, missing };
+  })();
+
+  /**
+   * Du kien LAY CAU LENH duoc chua.
+   *
+   * Nhe hon han dieu kien tao anh: khong can key AI, khong can moi mon deu co
+   * anh. Chi can MOT mon da dien du ten, mau va gia — du de cau lenh mo ta duoc
+   * mot bo do that chu khong phai mot bo do chung chung.
+   *
+   * VI SAO CO DUONG NAY
+   *   Key AI la thu khong phai ai cung co, va voi nhieu nguoi thi di lay key la
+   *   mot rao can lon hon han viec dan mot doan chu vao ChatGPT. Duong nay cho
+   *   ho dung dung cong cu ho da co san.
+   */
+  const promptReady = (() => {
+    const full = items.filter((i) => i.name.trim() && i.colorSlug && i.priceVnd.trim());
+    const missing: string[] = [];
+    if (full.length === 0) {
+      missing.push('Cần ít nhất một sản phẩm đã điền đủ tên, màu và giá.');
     }
     if (!styleSlug) missing.push('Chưa chọn phong cách cho set.');
     return { ok: missing.length === 0, missing };
@@ -1093,6 +1117,76 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           >
             {showPromptVi ? 'Ẩn yêu cầu gửi cho AI' : 'Xem yêu cầu gửi cho AI'}
           </button>
+
+          {/* ------------------------------------------------------------ */}
+          {/* LAY CAU LENH — duong danh cho nguoi khong co API key          */}
+          {/* ------------------------------------------------------------ */}
+          <div className="mt-6 border-t pt-5" style={{ borderColor: 'var(--line)' }}>
+            <p className="eyebrow mb-2">Không có API key?</p>
+            <p className="hint mb-3">
+              Lấy câu lệnh rồi tự dán vào ChatGPT, Gemini hay bất kỳ công cụ tạo ảnh nào
+              bạn đang dùng. Ảnh tạo xong thì <strong>tự tải lên</strong> ở ô phía trên —
+              website không nhận được ảnh từ những công cụ đó.
+            </p>
+
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!promptReady.ok}
+              onClick={() => { setShowRawPrompt((v) => !v); setCopied(false); }}
+            >
+              {showRawPrompt ? 'Ẩn câu lệnh' : 'Lấy câu lệnh'}
+            </button>
+
+            {!promptReady.ok && (
+              <div className="notice mt-3">
+                <p className="text-sm">Chưa lấy được câu lệnh vì:</p>
+                <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+                  {promptReady.missing.map((m) => <li key={m}>{m}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {showRawPrompt && (
+              <div className="mt-4">
+                <textarea
+                  readOnly
+                  className="field"
+                  rows={8}
+                  value={buildImagePrompt({ ...promptInput(), hasReferences: false })}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={() => {
+                      // navigator.clipboard co the bi tu choi (khong phai HTTPS,
+                      // hoac nguoi dung chan quyen). O nhap ben tren van chon
+                      // duoc bang tay, nen that bai o day khong phai ngo cut.
+                      void navigator.clipboard
+                        ?.writeText(buildImagePrompt({ ...promptInput(), hasReferences: false }))
+                        .then(() => setCopied(true))
+                        .catch(() => setCopied(false));
+                    }}
+                  >
+                    Chép câu lệnh
+                  </button>
+                  {copied && (
+                    <span className="text-xs" style={{ color: 'var(--color-ok)' }}>
+                      Đã chép. Dán vào công cụ của bạn.
+                    </span>
+                  )}
+                </div>
+                <p className="hint mt-2">
+                  Câu lệnh viết bằng tiếng Anh — các mô hình tạo ảnh hiểu tiếng Anh tốt hơn
+                  hẳn. Bấm &ldquo;Xem yêu cầu gửi cho AI&rdquo; ở trên để đọc bản tiếng Việt.
+                  Ảnh tự tạo bằng công cụ ngoài vẫn phải đánh dấu &ldquo;Ảnh do AI tạo&rdquo;
+                  ở ô bên dưới.
+                </p>
+              </div>
+            )}
+          </div>
 
           {showPromptVi && (
             <div className="notice mt-4">

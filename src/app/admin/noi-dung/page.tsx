@@ -28,6 +28,7 @@ import { IMAGE_LIMITS } from '@/lib/format';
 import { UploadButton } from '@/components/UploadButton';
 import { FONT_LABEL, fieldStyleCss, parseFieldStyle } from '@/lib/typography';
 import { FieldStyleRow } from '@/components/FieldStyleRow';
+import { PreviewPane, usePreviewWidth } from '@/components/PreviewPane';
 import { Spinner, EmptyState } from '@/components/site';
 
 /** Nhan tieng Viet cho cac gia tri cua o `choice`. */
@@ -87,6 +88,11 @@ export default function ContentAdminPage() {
   // Mac dinh hien TAT CA trang. 47 khoa chia 9 nhom van cuon duoc, va thay
   // het mot luot thi de nhan ra cho nao con bo trong.
   const [activePage, setActivePage] = useState<string>('tat-ca');
+  /** O nao dang sua ban dien thoai. Mac dinh moi o deu o ban may tinh. */
+  const [variant, setVariant] = useState<Record<string, 'pc' | 'mobile'>>({});
+  /** O dang duoc go. Quyet dinh khung ben canh dang hien cai gi. */
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const [previewWidth, setPreviewWidth] = usePreviewWidth();
 
   if (c.loading) return <Spinner label="Đang tải nội dung" />;
   if (c.rows.length === 0) {
@@ -130,6 +136,39 @@ export default function ContentAdminPage() {
       const next = { ...d };
       delete next[r.key];
       return next;
+    });
+    c.reload();
+  };
+
+  /**
+   * Ghi mot gia tri vao CA HAI ban.
+   *
+   * Ghi tuan tu chu khong song song: neu ban thu hai loi thi nguoi dung can
+   * biet ban thu nhat da vao roi, de ho khong bam lai va ghi de mot lan nua.
+   */
+  const saveBoth = async (pc: ContentRow, mobile: ContentRow, value: string) => {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    setSavingKey(pc.key);
+    setErr(null);
+
+    for (const row of [pc, mobile]) {
+      const { error } = await sb.from('site_content').update({ value }).eq('key', row.key);
+      if (error) {
+        setSavingKey(null);
+        setErr(`Không lưu được "${row.label}": ${error.message}`);
+        return;
+      }
+    }
+
+    setSavingKey(null);
+    setSavedKey(pc.key);
+    setDraft((d) => {
+      const n = { ...d };
+      delete n[pc.key];
+      delete n[mobile.key];
+      return n;
     });
     c.reload();
   };
@@ -190,6 +229,80 @@ export default function ContentAdminPage() {
     image: c.rows.find((r) => r.key === 'home.hero.image'),
   };
 
+  /**
+   * Khoi xem truoc phan mo dau trang chu.
+   *
+   * Dung tu gia tri DANG GO, va dung chung ham `heroAppearance` voi trang that
+   * nen hai noi khong the lech nhau. Neu chung tu tinh rieng thi som muon ban
+   * xem truoc se noi doi — kieu loi lam nguoi ta het tin ca trang quan tri.
+   */
+  const heroPreview = hero.title ? (
+          <div>
+            <div
+              className={`hero-media flex ${look.alignClass}`}
+              style={{ minHeight: '24rem' }}
+            >
+              {hero.image && val(hero.image) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={val(hero.image)} alt="" aria-hidden="true" />
+              )}
+              {look.overlay !== 'none' && (
+                <div className="absolute inset-0" style={{ background: look.overlay }} aria-hidden="true" />
+              )}
+              {/* Ban xem truoc phai theo DUNG ca kieu bo cuc, khong chi mau sac.
+                  Neu no bo qua splitCta thi doi sang kieu "nut duoi day" se thay
+                  mot dang, ma trang that lai ra mot dang khac — luc do ban xem
+                  truoc noi doi, va do la kieu loi lam nguoi ta het tin trang
+                  quan tri. */}
+              <div
+                className={`hero-body flex w-full flex-col p-8 ${look.splitCta ? 'h-full' : ''}`}
+                style={look.textStyle}
+              >
+                <div className={look.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
+                  <div className={look.boxStyle ? 'inline-block p-6' : ''} style={look.boxStyle}>
+                    {/* Ban xem truoc phai ap CA kieu chu rieng cua tung o, dung
+                        cach trang that lam: len the <span> ben trong, khong len
+                        the mang lop. Neu khong thi doi co chu roi mo xem truoc se
+                        thay mot dang, ma trang that lai ra mot dang khac. */}
+                    {hero.eyebrow && (
+                      <p className="eyebrow mb-3" style={{ color: look.dimColor }}>
+                        <span style={styleOf(hero.eyebrow.key)}>{val(hero.eyebrow)}</span>
+                      </p>
+                    )}
+                    <p className="display-sm whitespace-pre-line">
+                      <span style={styleOf(hero.title.key)}>{val(hero.title)}</span>
+                    </p>
+                    {hero.subtitle && !look.hideSubtitle && (
+                      <p className="mt-4 max-w-lg text-sm leading-relaxed">
+                        <span style={styleOf(hero.subtitle.key)}>{val(hero.subtitle)}</span>
+                      </p>
+                    )}
+                    {hero.cta && !look.splitCta && (
+                      <span className={`btn btn-sm mt-6 ${look.buttonClass}`}>{val(hero.cta)}</span>
+                    )}
+                  </div>
+                </div>
+
+                {look.splitCta && hero.cta && (
+                  <div className="flex justify-center">
+                    <span className={`btn btn-sm ${look.buttonClass}`}>{val(hero.cta)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+  ) : null;
+
+  /**
+   * Xem truoc rieng cho o dang go, cho nhung o khong thuoc phan mo dau.
+   *
+   * Phan mo dau co khoi rieng vi no can ca anh nen, lop phu va bo cuc. Cac o
+   * con lai chi la chu, nen chi can dung lai dung kieu chu cua chung tren dung
+   * mau nen cua trang.
+   */
+  const focusedRow = focusedKey ? c.rows.find((r) => r.key === focusedKey) : undefined;
+  const focusedIsHero = Boolean(focusedKey && focusedKey.startsWith('home.hero.'));
+
   return (
     <div>
       <div className="mb-10">
@@ -210,12 +323,13 @@ export default function ContentAdminPage() {
       <div className="mb-10 flex flex-wrap gap-2">
         <button type="button" className="chip" aria-pressed={activePage === 'tat-ca'}
                 onClick={() => setActivePage('tat-ca')}>
-          Tất cả ({c.rows.filter((r) => r.kind !== 'style').length})
+          Tất cả ({c.rows.filter((r) => r.kind !== 'style' && !r.key.endsWith('.mobile')).length})
         </button>
         {pages.map((p) => (
           <button key={p} type="button" className="chip" aria-pressed={activePage === p}
                   onClick={() => setActivePage(p)}>
-            {PAGE_LABELS[p] ?? p} ({c.rows.filter((r) => r.page === p && r.kind !== 'style').length})
+            {PAGE_LABELS[p] ?? p} (
+            {c.rows.filter((r) => r.page === p && r.kind !== 'style' && !r.key.endsWith('.mobile')).length})
           </button>
         ))}
       </div>
@@ -223,70 +337,16 @@ export default function ContentAdminPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Xem truoc phan mo dau trang chu, dung gia tri DANG GO              */}
       {/* ------------------------------------------------------------------ */}
-      {hero.title && (
-        <div className="mb-12">
-          <p className="eyebrow mb-4">Xem trước phần mở đầu trang chủ</p>
-          <div
-            className={`hero-media flex ${look.alignClass}`}
-            style={{ minHeight: '24rem' }}
-          >
-            {hero.image && val(hero.image) && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={val(hero.image)} alt="" aria-hidden="true" />
-            )}
-            {look.overlay !== 'none' && (
-              <div className="absolute inset-0" style={{ background: look.overlay }} aria-hidden="true" />
-            )}
-            {/* Ban xem truoc phai theo DUNG ca kieu bo cuc, khong chi mau sac.
-                Neu no bo qua splitCta thi doi sang kieu "nut duoi day" se thay
-                mot dang, ma trang that lai ra mot dang khac — luc do ban xem
-                truoc noi doi, va do la kieu loi lam nguoi ta het tin trang
-                quan tri. */}
-            <div
-              className={`hero-body flex w-full flex-col p-8 ${look.splitCta ? 'h-full' : ''}`}
-              style={look.textStyle}
-            >
-              <div className={look.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
-                <div className={look.boxStyle ? 'inline-block p-6' : ''} style={look.boxStyle}>
-                  {/* Ban xem truoc phai ap CA kieu chu rieng cua tung o, dung
-                      cach trang that lam: len the <span> ben trong, khong len
-                      the mang lop. Neu khong thi doi co chu roi mo xem truoc se
-                      thay mot dang, ma trang that lai ra mot dang khac. */}
-                  {hero.eyebrow && (
-                    <p className="eyebrow mb-3" style={{ color: look.dimColor }}>
-                      <span style={styleOf(hero.eyebrow.key)}>{val(hero.eyebrow)}</span>
-                    </p>
-                  )}
-                  <p className="display-sm whitespace-pre-line">
-                    <span style={styleOf(hero.title.key)}>{val(hero.title)}</span>
-                  </p>
-                  {hero.subtitle && !look.hideSubtitle && (
-                    <p className="mt-4 max-w-lg text-sm leading-relaxed">
-                      <span style={styleOf(hero.subtitle.key)}>{val(hero.subtitle)}</span>
-                    </p>
-                  )}
-                  {hero.cta && !look.splitCta && (
-                    <span className={`btn btn-sm mt-6 ${look.buttonClass}`}>{val(hero.cta)}</span>
-                  )}
-                </div>
-              </div>
-
-              {look.splitCta && hero.cta && (
-                <div className="flex justify-center">
-                  <span className={`btn btn-sm ${look.buttonClass}`}>{val(hero.cta)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-          <p className="muted-2 mt-3 text-xs">
-            Bản xem trước đổi ngay khi bạn gõ. Trang thật chỉ đổi sau khi bấm Lưu.
-          </p>
-        </div>
-      )}
 
       {/* ------------------------------------------------------------------ */}
-      {/* Cac o nhap, gom theo trang                                         */}
+      {/* Hai cot: o nhap ben trai, khung xem truoc dinh man hinh ben phai   */}
+      {/*                                                                     */}
+      {/* Duoi 1024px thi ve mot cot va khung xem truoc len tren — o do khong */}
+      {/* du cho cho hai cot, va mot khung dinh man hinh se an mat chinh cai  */}
+      {/* o dang go.                                                          */}
       {/* ------------------------------------------------------------------ */}
+      <div className="grid gap-10 lg:grid-cols-[1fr_30rem] lg:items-start">
+      <div>
       {shown.map((page) => (
         <section key={page} className="mb-14">
           <h2 className="display-xs mb-6 border-b pb-3" style={{ borderColor: 'var(--line)' }}>
@@ -298,25 +358,69 @@ export default function ContentAdminPage() {
               // O kieu chu khong hien thanh muc rieng: no duoc gan ngay duoi o
               // chu ma no thuoc ve. Hien ca hai se thanh mot danh sach dai gap
               // doi ma mot nua khong doc duoc ten.
-              .filter((r) => r.page === page && r.kind !== 'style')
+              .filter(
+                (r) =>
+                  r.page === page &&
+                  // Hai loai o nay khong hien thanh muc rieng: chung duoc gan
+                  // ngay duoi o chu ma chung thuoc ve. Hien ca ba se thanh mot
+                  // danh sach dai gap ba ma hai phan ba khong doc duoc ten.
+                  r.kind !== 'style' &&
+                  !r.key.endsWith('.mobile'),
+              )
               .map((r) => {
-                const dirty = draft[r.key] !== undefined && draft[r.key] !== r.value;
-                const busy = savingKey === r.key;
-                // Quy uoc khoa: o kieu chu = khoa cua o chu + ".style".
+                // Quy uoc khoa: o kieu chu = khoa + ".style", o dien thoai =
+                // khoa + ".mobile". Nho quy uoc nay ma khong can them cot lien
+                // ket nao trong database.
                 const styleRow = c.rows.find((x) => x.key === `${r.key}.style`);
+                const mobileRow = c.rows.find((x) => x.key === `${r.key}.mobile`);
+
+                // O DANG SUA: ban may tinh hay ban dien thoai.
+                const onMobile = variant[r.key] === 'mobile' && Boolean(mobileRow);
+                const active = onMobile && mobileRow ? mobileRow : r;
+
+                const dirty = draft[active.key] !== undefined && draft[active.key] !== active.value;
+                const busy = savingKey === active.key;
 
                 return (
                   <div key={r.key}>
-                    <label className="label" htmlFor={r.key}>
-                      {r.label}
-                    </label>
+                    <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+                      <label className="label mb-0" htmlFor={active.key}>
+                        {r.label}
+                      </label>
 
-                    {r.kind === 'image' ? (
+                      {/* CHUYEN BAN MAY TINH / DIEN THOAI.
+                          Chi hien khi o do THAT SU co ban dien thoai — o chon,
+                          o dia chi va cac o cai dat thi khong. Hien mot cai nut
+                          khong lam gi con te hon la khong co nut. */}
+                      {mobileRow && (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="chip"
+                            aria-pressed={!onMobile}
+                            onClick={() => setVariant((v) => ({ ...v, [r.key]: 'pc' }))}
+                          >
+                            Máy tính
+                          </button>
+                          <button
+                            type="button"
+                            className="chip"
+                            aria-pressed={onMobile}
+                            onClick={() => setVariant((v) => ({ ...v, [r.key]: 'mobile' }))}
+                          >
+                            Điện thoại
+                            {mobileRow.value.trim() !== '' && ' ·'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {active.kind === 'image' ? (
                       <div className="flex flex-col gap-3">
-                        {val(r) && (
+                        {val(active) && (
                           <div className="frame" style={{ maxWidth: '22rem' }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={val(r)} alt="" />
+                            <img src={val(active)} alt="" />
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-3">
@@ -324,49 +428,58 @@ export default function ContentAdminPage() {
                             label="Chọn ảnh từ máy"
                             busy={busy}
                             maxBytes={IMAGE_LIMITS.outfit}
-                            onPick={(f) => void onPickImage(r, f)}
+                            onPick={(f) => void onPickImage(active, f)}
                           />
-                          {val(r) && (
+                          {val(active) && (
                             <button
                               type="button"
                               className="btn btn-sm btn-quiet"
-                              onClick={() => set(r.key, '')}
+                              onClick={() => set(active.key, '')}
                             >
                               Bỏ ảnh
                             </button>
                           )}
                         </div>
                       </div>
-                    ) : r.kind === 'choice' ? (
+                    ) : active.kind === 'choice' ? (
                       <select
-                        id={r.key}
+                        id={active.key}
+                        onFocus={() => setFocusedKey(active.key)}
                         className="field"
-                        value={val(r)}
-                        onChange={(e) => set(r.key, e.target.value)}
+                        value={val(active)}
+                        onChange={(e) => set(active.key, e.target.value)}
                       >
-                        {r.options.map((o) => (
+                        {active.options.map((o) => (
                           <option key={o} value={o}>{CHOICE_LABELS[o] ?? o}</option>
                         ))}
                       </select>
-                    ) : r.kind === 'textarea' ? (
+                    ) : active.kind === 'textarea' ? (
                       <textarea
-                        id={r.key}
+                        id={active.key}
+                        onFocus={() => setFocusedKey(active.key)}
                         className="field"
                         rows={3}
-                        value={val(r)}
-                        onChange={(e) => set(r.key, e.target.value)}
+                        value={val(active)}
+                        onChange={(e) => set(active.key, e.target.value)}
                       />
                     ) : (
                       <input
-                        id={r.key}
+                        id={active.key}
+                        onFocus={() => setFocusedKey(active.key)}
                         type="text"
                         className="field"
-                        value={val(r)}
-                        onChange={(e) => set(r.key, e.target.value)}
+                        value={val(active)}
+                        onChange={(e) => set(active.key, e.target.value)}
                       />
                     )}
 
-                    {r.hint && <p className="hint">{r.hint}</p>}
+                    {active.hint && <p className="hint">{active.hint}</p>}
+
+                    {onMobile && (
+                      <p className="hint">
+                        Để trống ô này thì điện thoại dùng lại nội dung của bản máy tính.
+                      </p>
+                    )}
 
                     {/* O nay quyet dinh KHOI NAO hien o trang chu va theo thu tu
                         nao. Thu tu bo loc lai nam o cho khac — noi ro ra day de
@@ -382,12 +495,14 @@ export default function ContentAdminPage() {
                       </p>
                     )}
 
-                    {/* Kieu chu rieng cua chinh o nay. Chi cac o CHU moi co —
-                        anh, danh sach va o chon khong co chu de dat kieu. */}
+                    {/* Kieu chu KHONG tach hai ban. Co chu da tu co gian theo be
+                        ngang man hinh, va bon vai tro chung da lo phan do — nhan
+                        doi ca kieu chu se thanh mot rung nut cho mot viec he
+                        thong hien tai da lam dung. */}
                     {styleRow && (
                       <FieldStyleRow
                         value={val(styleRow)}
-                        sampleText={val(r)}
+                        sampleText={val(active)}
                         saving={savingKey === styleRow.key}
                         saved={savedKey === styleRow.key}
                         onChange={(next) => set(styleRow.key, next)}
@@ -395,15 +510,31 @@ export default function ContentAdminPage() {
                       />
                     )}
 
-                    <div className="mt-2 flex items-center gap-3">
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
                       <button
                         type="button"
                         className="btn btn-sm"
                         disabled={!dirty || busy}
-                        onClick={() => void save(r)}
+                        onClick={() => void save(active)}
                       >
-                        {busy ? 'Đang lưu…' : 'Lưu'}
+                        {busy ? 'Đang lưu…' : onMobile ? 'Lưu bản điện thoại' : 'Lưu'}
                       </button>
+
+                      {/* AP DUNG CHO CA HAI BAN.
+                          Phan lon o se giong nhau o hai ban — chi vai o thuc su
+                          can khac. Khong co nut nay thi moi lan sua mot cau chu
+                          la hai lan go va mot co hoi quen mot ben. */}
+                      {mobileRow && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-quiet"
+                          disabled={busy}
+                          onClick={() => void saveBoth(r, mobileRow, val(active))}
+                        >
+                          Áp dụng cho cả hai bản
+                        </button>
+                      )}
+
                       {dirty && !busy && (
                         <button
                           type="button"
@@ -411,7 +542,7 @@ export default function ContentAdminPage() {
                           onClick={() =>
                             setDraft((d) => {
                               const n = { ...d };
-                              delete n[r.key];
+                              delete n[active.key];
                               return n;
                             })
                           }
@@ -419,7 +550,7 @@ export default function ContentAdminPage() {
                           Hoàn tác
                         </button>
                       )}
-                      {savedKey === r.key && (
+                      {savedKey === active.key && (
                         <span className="text-xs" style={{ color: 'var(--color-ok)' }}>
                           Đã lưu
                         </span>
@@ -431,6 +562,46 @@ export default function ContentAdminPage() {
           </div>
         </section>
       ))}
+      </div>
+
+      {/* --- Cot phai: khung xem truoc --------------------------------- */}
+      <PreviewPane
+        width={previewWidth}
+        onWidthChange={setPreviewWidth}
+        note={
+          focusedRow
+            ? `Đang xem: ${focusedRow.label}. Khung đổi ngay khi bạn gõ; trang thật chỉ đổi sau khi bấm Lưu.`
+            : 'Bấm vào một ô bên trái để xem trước ô đó. Khung đổi ngay khi bạn gõ; trang thật chỉ đổi sau khi bấm Lưu.'
+        }
+      >
+        {/* Phan mo dau can ca anh nen, lop phu va bo cuc nen co khoi rieng.
+            Mac dinh cung hien no, vi do la thu duoc sua nhieu nhat. */}
+        {(focusedIsHero || !focusedRow) && heroPreview}
+
+        {focusedRow && !focusedIsHero && (
+          <div className="p-6" style={{ background: 'var(--bg)' }}>
+            <p className="eyebrow mb-3">{focusedRow.label}</p>
+
+            {focusedRow.kind === 'image' ? (
+              val(focusedRow) ? (
+                <div className="frame">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={val(focusedRow)} alt="" />
+                </div>
+              ) : (
+                <p className="muted-2 text-sm">Ô này chưa có ảnh.</p>
+              )
+            ) : (
+              <p className="whitespace-pre-line leading-relaxed">
+                <span style={styleOf(focusedRow.key.replace(/\.mobile$/, ''))}>
+                  {val(focusedRow) || '(ô này đang trống)'}
+                </span>
+              </p>
+            )}
+          </div>
+        )}
+      </PreviewPane>
+      </div>
     </div>
   );
 }

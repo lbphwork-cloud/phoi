@@ -8,9 +8,7 @@
  * khong ro rang hon.
  */
 
-import {
-  useCallback, useEffect, useRef, useState, useSyncExternalStore,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from './supabase/client';
 import type {
@@ -486,4 +484,42 @@ export function useRateLimit(key: string, maxCalls: number, windowMs: number) {
     localStorage.setItem(k, JSON.stringify(hits));
     return { allowed: true, retryAfterSec: 0 };
   }, [key, maxCalls, windowMs]);
+}
+
+// ---------------------------------------------------------------------------
+// Khung man hinh
+// ---------------------------------------------------------------------------
+
+/**
+ * Trang co dang hien tren khung hep (dien thoai) khong.
+ *
+ * 768px la moc `md` cua Tailwind — dung dung con so ma CSS trong ca du an dang
+ * dung, de JavaScript va CSS khong bao gio bat dong y kien nhau ve "the nao la
+ * dien thoai".
+ *
+ * DUNG useSyncExternalStore CHU KHONG PHAI useState + useEffect
+ *   Cach kia phai dat state trong effect, tuc la lan render dau LUON tra ve
+ *   "khong phai dien thoai" roi mot khoanh khac sau moi sua lai — nguoi dung
+ *   dien thoai se thay noi dung ban may tinh nhay mot cai roi moi doi. Hook nay
+ *   doc gia tri that ngay o lan render dau tien.
+ *
+ * Luc dung san trang tinh (khong co window) thi tra ve false: ban may tinh la
+ * ban day du, nen do la gia tri an toan hon khi chua biet.
+ */
+function subscribeMedia(query: string) {
+  return (cb: () => void) => {
+    const mq = window.matchMedia(query);
+    mq.addEventListener('change', cb);
+    return () => mq.removeEventListener('change', cb);
+  };
+}
+
+const MOBILE_QUERY = '(max-width: 767px)';
+
+export function useIsMobile(): boolean {
+  return useSyncExternalStore(
+    subscribeMedia(MOBILE_QUERY),
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false,
+  );
 }

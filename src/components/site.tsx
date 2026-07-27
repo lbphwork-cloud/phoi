@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth, useTheme } from '@/lib/hooks';
 import { useContent } from '@/lib/content';
 import { typographyCss } from '@/lib/typography';
+import { SearchBox } from '@/components/SearchBox';
 
 const NAV = [
   { href: '/kham-pha', label: 'Khám phá' },
@@ -77,6 +78,7 @@ export function SiteHeader() {
    */
   const logoLight = c.t('site.logo.light', '');
   const logoDark = c.t('site.logo.dark', '') || logoLight;
+  // `c.t` da tu chon ban dien thoai khi o do co gia tri, nen chi can mot lan goi.
   const logoHeight = c.t('site.logo.height', '28');
 
   const brand = (
@@ -138,13 +140,43 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        {/* Tren dien thoai khong du cho cho ca ba cot: cot trai bo trong, nut
-            Menu ben phai mo ra danh sach day du. */}
-        <div className="md:hidden" />
+        {/* Tren dien thoai, cot trai la nut ba gach va kinh lup — dung bo cuc
+            cua cac trang thoi trang: dieu huong ben trai, ten thuong hieu o
+            giua. Ba gach ve bang SVG chu khong dung ky tu "≡": ky tu do hien
+            khac nhau tren tung he dieu hanh va thuong bi lech tam. */}
+        <div className="flex items-center gap-1 md:hidden">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="navlink"
+            aria-expanded={open}
+            aria-label={open ? 'Đóng menu' : 'Mở menu'}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+              {open ? (
+                <>
+                  <path d="M5 5 19 19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M19 5 5 19" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </>
+              ) : (
+                <>
+                  <path d="M4 7h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M4 12h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                  <path d="M4 17h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </>
+              )}
+            </svg>
+          </button>
+          <SearchBox />
+        </div>
 
         <div className="flex justify-center">{brand}</div>
 
         <div className="flex items-center justify-end gap-1">
+          <span className="hidden md:inline-flex">
+            <SearchBox />
+          </span>
+
           <button
             type="button"
             onClick={cycle}
@@ -171,15 +203,6 @@ export function SiteHeader() {
             </Link>
           )}
 
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="navlink md:hidden"
-            aria-expanded={open}
-            aria-label="Mở menu"
-          >
-            {open ? 'Đóng' : 'Menu'}
-          </button>
         </div>
       </div>
 
