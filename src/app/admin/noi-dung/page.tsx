@@ -296,6 +296,20 @@ export default function ContentAdminPage() {
 
                     {r.hint && <p className="hint">{r.hint}</p>}
 
+                    {/* O nay quyet dinh KHOI NAO hien o trang chu va theo thu tu
+                        nao. Thu tu bo loc lai nam o cho khac — noi ro ra day de
+                        nguoi sua khoi doi o nay roi thac mac sao trang Kham pha
+                        khong doi theo. */}
+                    {r.key === 'home.styles.list' && (
+                      <p className="hint">
+                        Thứ tự bộ lọc ở trang Khám phá là một danh sách khác —{' '}
+                        <a href="/admin/phong-cach" className="underline">
+                          sửa ở trang Phong cách
+                        </a>
+                        .
+                      </p>
+                    )}
+
                     <div className="mt-2 flex items-center gap-3">
                       <button
                         type="button"

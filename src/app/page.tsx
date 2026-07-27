@@ -53,7 +53,7 @@ function Home() {
   // Danh sach phong cach hien o trang chu, do quan tri vien quyet dinh.
   const styleSlugs = c.list(
     'home.styles.list',
-    'toi-gian, streetwear, smart-casual, co-dien, thanh-lich',
+    'smart-casual, streetwear, toi-gian, co-dien, thanh-lich, pha-cach',
   );
 
   const styles = styleSlugs
