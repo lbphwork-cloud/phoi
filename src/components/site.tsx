@@ -21,6 +21,10 @@ const NAV = [
   { href: '/gio-hang', key: 'nav.cart', fallback: 'Cart' },
   { href: '/tao-bai', key: 'nav.create', fallback: 'Create' },
   { href: '/bai-cua-toi', key: 'nav.my_posts', fallback: 'My posts' },
+  // Dat cuoi cung trong nhom: bon muc tren la viec nguoi ta den day de lam,
+  // muc nay tra loi mot cau hoi. Cau hoi do chi duoc hoi mot lan trong doi
+  // moi nguoi dung, con bon muc kia duoc bam moi luot.
+  { href: '/gioi-thieu', key: 'nav.about', fallback: 'About' },
 ];
 
 /**
@@ -384,13 +388,9 @@ export function SiteFooter() {
               )}
             </span>
           </p>
-          <p className="mt-3 text-sm">
-            <Link href="/gioi-thieu" className="muted hover:underline">
-              <span style={c.s('about.link_label')}>
-                {c.t('about.link_label', 'Giới thiệu')}
-              </span>
-            </Link>
-          </p>
+          {/* Duong dan toi trang gioi thieu DA CHUYEN LEN THANH MENU. Khong de
+              lai ban sao o day: hai cho dan cung mot noi thi mot trong hai la
+              thua, va cho thua la cho se bi quen khi doi duong dan. */}
         </div>
 
         {/*

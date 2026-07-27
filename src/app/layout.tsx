@@ -213,11 +213,43 @@ export const viewport = {
   maximumScale: 5,
 };
 
+/**
+ * Dat che do sang/toi TRUOC KHI TRANG VE LAN DAU.
+ *
+ * VI SAO PHAI LA MOT DOAN SCRIPT CHAN TRONG <head>
+ *   Che do do nguoi dung chon nam trong localStorage, ma localStorage chi doc
+ *   duoc bang JavaScript. Neu de React doc no thi thu tu se la: trinh duyet ve
+ *   xong trang mot lan (theo mac dinh cua CSS, tuc la nen SANG) -> JavaScript
+ *   tai xong -> doi sang nen TOI. Nguoi dung thay mot cu loe trang moi lan mo
+ *   trang. Voi mot website mac dinh nen toi thi cu loe do xay ra voi gan nhu
+ *   moi luot xem.
+ *
+ *   Mot doan script dong bo trong <head> chay TRUOC khi trinh duyet ve bat cu
+ *   thu gi. No dat san `data-theme` len the <html>, nen lan ve dau tien da la
+ *   dung mau. Day la mot trong rat it truong hop mot script chan la lua chon
+ *   dung — no chi vai chuc byte va no phai chay truoc khi ve.
+ *
+ *   Bao trong try/catch vi localStorage bi CHAN trong che do rieng tu cua mot
+ *   so trinh duyet: doc no se nem loi, va mot loi trong <head> se lam trang
+ *   trang hoan toan. Chan duoc thi ve toi — dung mac dinh, khong loe.
+ *
+ *   'system' thi CO Y khong dat thuoc tinh nao: khong co `data-theme` thi CSS
+ *   tu chay theo `prefers-color-scheme` cua may.
+ */
+const THEME_SCRIPT =
+  "(function(){try{var t=localStorage.getItem('phoi.theme');" +
+  "if(t!=='light'&&t!=='dark'&&t!=='system')t='dark';" +
+  "if(t!=='system')document.documentElement.setAttribute('data-theme',t)}" +
+  "catch(e){document.documentElement.setAttribute('data-theme','dark')}})()";
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi" className={`h-full ${FONT_VARS}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         {/* Kieu chu do quan tri vien chon, do vao bien CSS o goc tai luc chay.
             Dat TRUOC moi thu khac de chu khong nhay kieu sau khi tai xong. */}

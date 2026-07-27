@@ -101,18 +101,33 @@ function subscribeTheme(onChange: () => void): () => void {
   };
 }
 
+/**
+ * CHE DO MAC DINH LA TOI, khong phai "theo he thong".
+ *
+ * Do la lua chon cua chu website: anh thoi trang tren nen toi trong dam hon,
+ * va phan lon nguoi xem se khong bao gio dong vao cai nut doi che do. Nguoi
+ * nao muon sang hoac muon theo he thong thi van bat duoc — ca ba lua chon deu
+ * con nguyen, chi doi cai nao la mac dinh.
+ *
+ * Doi mot dong nay la CHUA DU: xem chu thich ThemeScript trong layout.tsx.
+ * Doc localStorage chi chay duoc sau khi JavaScript tai xong, ma luc do trang
+ * da ve xong mot lan roi — neu khong lam gi them thi moi lan mo trang se loe
+ * trang mot cai truoc khi chuyen sang toi.
+ */
+const DEFAULT_THEME: Theme = 'dark';
+
 function readTheme(): Theme {
   try {
     const v = localStorage.getItem(THEME_KEY);
-    return isTheme(v) ? v : 'system';
+    return isTheme(v) ? v : DEFAULT_THEME;
   } catch {
     // localStorage co the bi chan (che do rieng tu tren mot so trinh duyet)
-    return 'system';
+    return DEFAULT_THEME;
   }
 }
 
 /** Ban doc luc dung san HTML: luc do khong co localStorage. */
-const readThemeOnServer = (): Theme => 'system';
+const readThemeOnServer = (): Theme => DEFAULT_THEME;
 
 export function useTheme() {
   const theme = useSyncExternalStore(subscribeTheme, readTheme, readThemeOnServer);
