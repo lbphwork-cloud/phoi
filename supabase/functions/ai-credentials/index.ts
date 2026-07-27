@@ -99,6 +99,126 @@ function looksValid(provider: string, key: string): string | null {
   return null;
 }
 
+/**
+ * Doc va giai ma key da luu cua mot nguoi dung.
+ *
+ * Dung service role vi cot encrypted_key da bi REVOKE quyen doc cua role
+ * authenticated — chinh chu cung khong select ra duoc. Do la co y.
+ */
+async function decryptStoredKey(uid: string, provider: string): Promise<string | null> {
+  const admin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  const { data } = await admin
+    .from('ai_credentials')
+    .select('encrypted_key')
+    .eq('owner_id', uid)
+    .eq('provider', provider)
+    .maybeSingle();
+
+  if (!data?.encrypted_key) return null;
+
+  try {
+    return await decryptSecret(data.encrypted_key);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Goi nha cung cap mot lan that nho de xem key co THAT SU dung duoc khong.
+ *
+ * KHONG DUNG LENH LIET KE MO HINH. Ban dau toi viet ham nay goi /v1beta/models
+ * — no tra ve "Key dung duoc, 50 mo hinh" trong khi moi lenh tao noi dung cua
+ * dung key do deu bi tu choi 429 vi han muc bang 0. Mot phep thu bao dat trong
+ * khi thu that hong con te hon la khong thu gi: no lam nguoi dung di tim
+ * nguyen nhan o cho khac.
+ *
+ * Liet ke mo hinh chi chung minh key co ton tai. Cai can biet la key co SINH
+ * duoc noi dung khong — nen phai goi dung viec do, du chi mot chu.
+ *
+ * PHAN BIET BA TINH HUONG, vi viec nguoi dung phai lam khac han nhau:
+ *   key sai        -> phai lay key khac
+ *   het han muc    -> key dung, phai tao key o du an moi hoac bat thanh toan
+ *   khong goi duoc -> loi mang, thu lai
+ */
+async function probeKey(
+  provider: string,
+  key: string,
+): Promise<{ ok: boolean; error?: string; note?: string }> {
+  if (provider === 'local_comfyui') {
+    return { ok: true, note: 'ComfyUI chạy trên máy bạn, không có key để thử.' };
+  }
+
+  try {
+    if (provider === 'gemini') {
+      // Mot chu, mot token. Gan nhu khong ton gi, nhung di qua dung cai han
+      // muc ma viec tao anh se dung.
+      const r = await fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent' +
+          `?key=${encodeURIComponent(key)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'OK' }] }],
+            generationConfig: { maxOutputTokens: 1 },
+          }),
+        },
+      );
+      const text = await r.text();
+
+      if (r.ok) return { ok: true, note: 'Key dùng được — vừa gọi thử và Google trả lời bình thường.' };
+
+      if (r.status === 429) {
+        return {
+          ok: false,
+          error:
+            'Key hợp lệ nhưng hạn mức đang bằng 0, nên không tạo được gì. ' +
+            'Vào aistudio.google.com/apikey, bấm "Create API key in new project" để lấy key ' +
+            'trong một dự án mới, hoặc bật thanh toán cho dự án hiện tại.',
+        };
+      }
+      if (r.status === 400 || r.status === 401 || r.status === 403) {
+        return {
+          ok: false,
+          error:
+            'Google từ chối key này — sai key, key đã bị xoá, hoặc dự án chưa bật ' +
+            'Generative Language API. Tạo key mới ở aistudio.google.com/apikey.',
+        };
+      }
+      return { ok: false, error: `Google trả về ${r.status}: ${text.slice(0, 200)}` };
+    }
+
+    // OpenAI: chi kiem tra key co hop le khong.
+    //
+    // KHONG goi thu mot lenh tao noi dung nhu ben Gemini, vi ben OpenAI moi lan
+    // goi deu tinh tien that. Bat nguoi dung tra tien de biet key con song la
+    // khong on. Doi lai, phep thu nay YEU HON — no khong noi duoc tai khoan con
+    // tien hay khong, va cau `note` ben duoi noi ro dieu do thay vi im lang.
+    const r = await fetch('https://api.openai.com/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (r.ok) {
+      return {
+        ok: true,
+        note: 'Key hợp lệ. Còn tài khoản có đủ tiền để tạo ảnh hay không thì chỉ biết khi tạo thật.',
+      };
+    }
+    if (r.status === 401) {
+      return { ok: false, error: 'OpenAI từ chối key này. Lấy key mới ở platform.openai.com/api-keys.' };
+    }
+    if (r.status === 429) {
+      return { ok: false, error: 'Key đúng nhưng tài khoản OpenAI đã hết hạn mức hoặc hết tiền.' };
+    }
+    return { ok: false, error: `OpenAI trả về ${r.status}.` };
+  } catch (e) {
+    return { ok: false, error: `Không gọi được nhà cung cấp: ${(e as Error).message}` };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
@@ -153,8 +273,8 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'Body không phải JSON hợp lệ.' }, 400);
   }
 
-  if (body.action !== 'save') {
-    return json({ ok: false, error: 'Chỉ hỗ trợ action = "save".' }, 400);
+  if (body.action !== 'save' && body.action !== 'test') {
+    return json({ ok: false, error: 'Chỉ hỗ trợ action = "save" hoặc "test".' }, 400);
   }
 
   const provider = String(body.provider ?? '');
@@ -162,6 +282,19 @@ Deno.serve(async (req) => {
 
   if (!['gemini', 'openai', 'local_comfyui'].includes(provider)) {
     return json({ ok: false, error: `Nhà cung cấp không hợp lệ: ${provider}` }, 400);
+  }
+
+  // --- Thu key ------------------------------------------------------------
+  // Luu key xong bao "da luu" thi khong noi len dieu gi: key sai, key het han
+  // muc, key cua mot du an da bi xoa — tat ca deu luu duoc y het nhau, va chi
+  // vo ra luc nguoi dung dang cho mot buc anh. Thu ngay tai day de biet lien.
+  if (body.action === 'test') {
+    const key = rawKey || (await decryptStoredKey(uid, provider));
+    if (!key) {
+      return json({ ok: false, error: 'Chưa có key nào để thử.' }, 400);
+    }
+    const result = await probeKey(provider, key);
+    return json(result, result.ok ? 200 : 200); // Khong phai loi HTTP: day la ket qua chan doan.
   }
 
   const formatError = looksValid(provider, rawKey);

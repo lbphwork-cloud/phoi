@@ -104,7 +104,85 @@ export async function saveAiKey(
   }
 }
 
-/** Trang thai o nhap key dung chung trong trinh soan bai. */
+/**
+ * Xoa mot key.
+ *
+ * Bang ai_credentials da duoc cap quyen DELETE cho chinh chu o migration 0002,
+ * nen viec nay khong can di qua Edge Function.
+ */
+export async function deleteAiKey(id: string): Promise<{ ok: boolean; message: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, message: 'Chưa cấu hình Supabase.' };
+
+  const { error } = await sb.from('ai_credentials').delete().eq('id', id);
+  if (error) return { ok: false, message: `Không xoá được key: ${error.message}` };
+  return { ok: true, message: 'Đã xoá key.' };
+}
+
+/**
+ * Goi nha cung cap mot lan that nho de xem key co THAT SU dung duoc khong.
+ *
+ * Khong tu goi tu trinh duyet: key da duoc ma hoa va chi Edge Function moi giai
+ * ma duoc. Chi tiet phep thu o supabase/functions/ai-credentials/index.ts —
+ * dang chu y la no goi lenh SINH NOI DUNG chu khong phai lenh liet ke mo hinh,
+ * vi mot key co the liet ke duoc mo hinh ma van khong sinh duoc gi.
+ */
+export async function testAiKey(
+  provider: AiProvider,
+): Promise<{ ok: boolean; message: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, message: 'Chưa cấu hình Supabase.' };
+
+  try {
+    const { data, error } = await sb.functions.invoke('ai-credentials', {
+      body: { action: 'test', provider },
+    });
+    if (error) throw new Error(error.message);
+
+    const r = data as { ok: boolean; error?: string; note?: string };
+    return r?.ok
+      ? { ok: true, message: r.note ?? 'Key dùng được.' }
+      : { ok: false, message: r?.error ?? 'Key không dùng được, không rõ lý do.' };
+  } catch (e) {
+    return { ok: false, message: `Không thử được key: ${(e as Error).message}` };
+  }
+}
+
+/**
+ * Loi gan nhat cua mot nha cung cap, lay tu lich su cong viec AI.
+ *
+ * Key hong va key tot trong y het nhau tren man hinh. Dong loi gan nhat la thu
+ * duy nhat phan biet duoc hai truong hop do ma khong phai bam thu.
+ */
+export function useLastAiError(provider: AiProvider): string | null {
+  const { data } = useAsyncData<Array<{ error: string | null }>>(
+    `ai-last-error-${provider}`,
+    (sb) =>
+      sb
+        .from('ai_jobs')
+        .select('error')
+        .eq('provider', provider)
+        .eq('status', 'failed')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .then(({ data: r, error }) => ({
+          data: (r as Array<{ error: string | null }> | null) ?? [],
+          error,
+        })),
+  );
+
+  return data?.[0]?.error ?? null;
+}
+
+/**
+ * Trang thai o nhap key dung chung trong trinh soan bai.
+ *
+ * LUU XONG THI THU LUON.
+ *   Bao "da luu" khong noi len dieu gi: key sai, key cua mot du an da bi xoa,
+ *   key con han muc bang 0 — tat ca deu luu duoc y het nhau, va chi vo ra dung
+ *   luc nguoi dung dang cho mot buc anh. Thu ngay tai day thi biet lien, va
+ *   biet trong boi canh vua dan key vao chu khong phai nua tieng sau.
+ */
 export function useKeyInput(reload: () => void) {
   const [rawKey, setRawKey] = useState('');
   const [busy, setBusy] = useState(false);
@@ -114,16 +192,28 @@ export function useKeyInput(reload: () => void) {
     async (provider: AiProvider) => {
       setBusy(true);
       setMessage(null);
-      const r = await saveAiKey(provider, rawKey);
-      setBusy(false);
-      setMessage({ ok: r.ok, text: r.message });
-      if (r.ok) {
-        setRawKey('');
-        reload();
+
+      const saved = await saveAiKey(provider, rawKey);
+      if (!saved.ok) {
+        setBusy(false);
+        setMessage({ ok: false, text: saved.message });
+        return;
       }
+
+      // Key da luu roi thi du sao cung giu lai — thu that bai khong phai ly do
+      // de vut key di, vi co the chi la loi mang nhat thoi.
+      setRawKey('');
+      reload();
+
+      const probe = await testAiKey(provider);
+      setBusy(false);
+      setMessage({
+        ok: probe.ok,
+        text: probe.ok ? `Đã lưu key. ${probe.message}` : `Đã lưu key, nhưng: ${probe.message}`,
+      });
     },
     [rawKey, reload],
   );
 
-  return { rawKey, setRawKey, busy, message, submit };
+  return { rawKey, setRawKey, busy, message, setMessage, submit };
 }

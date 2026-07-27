@@ -34,12 +34,15 @@ import {
 } from '@/lib/fetchProduct';
 import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
+import { UploadButton } from '@/components/UploadButton';
 import {
   SCENES, MODEL_TYPES, buildImagePrompt, requestAiImage,
   buildDescriptionPrompt, requestAiDescription, explainPromptVi,
   type AiProviderId,
 } from '@/lib/aiImage';
-import { useAiCredentials, useKeyInput } from '@/lib/aiCredentials';
+import {
+  useAiCredentials, useKeyInput, useLastAiError, testAiKey, deleteAiKey,
+} from '@/lib/aiCredentials';
 import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import type { ItemRole, Platform, ProductCategory } from '@/lib/supabase/types';
 
@@ -185,7 +188,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   // trong src/lib/aiImage.ts.
   const [aiRound, setAiRound] = useState(0);
   const [descBusy, setDescBusy] = useState(false);
-  const [descMessage, setDescMessage] = useState<string | null>(null);
+  const [descMessage, setDescMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [showPromptVi, setShowPromptVi] = useState(false);
 
   // Key AI cua chinh nguoi dang dang nhap. Quyet dinh nut tao anh co bam duoc
@@ -194,6 +197,33 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   const keyInput = useKeyInput(creds.reload);
   const credsLoading = creds.loading;
   const activeCred = creds.activeFor(aiProvider);
+  const lastAiError = useLastAiError(aiProvider);
+
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyProbe, setKeyProbe] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Ket qua moi nhat, du den tu luc luu key hay luc bam "Thu key".
+  const keyMessage = keyProbe ?? keyInput.message;
+
+  const probeKey = async () => {
+    setKeyBusy(true);
+    setKeyProbe(null);
+    const r = await testAiKey(aiProvider);
+    setKeyBusy(false);
+    setKeyProbe({ ok: r.ok, text: r.message });
+  };
+
+  const removeKey = async () => {
+    if (!activeCred) return;
+    if (!window.confirm(`Xoá key ${activeCred.key_hint}? Bạn sẽ phải dán lại key mới.`)) return;
+
+    setKeyBusy(true);
+    const r = await deleteAiKey(activeCred.id);
+    setKeyBusy(false);
+    setKeyProbe({ ok: r.ok, text: r.message });
+    if (r.ok) { creds.reload(); setShowKeyInput(true); }
+  };
 
   // Doc du lieu tu tien ich Chrome NGAY TRONG ham khoi tao state.
   //
@@ -288,6 +318,25 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     return { ok: missing.length === 0, missing };
   })();
 
+  /**
+   * Du kien viet mo ta duoc chua, va con thieu gi.
+   *
+   * Nhe hon dieu kien cua tao anh: viet chu thi khong can anh cua tung mon,
+   * chi can biet TEN cac mon va phong cach. Nhung van can key, vi khong co key
+   * thi bam xong chi nhan mot loi.
+   */
+  const descReady = (() => {
+    const missing: string[] = [];
+    if (!credsLoading && !activeCred) {
+      missing.push(`Chưa có API key ${PROVIDER_LABEL[aiProvider]} — dán vào ô dưới phần ảnh đại diện.`);
+    }
+    if (items.every((i) => !i.name.trim())) {
+      missing.push('Chưa nhập món nào. AI cần biết viết về cái gì.');
+    }
+    if (!styleSlug) missing.push('Chưa chọn phong cách cho set.');
+    return { ok: missing.length === 0, missing };
+  })();
+
   /** Du lieu dung chung cho ca cau lenh tao anh lan cau lenh viet mo ta. */
   const promptInput = () => ({
     outfitTitle: title,
@@ -316,7 +365,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       prompt: buildDescriptionPrompt(promptInput()),
     });
     setDescBusy(false);
-    setDescMessage(r.message);
+    setDescMessage({ ok: r.ok, text: r.message });
     if (r.ok && r.text) setDescription(r.text);
   };
 
@@ -692,21 +741,13 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                 <div className="sm:col-span-2">
                   <label className="label">Ảnh sản phẩm</label>
 
-                  <div className="mb-2 flex flex-wrap items-center gap-3">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      className="text-sm"
-                      disabled={itemUploading === it.key}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void uploadItemImage(it, f);
-                      }}
-                    />
-                    {itemUploading === it.key && (
-                      <span className="muted-2 text-xs">Đang tải ảnh lên…</span>
-                    )}
-                  </div>
+                  <UploadButton
+                    className="mb-2"
+                    label="Chọn ảnh từ máy"
+                    busy={itemUploading === it.key}
+                    maxBytes={IMAGE_LIMITS.product}
+                    onPick={(f) => void uploadItemImage(it, f)}
+                  />
 
                   <input
                     value={it.imageUrl}
@@ -753,30 +794,52 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           placeholder="Ví dụ: Tối giản trắng đen ngày thường"
         />
 
-        <label className="label" htmlFor="desc">Mô tả</label>
+        {/* NHAN VA NUT TREN CUNG MOT DONG.
+            Truoc day nut nay nam duoi o nhap va de kieu chu xam nhat khong
+            vien — chu website bao thang la "chua co nut tao mo ta bang AI".
+            Nut ma phai doc ky moi nhan ra thi coi nhu khong co. */}
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <label className="label mb-0" htmlFor="desc">Mô tả</label>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={descBusy || !descReady.ok}
+            onClick={() => void generateDescription()}
+          >
+            {descBusy ? 'Đang viết…' : 'Viết mô tả bằng AI'}
+          </button>
+        </div>
+
         <textarea
           id="desc"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="field mb-5"
+          className="field"
           rows={3}
           maxLength={600}
           placeholder="Vì sao cách phối này hợp lý. Một hai câu là đủ."
         />
 
-        {/* AI viet mo ta bang TIENG VIET — khac cau lenh tao anh, xem chu
-            thich buildDescriptionPrompt trong src/lib/aiImage.ts. */}
-        <div className="mb-5 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet"
-            disabled={descBusy || items.every((i) => !i.name.trim())}
-            onClick={() => void generateDescription()}
-          >
-            {descBusy ? 'Đang viết…' : 'Để AI viết mô tả (tiếng Việt)'}
-          </button>
-          {descMessage && <span className="muted-2 text-xs">{descMessage}</span>}
-        </div>
+        {/* Noi RO con thieu gi thay vi chi khoa nut roi de nguoi dung tu doan. */}
+        {!descReady.ok && (
+          <div className="notice mt-2">
+            <p className="text-sm">Chưa viết được vì:</p>
+            <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+              {descReady.missing.map((m) => <li key={m}>{m}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {descMessage && (
+          <div className={`mt-2 notice ${descMessage.ok ? '' : 'notice-danger'}`}>
+            <p className="text-sm">{descMessage.text}</p>
+          </div>
+        )}
+
+        <p className="hint mb-5">
+          AI viết dựa trên các món và phong cách bạn đã nhập. Kết quả là{' '}
+          <strong>bản nháp</strong> — đọc lại và sửa cho đúng ý bạn trước khi đăng.
+        </p>
 
         <div className="mb-5 grid gap-4 sm:grid-cols-2">
           <div>
@@ -819,11 +882,10 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
       {/* ------------------------------------------------------------------ */}
       <Block title="Ảnh đại diện" note="Ảnh lớn hiện ở đầu bài. Tối đa 5 MB, định dạng JPG, PNG, WebP hoặc AVIF.">
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
-          onChange={(e) => pickHero(e.target.files?.[0] ?? null)}
-          className="field"
+        <UploadButton
+          label="Chọn ảnh đại diện từ máy"
+          maxBytes={IMAGE_LIMITS.outfit}
+          onPick={(f) => pickHero(f)}
         />
         {heroError && <p className="hint-error">{heroError}</p>}
 
@@ -856,54 +918,94 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           {/* API key cua chinh ban                                        */}
           {/*                                                              */}
           {/* Dat NGAY TAI DAY chu khong o mot trang quan tri rieng. Cai   */}
-          {/* thieu de bam duoc nut phai nam canh cai nut do — khong ai    */}
-          {/* doan duoc rang thu minh thieu nam o mot trang khac.          */}
+          {/* thieu de bam duoc nut phai nam canh cai nut do.              */}
+          {/*                                                              */}
+          {/* LUON CO DUONG DOI KEY, ke ca khi da co key.                  */}
+          {/* Ban dau toi an o nhap di khi tai khoan da co key — nghe hop  */}
+          {/* ly, nhung KEY HONG TRONG Y HET KEY TOT. Dung tinh canh hien  */}
+          {/* gio: co key, key vo dung vi han muc bang 0, va khong co       */}
+          {/* duong nao thay ma khong roi trang.                            */}
           {/* ------------------------------------------------------------ */}
           <div className="notice mb-5">
             {credsLoading ? (
               <p className="muted text-sm">Đang kiểm tra key…</p>
-            ) : activeCred ? (
-              <p className="text-sm">
-                Đang dùng key <code>{activeCred.key_hint}</code> của {PROVIDER_LABEL[aiProvider]}.
-                <span className="muted-2 block text-xs">
-                  Key là của riêng tài khoản bạn, tiền dùng AI tính vào tài khoản bạn.
-                  Đổi hoặc xoá trong trang Quản trị › AI.
-                </span>
-              </p>
             ) : (
               <>
-                <p className="mb-3 text-sm">
-                  Tài khoản bạn <strong>chưa có key {PROVIDER_LABEL[aiProvider]}</strong>.
-                  Mỗi người dùng key của chính mình, nên tiền dùng AI tính vào tài khoản bạn
-                  chứ không phải của ai khác.
-                </p>
-                <p className="hint mb-3">{PROVIDER_KEY_NOTE[aiProvider]}</p>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    type="password"
-                    className="field"
-                    value={keyInput.rawKey}
-                    onChange={(e) => keyInput.setRawKey(e.target.value)}
-                    placeholder="Dán API key vào đây"
-                    autoComplete="off"
-                    aria-label={`API key ${PROVIDER_LABEL[aiProvider]}`}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-sm shrink-0"
-                    disabled={keyInput.busy || !keyInput.rawKey.trim()}
-                    onClick={() => void keyInput.submit(aiProvider)}
-                  >
-                    {keyInput.busy ? 'Đang lưu…' : 'Lưu key'}
-                  </button>
-                </div>
+                {activeCred ? (
+                  <div className="mb-3 flex flex-wrap items-center gap-3">
+                    <p className="text-sm">
+                      Key {PROVIDER_LABEL[aiProvider]}: <code>{activeCred.key_hint}</code>
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-quiet"
+                      disabled={keyBusy}
+                      onClick={() => void probeKey()}
+                    >
+                      {keyBusy ? 'Đang thử…' : 'Thử key'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-quiet"
+                      onClick={() => setShowKeyInput((v) => !v)}
+                    >
+                      {showKeyInput ? 'Thôi' : 'Đổi key'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-quiet btn-danger"
+                      disabled={keyBusy}
+                      onClick={() => void removeKey()}
+                    >
+                      Xoá key
+                    </button>
+                  </div>
+                ) : (
+                  <p className="mb-3 text-sm">
+                    Tài khoản bạn <strong>chưa có key {PROVIDER_LABEL[aiProvider]}</strong>.
+                    Mỗi người dùng key của chính mình, nên tiền dùng AI tính vào tài khoản
+                    bạn chứ không phải của ai khác.
+                  </p>
+                )}
+
+                {/* Loi gan nhat cua nha cung cap. Day la thu duy nhat phan biet
+                    duoc key con song va key da chet ma khong phai bam thu. */}
+                {activeCred && lastAiError && !keyMessage && (
+                  <p className="hint-error">Lần gọi gần nhất thất bại: {lastAiError}</p>
+                )}
+
+                {(!activeCred || showKeyInput) && (
+                  <>
+                    <p className="hint mb-3">{PROVIDER_KEY_NOTE[aiProvider]}</p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <input
+                        type="password"
+                        className="field"
+                        value={keyInput.rawKey}
+                        onChange={(e) => keyInput.setRawKey(e.target.value)}
+                        placeholder="Dán API key vào đây"
+                        autoComplete="off"
+                        aria-label={`API key ${PROVIDER_LABEL[aiProvider]}`}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm shrink-0"
+                        disabled={keyInput.busy || !keyInput.rawKey.trim()}
+                        onClick={() => {
+                          setShowKeyInput(false);
+                          void keyInput.submit(aiProvider);
+                        }}
+                      >
+                        {keyInput.busy ? 'Đang lưu và thử…' : 'Lưu key'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
-            {keyInput.message && (
-              <p className={keyInput.message.ok ? 'hint' : 'hint-error'}>
-                {keyInput.message.text}
-              </p>
+            {keyMessage && (
+              <p className={keyMessage.ok ? 'hint' : 'hint-error'}>{keyMessage.text}</p>
             )}
           </div>
 

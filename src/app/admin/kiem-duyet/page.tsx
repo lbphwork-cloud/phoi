@@ -37,9 +37,11 @@ import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase/client';
 import { EmptyState, Spinner } from '@/components/site';
 import { StatusTag } from '@/components/outfit';
+import { UploadButton } from '@/components/UploadButton';
+import { deleteOutfit, confirmDelete } from '@/lib/deleteOutfit';
 import { useAsyncData, useTaxonomy, useAuth } from '@/lib/hooks';
 import { uploadImage } from '@/lib/storage';
-import { formatRelative, formatVnd } from '@/lib/format';
+import { formatRelative, formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import type { OutfitWithItems, ReviewAction } from '@/lib/supabase/types';
 
 /** Cac truong cua bai co the sua ngay tai trang duyet. */
@@ -50,6 +52,30 @@ interface OutfitEdit {
   style_slug?: string;
   occasion_slug?: string;
 }
+
+/**
+ * Ly do soan san cho viec tu choi hoac yeu cau sua.
+ *
+ * VI SAO CO DANH SACH NAY
+ *   Bat quan tri vien go tay moi lan dan tori hai ket cuc, deu xau: hoac ho go
+ *   qua ngan ("khong dat") — tac gia doc xong van khong biet phai sua gi; hoac
+ *   ho ngai go nen bam duyet cho xong. Bam mot cai la co mot cau day du, ro
+ *   rang, va giong nhau giua cac bai.
+ *
+ *   Van giu o go tu do ben duoi: danh sach nay khong bao gio phu het truong hop
+ *   that, va ep moi ly do vao mot khuon co san la cach chac chan de mot ngay
+ *   nao do gui cho tac gia mot ly do khong dung voi bai cua ho.
+ */
+const REASON_PRESETS = [
+  'Ảnh mờ hoặc chất lượng thấp, cần ảnh rõ hơn.',
+  'Ảnh không khớp với các sản phẩm được liệt kê trong set.',
+  'Link sản phẩm không mở được hoặc đã hết hàng.',
+  'Giá ghi không khớp với giá thật trên sàn.',
+  'Tên sản phẩm chưa rõ, cần ghi đúng tên trên trang bán.',
+  'Các món chưa tạo thành một set hoàn chỉnh.',
+  'Mô tả sao chép nguyên văn từ trang bán, cần viết lại.',
+  'Nội dung không phù hợp với chủ đề thời trang nam.',
+];
 
 export default function ModerationPage() {
   const tax = useTaxonomy();
@@ -163,8 +189,15 @@ export default function ModerationPage() {
     const sb = getSupabase()!;
     const reason = (reasons[id] ?? '').trim();
 
-    if (action === 'request_changes' && !reason) {
-      setActionError('Phải nhập lý do khi yêu cầu sửa. Tác giả cần biết phải sửa gì.');
+    // Tu choi la ket thuc, khong co duong lam tiep — nen no can mot ly do hon
+    // chu khong phai it hon. Ham review_outfit trong database cung chan, day
+    // chi la lop bao loi som bang tieng Viet.
+    if ((action === 'request_changes' || action === 'reject') && !reason) {
+      setActionError(
+        action === 'reject'
+          ? 'Phải nhập lý do khi từ chối. Bài bị từ chối là hết đường, tác giả cần biết vì sao.'
+          : 'Phải nhập lý do khi yêu cầu sửa. Tác giả cần biết phải sửa gì.',
+      );
       return;
     }
 
@@ -207,6 +240,19 @@ export default function ModerationPage() {
 
     setBusyId(null);
     if (e) { setActionError(e.message); return; }
+    reload();
+  };
+
+  const removeOutfit = async (o: OutfitWithItems) => {
+    if (!confirmDelete(o.title)) return;
+
+    setBusyId(o.id);
+    setActionError(null);
+
+    const r = await deleteOutfit(o);
+
+    setBusyId(null);
+    if (!r.ok) { setActionError(r.message ?? 'Không xoá được.'); return; }
     reload();
   };
 
@@ -386,16 +432,13 @@ export default function ModerationPage() {
                       </div>
                     </div>
 
-                    <label className="label" htmlFor={`img-${o.id}`}>Đổi ảnh đại diện</label>
-                    <input
-                      id={`img-${o.id}`}
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/avif"
-                      className="mb-4 text-sm"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) void onHeroFile(o, f);
-                      }}
+                    <label className="label">Đổi ảnh đại diện</label>
+                    <UploadButton
+                      className="mb-4"
+                      label="Chọn ảnh từ máy"
+                      busy={busyId === o.id}
+                      maxBytes={IMAGE_LIMITS.outfit}
+                      onPick={(f) => void onHeroFile(o, f)}
                     />
 
                     {/* --- Tung mon --- */}
@@ -477,15 +520,45 @@ export default function ModerationPage() {
                     {/* --- Quyet dinh duyet --- */}
                     <div className="mt-8 border-t pt-5" style={{ borderColor: 'var(--line)' }}>
                       <label className="label" htmlFor={`reason-${o.id}`}>
-                        Lý do (bắt buộc khi yêu cầu sửa hoặc ẩn)
+                        Lý do (bắt buộc khi từ chối, yêu cầu sửa hoặc ẩn)
                       </label>
+
+                      {/* Bam mot ly do la no duoc THEM vao o ben duoi chu khong
+                          ghi de: mot bai co the vua mo anh vua sai gia. Bam lai
+                          lan nua thi bo ly do do ra. */}
+                      <div className="mb-3 flex flex-wrap gap-2">
+                        {REASON_PRESETS.map((preset) => {
+                          const current = reasons[o.id] ?? '';
+                          const on = current.includes(preset);
+                          return (
+                            <button
+                              key={preset}
+                              type="button"
+                              className="chip"
+                              aria-pressed={on}
+                              onClick={() =>
+                                setReasons((r) => {
+                                  const cur = r[o.id] ?? '';
+                                  const next = on
+                                    ? cur.replace(preset, '').replace(/\s{2,}/g, ' ').trim()
+                                    : (cur ? `${cur.trim()} ${preset}` : preset);
+                                  return { ...r, [o.id]: next };
+                                })
+                              }
+                            >
+                              {preset}
+                            </button>
+                          );
+                        })}
+                      </div>
+
                       <textarea
                         id={`reason-${o.id}`}
                         value={reasons[o.id] ?? ''}
                         onChange={(e) => setReasons((r) => ({ ...r, [o.id]: e.target.value }))}
                         className="field mb-3"
                         rows={2}
-                        placeholder="Ví dụ: ảnh mờ, cần ảnh rõ hơn. Hoặc: link sản phẩm thứ 2 đã hết hàng."
+                        placeholder="Bấm lý do có sẵn ở trên, hoặc tự viết. Tác giả sẽ đọc đúng những dòng này."
                       />
 
                       <div className="flex flex-wrap gap-2">
@@ -522,6 +595,28 @@ export default function ModerationPage() {
                           Ẩn vì vi phạm
                         </button>
                       </div>
+
+                      {/* XOA HAN chi hien voi bai da tu choi hoac da an.
+                          Bai dang cho duyet ma co nut xoa canh nut duyet la moi
+                          truong cho mot cu bam nham khong hoan lai duoc. Da tu
+                          choi thi quyet dinh da xong roi, xoa chi la don dep. */}
+                      {(o.status === 'rejected' || o.status === 'hidden') && (
+                        <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--line)' }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-danger"
+                            disabled={busy}
+                            onClick={() => void removeOutfit(o)}
+                          >
+                            Xoá hẳn bài này
+                          </button>
+                          <p className="hint">
+                            Bài bị từ chối vẫn chiếm chỗ trong danh sách và trong database.
+                            Xoá hẳn thì mất vĩnh viễn; sản phẩm vẫn nằm lại vì có thể set
+                            khác đang dùng.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

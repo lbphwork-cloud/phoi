@@ -24,6 +24,8 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks';
 import { useContent, heroAppearance, type ContentRow } from '@/lib/content';
 import { uploadImage } from '@/lib/storage';
+import { IMAGE_LIMITS } from '@/lib/format';
+import { UploadButton } from '@/components/UploadButton';
 import { Spinner, EmptyState } from '@/components/site';
 
 /** Nhan tieng Viet cho cac gia tri cua o `choice`. */
@@ -244,15 +246,11 @@ export default function ContentAdminPage() {
                           </div>
                         )}
                         <div className="flex flex-wrap items-center gap-3">
-                          <input
-                            id={r.key}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/avif"
-                            className="text-sm"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) void onPickImage(r, f);
-                            }}
+                          <UploadButton
+                            label="Chọn ảnh từ máy"
+                            busy={busy}
+                            maxBytes={IMAGE_LIMITS.outfit}
+                            onPick={(f) => void onPickImage(r, f)}
                           />
                           {val(r) && (
                             <button

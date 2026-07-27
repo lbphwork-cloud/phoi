@@ -7,6 +7,7 @@ import { EmptyState, Spinner } from '@/components/site';
 import { StatusTag } from '@/components/outfit';
 import { AdminOutfitItems } from '@/components/AdminOutfitItems';
 import { OrphanProducts } from '@/components/AdminOrphanProducts';
+import { deleteOutfit, confirmDelete } from '@/lib/deleteOutfit';
 import { useAsyncData, useTaxonomy } from '@/lib/hooks';
 import { formatRelative, formatVnd } from '@/lib/format';
 import { STATUS_LABEL } from '@/lib/supabase/types';
@@ -73,6 +74,23 @@ export default function AdminOutfitsPage() {
 
     setBusyId(null);
     if (e) { setActionError(e.message); return; }
+    reload();
+  };
+
+  /** Xoa han mot bai. Hoi xac nhan roi ghi nhat ky — xem src/lib/deleteOutfit.ts. */
+  const removeOutfit = async (o: Outfit) => {
+    if (!confirmDelete(o.title)) return;
+
+    setBusyId(o.id);
+    setActionError(null);
+
+    const r = await deleteOutfit(o);
+
+    setBusyId(null);
+    if (!r.ok) { setActionError(r.message ?? 'Không xoá được.'); return; }
+
+    // Dong vua xoa co the dang mo phan san pham ben trong.
+    setOpenId((x) => (x === o.id ? null : x));
     reload();
   };
 
@@ -189,6 +207,14 @@ export default function AdminOutfitsPage() {
                         </button>
                       )}
                       <Link href={`/outfit/${o.slug}`} className="btn btn-quiet btn-sm">Xem</Link>
+                      <button
+                        type="button"
+                        className="btn btn-quiet btn-sm btn-danger"
+                        disabled={busyId === o.id}
+                        onClick={() => void removeOutfit(o)}
+                      >
+                        Xoá
+                      </button>
                     </div>
                   </td>
                 </tr>

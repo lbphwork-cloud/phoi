@@ -25,8 +25,9 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useAsyncData, useAuth } from '@/lib/hooks';
 import { uploadImage } from '@/lib/storage';
 import { checkAffiliateUrl } from '@/lib/affiliate';
-import { formatVnd } from '@/lib/format';
+import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
+import { UploadButton } from '@/components/UploadButton';
 import { ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import type { OutfitWithItems } from '@/lib/supabase/types';
 
@@ -57,14 +58,52 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Anh dai dien cua ca set. Giu rieng khoi `draft` vi no thuoc bang outfits,
+  // khong thuoc mon nao.
+  const [heroDraft, setHeroDraft] = useState<string | null>(null);
+  const [heroBusy, setHeroBusy] = useState(false);
+  const [heroSaved, setHeroSaved] = useState(false);
+
   if (loading) return <Spinner label="Đang tải sản phẩm trong set" />;
   if (error) return <p className="hint-error">Không tải được sản phẩm: {error}</p>;
+  if (!data) return <p className="muted-2 text-sm">Không tìm thấy set đồ này.</p>;
 
-  const items = [...(data?.outfit_items ?? [])].sort((a, b) => a.position - b.position);
+  const items = [...(data.outfit_items ?? [])].sort((a, b) => a.position - b.position);
+  const heroUrl = heroDraft ?? data.hero_image_url ?? '';
+  const heroDirty = heroDraft !== null && heroDraft !== (data.hero_image_url ?? '');
 
-  if (items.length === 0) {
-    return <p className="muted-2 text-sm">Set này chưa có sản phẩm nào.</p>;
-  }
+  const uploadHero = async (file: File) => {
+    if (!session) return;
+    setHeroBusy(true);
+    setSaveError(null);
+
+    const r = await uploadImage('outfit-images', session.user.id, file);
+    setHeroBusy(false);
+
+    if (!r.ok || !r.url) { setSaveError(r.message); return; }
+    setHeroDraft(r.url);
+    setHeroSaved(false);
+  };
+
+  const saveHero = async () => {
+    const sb = getSupabase();
+    if (!sb || heroDraft === null) return;
+
+    setHeroBusy(true);
+    setSaveError(null);
+
+    const { error: e } = await sb
+      .from('outfits')
+      .update({ hero_image_url: heroDraft.trim() || null })
+      .eq('id', outfitId);
+
+    setHeroBusy(false);
+    if (e) { setSaveError(`Ảnh đại diện: ${e.message}`); return; }
+
+    setHeroSaved(true);
+    setHeroDraft(null);
+    reload();
+  };
 
   const set = (itemId: string, patch: ItemDraft) => {
     setDraft((d) => ({ ...d, [itemId]: { ...d[itemId], ...patch } }));
@@ -129,6 +168,79 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     <div className="flex flex-col gap-6">
       {saveError && <div className="notice notice-danger">{saveError}</div>}
 
+      {/* ------------------------------------------------------------------ */}
+      {/* Anh dai dien cua ca set                                            */}
+      {/*                                                                     */}
+      {/* Dat TREN cac mon vi day la thu nguoi xem nhin thay dau tien o trang */}
+      {/* chu va trang kham pha — anh mon le chi hien khi da bam vao bai.     */}
+      {/* Doi anh dai dien cua bai DA DANG se dua bai quay lai cho duyet:     */}
+      {/* trigger outfits_require_rereview() lam viec do, khong phai ma o day.*/}
+      {/* ------------------------------------------------------------------ */}
+      <div className="flex flex-col gap-4 border p-4 sm:flex-row" style={{ borderColor: 'var(--line)' }}>
+        <div className="w-24 shrink-0">
+          <div className="frame" style={{ aspectRatio: '4 / 5' }}>
+            {heroUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={heroUrl} alt="" />
+            ) : (
+              <div className="frame frame-empty absolute inset-0">—</div>
+            )}
+          </div>
+          <p className="muted-2 mt-2 text-center text-xs">Ảnh bài</p>
+        </div>
+
+        <div className="flex-1">
+          <label className="label">Ảnh đại diện của set</label>
+          <UploadButton
+            className="mb-2"
+            label="Chọn ảnh từ máy"
+            busy={heroBusy}
+            maxBytes={IMAGE_LIMITS.outfit}
+            onPick={(f) => void uploadHero(f)}
+          />
+          <input
+            className="field"
+            value={heroUrl}
+            placeholder="Hoặc dán địa chỉ ảnh"
+            onChange={(e) => { setHeroDraft(e.target.value); setHeroSaved(false); }}
+          />
+
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!heroDirty || heroBusy}
+              onClick={() => void saveHero()}
+            >
+              {heroBusy ? 'Đang lưu…' : 'Lưu ảnh đại diện'}
+            </button>
+            {heroDirty && !heroBusy && (
+              <button
+                type="button"
+                className="btn btn-sm btn-quiet"
+                onClick={() => setHeroDraft(null)}
+              >
+                Hoàn tác
+              </button>
+            )}
+            {heroSaved && (
+              <span className="text-xs" style={{ color: 'var(--color-ok)' }}>Đã lưu</span>
+            )}
+          </div>
+
+          {data.status === 'published' && (
+            <p className="hint">
+              Bài đang hiển thị công khai. Đổi ảnh đại diện sẽ đưa bài quay lại chờ duyệt —
+              quy tắc nằm ở tầng database.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {items.length === 0 && (
+        <p className="muted-2 text-sm">Set này chưa có sản phẩm nào.</p>
+      )}
+
       {items.map((it) => {
         const p = it.products;
         const d = draft[it.id] ?? {};
@@ -183,15 +295,12 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
               <div>
                 <label className="label">Ảnh</label>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/avif"
-                  className="mb-2 text-sm"
-                  disabled={busy}
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void uploadItemImage(it.id, f);
-                  }}
+                <UploadButton
+                  className="mb-2"
+                  label="Chọn ảnh từ máy"
+                  busy={busy}
+                  maxBytes={IMAGE_LIMITS.product}
+                  onPick={(f) => void uploadItemImage(it.id, f)}
                 />
                 <input
                   className="field"

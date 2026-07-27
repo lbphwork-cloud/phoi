@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useTaxonomy, useUserContext } from '@/lib/hooks';
 import { useOutfits, type OutfitFilters } from '@/lib/useOutfits';
@@ -31,32 +32,41 @@ const PRICE_STEPS: Array<{ label: string; min: number | null; max: number | null
   { label: 'Trên 3 triệu', min: 3_000_000, max: null },
 ];
 
-/**
- * Doc phong cach tu dia chi: /kham-pha?style=toi-gian
- *
- * Trang chu dan sang day kem san phong cach. Doc bang window thay vi
- * useSearchParams de khong phai boc trang trong <Suspense> — ban xuat tinh bat
- * buoc dieu do, va o day chi can doc mot lan luc mo trang.
- */
-function styleFromUrl(): string | null {
-  if (typeof window === 'undefined') return null;
-  return new URLSearchParams(window.location.search).get('style');
-}
-
 export default function DiscoverPage() {
   if (!isSupabaseConfigured) return <SetupNotice />;
-  return <Discover />;
+
+  // useSearchParams bat buoc phai nam trong <Suspense> o ban xuat tinh.
+  return (
+    <Suspense fallback={<div className="shell py-20"><Spinner /></div>}>
+      <Discover />
+    </Suspense>
+  );
 }
 
 function Discover() {
   const tax = useTaxonomy();
+  /**
+   * Phong cach do trang chu truyen sang: /kham-pha/?style=toi-gian
+   *
+   * TRUOC DAY DOC BANG window.location.search VA NO SAI.
+   *   Bam tu trang chu la dieu huong PHIA TRINH DUYET — React dung trang moi
+   *   TRUOC, roi Next moi doi dia chi tren thanh dia chi. Doc window trong lan
+   *   render dau nen van thay dia chi cua trang CU, tuc la khong co tham so
+   *   nao, nen bo loc khong bat. Go thang dia chi vao trinh duyet thi lai chay
+   *   dung — dung kieu loi chi xuat hien khi bam tu trong trang, va rat kho
+   *   doan neu chi doc ma nguon.
+   *
+   *   useSearchParams doc tu chinh bo dieu huong cua Next nen luon dung o moi
+   *   kieu dieu huong. Cai gia phai tra la mot lop <Suspense> o tren.
+   */
+  const searchParams = useSearchParams();
   const c = useContent();
   const { ctx, privateData } = useUserContext();
 
-  // Doc mot lan luc mo trang. Khoi tao lazy de khong cham window khi render
-  // tren may chu luc dung san trang tinh.
+  // Doc mot lan luc mo trang. Sau do bo loc thuoc ve nguoi dung: ho bo chon
+  // phong cach thi khong co ly do gi de dia chi keo no quay lai.
   const [filters, setFilters] = useState<OutfitFilters>(() => {
-    const s = styleFromUrl();
+    const s = searchParams.get('style');
     return s ? { styleSlug: s } : {};
   });
   const [priceStep, setPriceStep] = useState(0);

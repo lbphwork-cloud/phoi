@@ -217,6 +217,58 @@ export interface GenerateResult {
  * tai anh len storage. Anh tra ve la BAN NHAP — ban tu xem roi chon gan vao set
  * do, vi anh AI luon phai qua kiem duyet tay.
  */
+/**
+ * Lay THONG BAO THAT tu mot loi cua Edge Function.
+ *
+ * VI SAO PHAI CO HAM NAY
+ *   Khi function tra ve ma trang thai khac 2xx, thu vien supabase-js nem ra
+ *   `FunctionsHttpError` voi noi dung co dinh "Edge Function returned a non-2xx
+ *   status code" — vo nghia voi nguoi dung. Noi dung that ("Da het han muc
+ *   Gemini cho hom nay…") nam trong `error.context`, chinh la doi tuong Response
+ *   goc, va se mat luon neu khong ai mo ra doc.
+ *
+ *   Truoc day cho nay chi hien cau vo nghia do kem loi khuyen sai la "xem
+ *   README" — trong khi function chay hoan toan binh thuong va da noi ro van de
+ *   bang tieng Viet.
+ *
+ * `clone()` truoc khi doc: than Response chi doc duoc mot lan, va co the co cho
+ * khac cung dang muon doc no.
+ */
+async function edgeErrorMessage(error: unknown, fallbackHint: string): Promise<string> {
+  const ctx = (error as { context?: unknown })?.context;
+
+  if (ctx && typeof (ctx as Response).clone === 'function') {
+    try {
+      const body = (await (ctx as Response).clone().json()) as { error?: string };
+      if (typeof body?.error === 'string' && body.error.trim()) {
+        return withQuotaHelp(body.error.trim());
+      }
+    } catch {
+      // Khong phai JSON — roi xuong duoi dung thong bao chung.
+    }
+  }
+
+  return `${(error as Error)?.message ?? 'Lỗi không rõ'}. ${fallbackHint}`;
+}
+
+/**
+ * Loi het han muc thi kem luon viec can lam.
+ *
+ * "Da het han muc" dung nhung chua du: nguoi doc van phai tu di tim xem sua o
+ * dau. Han muc bang 0 cua Google khong tu het sau vai gio — phai tao key trong
+ * mot du an khac hoac bat thanh toan.
+ */
+function withQuotaHelp(message: string): string {
+  if (!/hạn mức|quota|429/i.test(message)) return message;
+  if (/aistudio/i.test(message)) return message;
+  return (
+    message +
+    ' Nếu lỗi này lặp lại mãi thì hạn mức của dự án đang là 0: vào ' +
+    'aistudio.google.com/apikey, bấm "Create API key in new project" để lấy key ' +
+    'trong dự án mới, hoặc bật thanh toán cho dự án hiện tại.'
+  );
+}
+
 export async function requestAiImage(args: {
   provider: AiProviderId;
   prompt: string;
@@ -245,9 +297,10 @@ export async function requestAiImage(args: {
     if (error) {
       return {
         ok: false, urls: [], jobId: null,
-        message:
-          `Không gọi được ai-generate: ${error.message}. ` +
-          'Nếu chưa triển khai function này, xem supabase/functions/README.md.',
+        message: await edgeErrorMessage(
+          error,
+          'Nếu chưa triển khai function ai-generate, xem supabase/functions/README.md.',
+        ),
       };
     }
 
@@ -264,7 +317,7 @@ export async function requestAiImage(args: {
           ok: false,
           urls: [],
           jobId: r?.jobId ?? null,
-          message: r?.error ?? 'Tạo ảnh thất bại, không rõ lý do.',
+          message: withQuotaHelp(r?.error ?? 'Tạo ảnh thất bại, không rõ lý do.'),
         };
   } catch (e) {
     return {
@@ -303,16 +356,20 @@ export async function requestAiDescription(args: {
     if (error) {
       return {
         ok: false, text: '',
-        message:
-          `Không gọi được ai-generate: ${error.message}. ` +
-          'Nếu chưa triển khai function này, xem supabase/functions/README.md.',
+        message: await edgeErrorMessage(
+          error,
+          'Nếu chưa triển khai function ai-generate, xem supabase/functions/README.md.',
+        ),
       };
     }
 
     const r = data as { ok: boolean; text?: string; error?: string };
     return r?.ok && r.text
       ? { ok: true, text: r.text.trim(), message: 'Đã tạo mô tả. Đọc lại rồi sửa cho đúng ý bạn.' }
-      : { ok: false, text: '', message: r?.error ?? 'Tạo mô tả thất bại, không rõ lý do.' };
+      : {
+          ok: false, text: '',
+          message: withQuotaHelp(r?.error ?? 'Tạo mô tả thất bại, không rõ lý do.'),
+        };
   } catch (e) {
     return { ok: false, text: '', message: `Lỗi khi gọi ai-generate: ${(e as Error).message}` };
   }
