@@ -1,11 +1,13 @@
 'use client';
 
+import { useContent } from '@/lib/content';
 import Link from 'next/link';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useTaxonomy, useUserContext } from '@/lib/hooks';
 import { useOutfitDetail } from '@/lib/useOutfits';
 import { AiTag, FeedbackBar, ProductRow, SeedTag, StatusTag } from '@/components/outfit';
 import { EmptyState, SetupNotice, Spinner } from '@/components/site';
+import { SaveButton } from '@/components/SaveButton';
 import { formatVnd, formatRelative } from '@/lib/format';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
 
@@ -17,6 +19,7 @@ export default function OutfitDetail({ slug }: { slug: string }) {
 function Detail({ slug }: { slug: string }) {
   const { outfit, loading, notFound } = useOutfitDetail(slug);
   const tax = useTaxonomy();
+  const c = useContent();
   const { privateData, reload } = useUserContext();
 
   if (loading) return <Spinner label="Đang tải outfit" />;
@@ -81,6 +84,11 @@ function Detail({ slug }: { slug: string }) {
             </div>
 
             <h1 className="display-sm mb-5">{outfit.title}</h1>
+
+            {/* Nut luu o trang chi tiet la dang DAY DU co chu, khac nut gon
+                tren the outfit: o day co cho, va day la luc nguoi ta da doc ky
+                va dang quyet dinh. */}
+            <SaveButton outfitId={outfit.id} full className="mb-5" />
 
             {outfit.description && (
               <p className="muted mb-8 text-lg leading-relaxed">{outfit.description}</p>
@@ -148,7 +156,11 @@ function Detail({ slug }: { slug: string }) {
       {/* Danh sach san pham                                                */}
       {/* ---------------------------------------------------------------- */}
       <div className="shell mt-20">
-        <h2 className="display-sm mb-2">Các món trong set</h2>
+        <h2 className="display-sm mb-2">
+          <span style={c.s('outfit.items_heading')}>
+            {c.t('outfit.items_heading', 'Các món trong set')}
+          </span>
+        </h2>
         <p className="muted-2 mb-8 text-sm">
           Bấm để sang sàn. PHỐI không bán hàng — bạn mua trực tiếp trên Shopee
           hoặc TikTok Shop.

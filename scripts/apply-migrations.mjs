@@ -75,14 +75,14 @@ create table if not exists phoi_meta.applied_migrations (
 async function runChecks(db) {
   console.log('\n=== Kiem tra ket qua ===');
 
-  // 19 bang: 18 tu 0001, cong site_content tu 0008. Bang theo doi migration nam
-  // o schema phoi_meta nen khong tinh vao day.
+  // 20 bang: 18 tu 0001, site_content tu 0008, saved_outfits tu 0017. Bang theo
+  // doi migration nam o schema phoi_meta nen khong tinh vao day.
   {
     const [r] = await db.rows(
       `select count(*)::int as n from information_schema.tables
         where table_schema = 'public' and table_type = 'BASE TABLE'`,
     );
-    report('0001+0008 — 19 bang trong schema public', r.n === 19, `co ${r.n}`);
+    report('0001+0008+0017 — 20 bang trong schema public', r.n === 20, `co ${r.n}`);
   }
 
   // 0002 — RLS. Day la phep kiem tra quan trong nhat ve bao mat: thieu no thi

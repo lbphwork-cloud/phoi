@@ -62,6 +62,7 @@ const PAGE_LABELS: Record<string, string> = {
   'du-lieu': 'Trang dữ liệu cá nhân',
   'outfit': 'Trang chi tiết set đồ',
   'bai-cua-toi': 'Trang bài của tôi',
+  'gio-hang': 'Trang giỏ hàng',
 };
 
 /**

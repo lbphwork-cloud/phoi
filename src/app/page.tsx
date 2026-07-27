@@ -172,7 +172,11 @@ function Home() {
                     `em` trong font-size tinh theo co chu cua CHA, nen dat thang len the
                     mang lop .display se lam co chu tinh theo body (16px) thay vi theo co
                     that cua tieu de. Xem chu thich fieldStyleCss trong lib/typography.ts. */}
-                <h1 className="display mx-auto max-w-3xl whitespace-pre-line">
+                {/* max-w-5xl chu khong phai 3xl: chu website dat tieu de o co
+                    lon han va viet in hoa, nen mot khung 48rem lam no xuong hang
+                    som. 64rem van du hep de dong chu khong dai qua muc doc duoc
+                    trong mot luot mat. */}
+                <h1 className="display mx-auto max-w-5xl whitespace-pre-line">
                   <span style={c.s('home.hero.title')}>{heroTitle}</span>
                 </h1>
 

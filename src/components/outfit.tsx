@@ -6,6 +6,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { AFFILIATE_LINK_ATTRS } from '@/lib/affiliate';
 import { formatVnd, formatVndShort, priceFreshnessNote } from '@/lib/format';
 import { useReveal, useTaxonomy } from '@/lib/hooks';
+import { SaveButton } from '@/components/SaveButton';
 import type { ScoreBreakdown } from '@/lib/scoring';
 import type {
   AffiliateLink, Outfit, OutfitStatus, Product,
@@ -103,6 +104,11 @@ export function OutfitCard({
 
   return (
     <div ref={ref} className="reveal group/card relative">
+      {/* Nut luu nam canh nut khong thich, cung goc tren ben phai. Hai nut
+          nay la hai huong cua cung mot quyet dinh — thich hay khong — nen dat
+          canh nhau de mat khong phai di tim. */}
+      <SaveButton outfitId={outfit.id} className="btn-save-card" />
+
       {onDislike && (
         <button
           type="button"

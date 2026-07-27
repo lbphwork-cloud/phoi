@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { useContent } from '@/lib/content';
 import { SetupNotice, Spinner } from '@/components/site';
 import { useAuth, useTaxonomy, useUserContext } from '@/lib/hooks';
 import { analyzeBirthDate, explainMenh, NGU_HANH_LABEL } from '@/lib/nguhanh';
@@ -82,6 +83,7 @@ function ProfileForm({
   onSaved,
 }: ProfileFormProps) {
   const tax = useTaxonomy();
+  const c = useContent();
 
   const [name, setName] = useState(initialName);
   const [styles, setStyles] = useState<string[]>(initialStyles);
@@ -162,8 +164,15 @@ function ProfileForm({
 
   return (
     <div className="shell-narrow py-12 md:py-16">
-      <p className="eyebrow mb-4">Hồ sơ</p>
-      <h1 className="display-sm mb-10">Gu của bạn</h1>
+      <p className="eyebrow mb-4">
+        <span style={c.s('profile.title')}>{c.t('profile.title', 'Hồ sơ')}</span>
+      </p>
+      <h1 className="display-sm mb-4">
+        <span style={c.s('profile.subtitle')}>{c.t('profile.subtitle', 'Gu của bạn')}</span>
+      </h1>
+      <p className="muted mb-10 max-w-2xl text-sm leading-relaxed">
+        <span style={c.s('profile.saved')}>{c.t('profile.saved', '')}</span>
+      </p>
 
       {/* ------------------------------------------------------------------ */}
       <Section title="Tên hiển thị">

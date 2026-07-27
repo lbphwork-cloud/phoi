@@ -9,6 +9,7 @@ import { typographyCss } from '@/lib/typography';
 
 const NAV = [
   { href: '/kham-pha', label: 'Khám phá' },
+  { href: '/gio-hang', label: 'Giỏ hàng' },
   { href: '/tao-bai', label: 'Tạo bài' },
   { href: '/bai-cua-toi', label: 'Bài của tôi' },
 ];
@@ -216,16 +217,23 @@ export function SiteHeader() {
 }
 
 export function SiteFooter() {
+  const c = useContent();
+
   return (
     <footer className="mt-24 border-t py-12" style={{ borderColor: 'var(--line)' }}>
       <div className="shell grid gap-10 md:grid-cols-3">
         <div>
           <p className="display-xs mb-3" style={{ letterSpacing: '0.28em' }}>
-            PHỐI
+            <span style={c.s('site.name')}>{c.t('site.name', 'PHỐI')}</span>
           </p>
           <p className="muted text-sm">
-            Gợi ý phối đồ nam theo gu và theo mệnh. Sản phẩm trong khoảng
-            150.000&nbsp;–&nbsp;700.000đ, mua trên Shopee và TikTok Shop.
+            <span style={c.s('site.tagline')}>
+              {c.t(
+                'site.tagline',
+                'Gợi ý phối đồ nam theo gu và theo mệnh. Sản phẩm trong khoảng ' +
+                  '150.000 – 700.000đ, mua trên Shopee và TikTok Shop.',
+              )}
+            </span>
           </p>
         </div>
 
@@ -233,6 +241,7 @@ export function SiteFooter() {
           <p className="eyebrow mb-3">Trang</p>
           <ul className="flex flex-col gap-1 text-sm">
             <li><Link href="/kham-pha" className="muted hover:underline">Khám phá outfit</Link></li>
+            <li><Link href="/gio-hang" className="muted hover:underline">Giỏ hàng</Link></li>
             <li><Link href="/tao-bai" className="muted hover:underline">Tạo bài phối đồ</Link></li>
             <li><Link href="/ho-so" className="muted hover:underline">Hồ sơ và quyền dữ liệu</Link></li>
           </ul>
@@ -246,13 +255,23 @@ export function SiteFooter() {
         <div>
           <p className="eyebrow mb-3">Công bố</p>
           <p className="muted-2 text-xs leading-relaxed">
-            Các liên kết mua hàng trên PHỐI là liên kết tiếp thị. Người đăng bài
-            có thể nhận hoa hồng từ sàn khi bạn mua qua liên kết của họ. Giá bạn
-            trả không thay đổi.
+            <span style={c.s('footer.affiliate')}>
+              {c.t(
+                'footer.affiliate',
+                'Các liên kết mua hàng trên PHỐI là liên kết tiếp thị. Người đăng bài ' +
+                  'có thể nhận hoa hồng từ sàn khi bạn mua qua liên kết của họ. ' +
+                  'Giá bạn trả không thay đổi.',
+              )}
+            </span>
           </p>
           <p className="muted-2 mt-3 text-xs leading-relaxed">
-            Nội dung về ngũ hành chỉ là gợi ý màu sắc mang tính tham khảo trong
-            phối đồ, không phải dự đoán vận mệnh.
+            <span style={c.s('footer.about')}>
+              {c.t(
+                'footer.about',
+                'Nội dung về ngũ hành chỉ là gợi ý màu sắc mang tính tham khảo trong ' +
+                  'phối đồ, không phải dự đoán vận mệnh.',
+              )}
+            </span>
           </p>
           <p className="muted-2 mt-3 text-xs leading-relaxed">
             Giá sản phẩm do sàn quyết định và có thể đã thay đổi so với thời điểm

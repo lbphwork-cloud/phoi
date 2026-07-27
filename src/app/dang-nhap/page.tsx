@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
+import { useContent } from '@/lib/content';
 import { SetupNotice } from '@/components/site';
 import { useAuth } from '@/lib/hooks';
 
@@ -22,6 +23,7 @@ function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const c = useContent();
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -130,7 +132,11 @@ function Login() {
 
   return (
     <div className="shell-narrow py-16 md:py-24">
-      <p className="eyebrow mb-4">{mode === 'signin' ? 'Đăng nhập' : 'Đăng ký'}</p>
+      <p className="eyebrow mb-4">
+        <span style={c.s('login.title')}>
+          {c.t('login.title', mode === 'signin' ? 'Đăng nhập' : 'Đăng ký')}
+        </span>
+      </p>
       <h1 className="display-sm mb-4">
         {mode === 'signin' ? 'Vào PHỐI' : 'Tạo tài khoản PHỐI'}
       </h1>

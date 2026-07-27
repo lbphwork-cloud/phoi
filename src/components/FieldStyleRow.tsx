@@ -81,6 +81,13 @@ export function FieldStyleRow({
         : String(Math.round(Number(SIZE_SCALE[st.size] ?? '1') * 100)))
     : '';
 
+  /** So dang go nhung nam ngoai khoang cho phep, hoac null. */
+  const sizeOutOfRange = (() => {
+    const n = Number(sizeInput);
+    if (!sizeInput || !Number.isFinite(n)) return null;
+    return n < SIZE_MIN || n > SIZE_MAX ? n : null;
+  })();
+
   const changed = Object.keys(st).length > 0;
   const warn = st.color ? contrastWarning(st.color) : null;
 
@@ -140,9 +147,21 @@ export function FieldStyleRow({
                 value={sizeInput}
                 onChange={(e) => set({ size: e.target.value })}
               />
-              <p className="hint">
-                100 là giữ nguyên. 200 là to gấp đôi. Để trống thì theo kiểu chung.
-              </p>
+              {/* KEP AM THAM LA MOT LOI GIAO DIEN.
+                  Truoc day so ngoai khoang bi keo ve chan gan nhat ma khong bao
+                  gi — nen go 10, 20, 30, 40 deu ra ket qua y het nhau, va nguoi
+                  dung ket luan la "sua size ma khong thay doi". Noi ro thi ho
+                  biet ngay minh dang cham tran. */}
+              {sizeOutOfRange !== null ? (
+                <p className="hint-error">
+                  Chỉ nhận từ {SIZE_MIN} đến {SIZE_MAX}. Số {sizeOutOfRange} sẽ được
+                  áp thành {Math.min(SIZE_MAX, Math.max(SIZE_MIN, sizeOutOfRange))}.
+                </p>
+              ) : (
+                <p className="hint">
+                  100 là giữ nguyên. 200 là to gấp đôi. Để trống thì theo kiểu chung.
+                </p>
+              )}
             </div>
             <Select label="Độ đậm" value={st.weight ?? ''} onChange={(v) => set({ weight: v })}
                     options={Object.keys(WEIGHT)} labels={WEIGHT_LABEL} />

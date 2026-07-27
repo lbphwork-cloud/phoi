@@ -148,7 +148,11 @@ function Discover() {
         <p className="eyebrow mb-4">
           <span style={c.s('discover.title')}>{c.t('discover.title', 'Khám phá')}</span>
         </p>
-        <h1 className="display-sm mb-4">Tất cả outfit</h1>
+        <h1 className="display-sm mb-4">
+          <span style={c.s('discover.heading')}>
+            {c.t('discover.heading', 'Tất cả outfit')}
+          </span>
+        </h1>
         <p className="muted max-w-2xl text-sm leading-relaxed">
           <span style={c.s('discover.subtitle')}>
           {c.t(
@@ -273,7 +277,7 @@ function Discover() {
       {loading ? (
         <Spinner />
       ) : visible.length === 0 ? (
-        <EmptyState title="Không có outfit nào khớp">
+        <EmptyState title={c.t('discover.empty_title', 'Không có outfit nào khớp')}>
           {activeCount > 0 ? (
             <>
               Thử bỏ một vài bộ lọc.{' '}
@@ -306,7 +310,12 @@ function Discover() {
           </div>
 
           <p className="muted-2 mt-12 text-center text-xs">
-            Giá hiển thị là tổng tạm tính của cả set, ghi nhận tại thời điểm nhập.
+            <span style={c.s('discover.price_note')}>
+              {c.t(
+                'discover.price_note',
+                'Giá hiển thị là tổng tạm tính của cả set, ghi nhận tại thời điểm nhập.',
+              )}
+            </span>{' '}
             Ví dụ khoảng giá mục tiêu mỗi món: {formatVnd(150_000)} – {formatVnd(700_000)}.
           </p>
         </>

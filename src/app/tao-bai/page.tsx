@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
+import { useContent } from '@/lib/content';
 import { SetupNotice, Spinner } from '@/components/site';
 import { OutfitEditor } from '@/components/OutfitEditor';
 import { useAuth } from '@/lib/hooks';
@@ -13,6 +14,7 @@ export default function CreatePage() {
 
 function Create() {
   const { session, isAdmin, loading } = useAuth();
+  const c = useContent();
 
   if (loading) return <Spinner />;
 
@@ -32,8 +34,14 @@ function Create() {
 
   return (
     <div className="shell-narrow py-12 md:py-16">
-      <p className="eyebrow mb-4">Tạo bài</p>
-      <h1 className="display-sm mb-4">Bài phối đồ mới</h1>
+      <p className="eyebrow mb-4">
+        <span style={c.s('create.title')}>{c.t('create.title', 'Tạo bài')}</span>
+      </p>
+      <h1 className="display-sm mb-4">
+        <span style={c.s('create.subtitle')}>
+          {c.t('create.subtitle', 'Bài phối đồ mới')}
+        </span>
+      </h1>
       <p className="muted mb-10 text-sm leading-relaxed">
         Bạn gắn link affiliate của chính bạn cho từng sản phẩm và hưởng toàn bộ
         hoa hồng từ link đó. Nhiều người được đăng cùng một sản phẩm, mỗi người

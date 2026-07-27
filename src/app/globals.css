@@ -232,6 +232,42 @@ body {
 .btn-danger { border-color: var(--color-danger); color: var(--color-danger); }
 .btn-danger:hover:not(:disabled) { background: var(--color-danger); color: #fff; }
 
+/* Nut luu vao gio. Cung goc voi nut khong thich nhung nam ben trai no, de hai
+   quyet dinh nguoc chieu nhau khong bam nham vao nhau. */
+.btn-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 1rem;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(20, 18, 15, 0.42);
+  color: #fff;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+  transition: background 0.2s ease, opacity 0.2s ease;
+}
+.btn-save:hover:not(:disabled) { background: rgba(20, 18, 15, 0.72); }
+.btn-save[aria-pressed="true"] { background: #fff; color: #14120f; border-color: #fff; }
+
+/* Tren the outfit: hien mo, ro han khi ro chuot vao the. Tren dien thoai
+   khong co "ro chuot vao" nen luon hien ro — day la ly do dung media query
+   thay vi chi dua vao :hover. */
+.btn-save-card {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+  opacity: 1;
+}
+@media (hover: hover) {
+  .btn-save-card { opacity: 0; }
+  .group\/card:hover .btn-save-card,
+  .btn-save-card:focus-visible { opacity: 1; }
+}
+
 /* --- Logo hai phien ban --------------------------------------------------
 
    Ca hai anh deu nam trong trang, an/hien bang CSS. Chon bang JavaScript se
