@@ -51,6 +51,11 @@ export const FONT_LABEL: Record<string, string> = {
  * DUNG HE SO CHU KHONG PHAI SO PIXEL. Co chu goc dat bang clamp() nen no da tu
  * co gian theo be ngang man hinh; gan mot so pixel cung se pha mat dieu do va
  * tieu de se tran ra ngoai tren dien thoai.
+ *
+ * NAM MUC NAY GIU LAI CHI DE DOC GIA TRI CU. Chung tung la lua chon duy nhat,
+ * va dai cua chung qua hep — "Rat lon" moi chi 1,35 lan, khong du de lam mot
+ * tieu de that su lon. Gio nguoi dung go thang so phan tram; bang nay chi con
+ * viec dich cac gia tri da luu truoc do.
  */
 export const SIZE_SCALE: Record<string, string> = {
   'rat-nho': '0.8',
@@ -59,6 +64,35 @@ export const SIZE_SCALE: Record<string, string> = {
   lon: '1.15',
   'rat-lon': '1.35',
 };
+
+/** Chan tren va chan duoi cua co chu, tinh theo phan tram. */
+export const SIZE_MIN = 50;
+export const SIZE_MAX = 400;
+
+/**
+ * Doi mot gia tri co chu thanh he so nhan.
+ *
+ * NHAN CA HAI DANG:
+ *   - so phan tram do nguoi dung go: "180" -> 1.8
+ *   - ten muc cu da luu trong database: "rat-lon" -> 1.35
+ *
+ * Tra ve null khi khong doc duoc, de ben goi biet la "chua dat" chu khong phai
+ * "dat bang 1" — hai truong hop nay khac nhau: chua dat thi de tang duoi quyet
+ * dinh, con dat bang 1 la co y giu nguyen co goc.
+ *
+ * KEP TRONG KHOANG cho phep: mot con so go nham (vi du 4000) khong duoc phep
+ * lam vo bo cuc ca trang.
+ */
+export function resolveSize(raw: string): string | null {
+  const v = (raw ?? '').trim();
+  if (!v) return null;
+
+  const n = Number(v);
+  if (Number.isFinite(n) && n > 0) {
+    return String(Math.min(SIZE_MAX, Math.max(SIZE_MIN, n)) / 100);
+  }
+  return SIZE_SCALE[v] ?? null;
+}
 
 export const WEIGHT: Record<string, string> = {
   manh: '300',
@@ -103,10 +137,10 @@ export const ROLE_LABEL: Record<TypeRole, string> = {
 
 /** Gia tri mac dinh — bang dung voi globals.css truoc khi co tinh nang nay. */
 const DEFAULTS: Record<TypeRole, { font: string; size: string; weight: string; color: string; case: string }> = {
-  display: { font: 'be-vietnam', size: 'vua', weight: 'manh', color: 'theo-giao-dien', case: 'nhu-go' },
-  heading: { font: 'be-vietnam', size: 'vua', weight: 'manh', color: 'theo-giao-dien', case: 'nhu-go' },
-  body: { font: 'be-vietnam', size: 'vua', weight: 'thuong', color: 'theo-giao-dien', case: 'nhu-go' },
-  button: { font: 'be-vietnam', size: 'vua', weight: 'dam', color: 'theo-giao-dien', case: 'in-hoa' },
+  display: { font: 'be-vietnam', size: '100', weight: 'manh', color: 'theo-giao-dien', case: 'nhu-go' },
+  heading: { font: 'be-vietnam', size: '100', weight: 'manh', color: 'theo-giao-dien', case: 'nhu-go' },
+  body: { font: 'be-vietnam', size: '100', weight: 'thuong', color: 'theo-giao-dien', case: 'nhu-go' },
+  button: { font: 'be-vietnam', size: '100', weight: 'dam', color: 'theo-giao-dien', case: 'in-hoa' },
 };
 
 /**
@@ -128,7 +162,7 @@ export function typographyCss(t: (key: string, fallback: string) => string): str
     const textCase = t(`type.${role}.case`, d.case);
 
     lines.push(`--type-${role}-font: ${FONT_STACK[font] ?? FONT_STACK['be-vietnam']};`);
-    lines.push(`--type-${role}-scale: ${SIZE_SCALE[size] ?? SIZE_SCALE.vua};`);
+    lines.push(`--type-${role}-scale: ${resolveSize(size) ?? '1'};`);
     lines.push(`--type-${role}-weight: ${WEIGHT[weight] ?? WEIGHT.thuong};`);
     lines.push(`--type-${role}-case: ${CASE[textCase] ?? CASE['nhu-go']};`);
 
@@ -184,7 +218,7 @@ export function parseFieldStyle(raw: string): FieldStyle {
     const [k, v] = part.split('=').map((x) => x?.trim());
     if (!k || !v) continue;
     if (k === 'font' && FONT_STACK[v]) out.font = v;
-    else if (k === 'size' && SIZE_SCALE[v]) out.size = v;
+    else if (k === 'size' && resolveSize(v) !== null) out.size = v;
     else if (k === 'weight' && WEIGHT[v]) out.weight = v;
     else if (k === 'color' && v in TEXT_COLOR) out.color = v;
     else if (k === 'italic') out.italic = v === '1';
@@ -218,7 +252,21 @@ export function encodeFieldStyle(s: FieldStyle): string {
 export function fieldStyleCss(s: FieldStyle): React.CSSProperties {
   const css: React.CSSProperties = {};
   if (s.font && FONT_STACK[s.font]) css.fontFamily = FONT_STACK[s.font];
-  if (s.size && SIZE_SCALE[s.size]) css.fontSize = `${SIZE_SCALE[s.size]}em`;
+  /*
+    LOI DA SUA: `em` TRONG font-size TINH THEO CO CHU CUA PHAN TU CHA.
+
+    Ban truoc doan nay dat `fontSize: '1.35em'` thang len chinh the <h1>. Vi
+    `em` trong thuoc tinh font-size khong tinh theo co chu cua chinh phan tu do
+    ma tinh theo CHA cua no, ket qua la 1,35 x 16px = 21,6px — trong khi tieu de
+    goc la 72px. Chon "Rat lon" lam chu NHO DI hon ba lan.
+
+    Cach chua: cum kieu chu duoc dat len mot the <span> BEN TRONG phan tu, chu
+    khong len chinh phan tu. Luc do cha cua span chinh la the mang lop .display,
+    nen `em` tinh dung theo co chu that cua tieu de. Xem chu thich o cac cho goi
+    trong src/app/page.tsx.
+  */
+  const scale = s.size ? resolveSize(s.size) : null;
+  if (scale) css.fontSize = `${scale}em`;
   if (s.weight && WEIGHT[s.weight]) css.fontWeight = Number(WEIGHT[s.weight]);
   if (s.color && TEXT_COLOR[s.color]) css.color = TEXT_COLOR[s.color];
   if (s.italic) css.fontStyle = 'italic';

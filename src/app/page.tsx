@@ -103,9 +103,10 @@ function Home() {
       <Link
         href={c.t('home.hero.cta_href', '/kham-pha')}
         className={`btn ${hero.buttonClass}`}
-        style={c.s('home.hero.cta_label')}
       >
-        {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
+        <span style={c.s('home.hero.cta_label')}>
+          {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
+        </span>
       </Link>
       {!ctxLoading && !personalised && (
         <Link href="/ho-so" className="btn btn-ghost-onmedia">
@@ -152,9 +153,11 @@ function Home() {
                    style={hero.boxStyle}>
                 <p
                   className={hero.splitCta ? 'eyebrow mb-8' : 'eyebrow mb-4'}
-                  style={{ color: hero.dimColor, ...c.s('home.hero.eyebrow') }}
+                  style={{ color: hero.dimColor }}
                 >
-                  {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
+                  <span style={c.s('home.hero.eyebrow')}>
+                    {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
+                  </span>
                 </p>
 
                 {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
@@ -165,11 +168,12 @@ function Home() {
                     lech trai — nhin ra chu bi day han sang trai, trong khi dong
                     chu nho (rong het co) lai dung giua. Do la ly do hai dong
                     khong thang hang nhau. */}
-                <h1
-                  className="display mx-auto max-w-3xl whitespace-pre-line"
-                  style={c.s('home.hero.title')}
-                >
-                  {heroTitle}
+                {/* Cum kieu chu dat len <span> BEN TRONG, khong len chinh the nay.
+                    `em` trong font-size tinh theo co chu cua CHA, nen dat thang len the
+                    mang lop .display se lam co chu tinh theo body (16px) thay vi theo co
+                    that cua tieu de. Xem chu thich fieldStyleCss trong lib/typography.ts. */}
+                <h1 className="display mx-auto max-w-3xl whitespace-pre-line">
+                  <span style={c.s('home.hero.title')}>{heroTitle}</span>
                 </h1>
 
                 {/*
@@ -186,11 +190,8 @@ function Home() {
                   o nay, rong nghia la rong that.
                 */}
                 {!hero.hideSubtitle && subtitle && (
-                  <p
-                    className="mx-auto mt-6 max-w-xl text-base leading-relaxed md:text-lg"
-                    style={c.s('home.hero.subtitle')}
-                  >
-                    {subtitle}
+                  <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed md:text-lg">
+                    <span style={c.s('home.hero.subtitle')}>{subtitle}</span>
                   </p>
                 )}
 
@@ -208,8 +209,10 @@ function Home() {
       {styles.length > 0 && (
         <section className="pt-20 md:pt-28">
           <div className="shell mb-12 md:mb-16">
-            <p className="eyebrow" style={c.s('home.styles.eyebrow')}>
-              {c.t('home.styles.eyebrow', 'Theo phong cách')}
+            <p className="eyebrow">
+              <span style={c.s('home.styles.eyebrow')}>
+                {c.t('home.styles.eyebrow', 'Theo phong cách')}
+              </span>
             </p>
           </div>
 
@@ -225,8 +228,10 @@ function Home() {
               anh va mot duong dan rieng, chi khong doi mot man hinh moi cai. */}
           {styles.length > BIG_BLOCKS && (
             <div className="shell mt-20 md:mt-28">
-              <p className="eyebrow mb-8" style={c.s('home.styles.more_eyebrow')}>
-                {c.t('home.styles.more_eyebrow', 'Còn nữa')}
+              <p className="eyebrow mb-8">
+                <span style={c.s('home.styles.more_eyebrow')}>
+                  {c.t('home.styles.more_eyebrow', 'Còn nữa')}
+                </span>
               </p>
               <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
                 {styles.slice(BIG_BLOCKS).map((s) => (
@@ -246,20 +251,25 @@ function Home() {
         style={{ borderColor: 'var(--line)' }}
       >
         <div className="shell">
-          <p className="eyebrow mb-10" style={c.s('home.steps.heading')}>
-            {c.t('home.steps.heading', 'Cách hoạt động')}
+          <p className="eyebrow mb-10">
+            <span style={c.s('home.steps.heading')}>
+              {c.t('home.steps.heading', 'Cách hoạt động')}
+            </span>
           </p>
           <div className="grid gap-10 md:grid-cols-3">
             {[1, 2, 3].map((n) => (
               <div key={n}>
                 <p className="eyebrow mb-3">{String(n).padStart(2, '0')}</p>
-                <p className="display-xs mb-2" style={c.s(`home.step${n}.title`)}>
+                <p className="display-xs mb-2">
+                  <span style={c.s(`home.step${n}.title`)}>
                   {c.t(
                     `home.step${n}.title`,
                     ['Chọn gu', 'Xem và phản hồi', 'Mua trên sàn'][n - 1],
                   )}
+                  </span>
                 </p>
-                <p className="muted text-sm leading-relaxed" style={c.s(`home.step${n}.desc`)}>
+                <p className="muted text-sm leading-relaxed">
+                  <span style={c.s(`home.step${n}.desc`)}>
                   {c.t(
                     `home.step${n}.desc`,
                     [
@@ -268,6 +278,7 @@ function Home() {
                       'Bấm vào món bạn muốn để sang Shopee hoặc TikTok Shop. PHỐI không bán hàng và không giữ tiền của bạn.',
                     ][n - 1],
                   )}
+                  </span>
                 </p>
               </div>
             ))}

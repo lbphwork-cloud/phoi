@@ -26,7 +26,7 @@ import { useContent, heroAppearance, type ContentRow } from '@/lib/content';
 import { uploadImage } from '@/lib/storage';
 import { IMAGE_LIMITS } from '@/lib/format';
 import { UploadButton } from '@/components/UploadButton';
-import { FONT_LABEL } from '@/lib/typography';
+import { FONT_LABEL, fieldStyleCss, parseFieldStyle } from '@/lib/typography';
 import { FieldStyleRow } from '@/components/FieldStyleRow';
 import { Spinner, EmptyState } from '@/components/site';
 
@@ -168,6 +168,18 @@ export default function ContentAdminPage() {
     return v.trim() === '' ? f : v;
   });
 
+  /**
+   * Kieu chu rieng cua mot o, tinh tu gia tri DANG GO.
+   *
+   * Khong dung c.s() vi ham do doc gia tri da luu — ban xem truoc phai doi ngay
+   * khi nguoi dung chon, truoc khi bam Luu.
+   */
+  const styleOf = (key: string) => {
+    const row = c.rows.find((r) => r.key === `${key}.style`);
+    if (!row) return undefined;
+    return fieldStyleCss(parseFieldStyle(draft[row.key] ?? row.value));
+  };
+
   // Gom cac khoa cua phan mo dau de dung khoi xem truoc.
   const hero = {
     eyebrow: c.rows.find((r) => r.key === 'home.hero.eyebrow'),
@@ -235,14 +247,22 @@ export default function ContentAdminPage() {
             >
               <div className={look.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
                 <div className={look.boxStyle ? 'inline-block p-6' : ''} style={look.boxStyle}>
+                  {/* Ban xem truoc phai ap CA kieu chu rieng cua tung o, dung
+                      cach trang that lam: len the <span> ben trong, khong len
+                      the mang lop. Neu khong thi doi co chu roi mo xem truoc se
+                      thay mot dang, ma trang that lai ra mot dang khac. */}
                   {hero.eyebrow && (
                     <p className="eyebrow mb-3" style={{ color: look.dimColor }}>
-                      {val(hero.eyebrow)}
+                      <span style={styleOf(hero.eyebrow.key)}>{val(hero.eyebrow)}</span>
                     </p>
                   )}
-                  <p className="display-sm whitespace-pre-line">{val(hero.title)}</p>
+                  <p className="display-sm whitespace-pre-line">
+                    <span style={styleOf(hero.title.key)}>{val(hero.title)}</span>
+                  </p>
                   {hero.subtitle && !look.hideSubtitle && (
-                    <p className="mt-4 max-w-lg text-sm leading-relaxed">{val(hero.subtitle)}</p>
+                    <p className="mt-4 max-w-lg text-sm leading-relaxed">
+                      <span style={styleOf(hero.subtitle.key)}>{val(hero.subtitle)}</span>
+                    </p>
                   )}
                   {hero.cta && !look.splitCta && (
                     <span className={`btn btn-sm mt-6 ${look.buttonClass}`}>{val(hero.cta)}</span>

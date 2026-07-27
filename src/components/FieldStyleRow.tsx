@@ -22,7 +22,7 @@
 
 import { useState } from 'react';
 import {
-  FONT_LABEL, SIZE_SCALE, WEIGHT, TEXT_COLOR, contrastWarning,
+  FONT_LABEL, SIZE_SCALE, SIZE_MIN, SIZE_MAX, WEIGHT, TEXT_COLOR, contrastWarning,
   encodeFieldStyle, parseFieldStyle, fieldStyleCss, type FieldStyle,
 } from '@/lib/typography';
 
@@ -68,6 +68,19 @@ export function FieldStyleRow({
     onChange(encodeFieldStyle(next));
   };
 
+  /**
+   * Gia tri hien trong o nhap so.
+   *
+   * Cac o luu tu truoc mang ten muc ("rat-lon") chu khong phai so. Doi chung
+   * sang so tuong duong de nguoi dung thay ngay minh dang o muc nao, thay vi
+   * mot o trong lam ho tuong chua dat gi.
+   */
+  const sizeInput = st.size
+    ? (Number.isFinite(Number(st.size))
+        ? st.size
+        : String(Math.round(Number(SIZE_SCALE[st.size] ?? '1') * 100)))
+    : '';
+
   const changed = Object.keys(st).length > 0;
   const warn = st.color ? contrastWarning(st.color) : null;
 
@@ -110,8 +123,27 @@ export function FieldStyleRow({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <Select label="Font" value={st.font ?? ''} onChange={(v) => set({ font: v })}
                     options={Object.keys(FONT_LABEL)} labels={FONT_LABEL} />
-            <Select label="Cỡ" value={st.size ?? ''} onChange={(v) => set({ size: v })}
-                    options={Object.keys(SIZE_SCALE)} labels={SIZE_LABEL} />
+            {/* O NHAP SO, KHONG PHAI DANH SACH CHON.
+                Nam muc cu ("Rat nho" den "Rat lon") chi trai tu 80% den 135% —
+                khong du de lam mot tieu de that su lon, va chu website da bao
+                dung dieu do. Go so thi muon bao nhieu cung duoc trong khoang
+                50–400%. */}
+            <div>
+              <label className="label">Cỡ chữ (%)</label>
+              <input
+                type="number"
+                className="field"
+                min={SIZE_MIN}
+                max={SIZE_MAX}
+                step={5}
+                placeholder="Theo kiểu chung"
+                value={sizeInput}
+                onChange={(e) => set({ size: e.target.value })}
+              />
+              <p className="hint">
+                100 là giữ nguyên. 200 là to gấp đôi. Để trống thì theo kiểu chung.
+              </p>
+            </div>
             <Select label="Độ đậm" value={st.weight ?? ''} onChange={(v) => set({ weight: v })}
                     options={Object.keys(WEIGHT)} labels={WEIGHT_LABEL} />
             <Select label="Màu" value={st.color ?? ''} onChange={(v) => set({ color: v })}
@@ -188,7 +220,7 @@ export function FieldStyleRow({
 function describe(s: FieldStyle): string {
   const parts: string[] = [];
   if (s.font) parts.push(FONT_LABEL[s.font]?.split(' —')[0] ?? s.font);
-  if (s.size) parts.push(SIZE_LABEL[s.size] ?? s.size);
+  if (s.size) parts.push(`cỡ ${SIZE_LABEL[s.size] ?? `${s.size}%`}`);
   if (s.weight) parts.push(WEIGHT_LABEL[s.weight] ?? s.weight);
   if (s.color) parts.push(COLOR_LABEL[s.color] ?? s.color);
   if (s.italic) parts.push('nghiêng');
