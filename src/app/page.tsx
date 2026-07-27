@@ -148,7 +148,7 @@ function Home() {
             style={hero.textStyle}
           >
             <div>
-              <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : ''}
+              <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : 'w-full'}
                    style={hero.boxStyle}>
                 <p
                   className={hero.splitCta ? 'eyebrow mb-8' : 'eyebrow mb-4'}
@@ -158,8 +158,15 @@ function Home() {
                 </p>
 
                 {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
+                {/* mx-auto la BAT BUOC khi co max-width.
+                    `text-center` chi canh giua chu BEN TRONG khung chu chua no.
+                    Mot khung rong 48rem khong co mx-auto se nam sat le trai cua
+                    vung noi dung, nen chu duoc canh giua trong mot khung dang
+                    lech trai — nhin ra chu bi day han sang trai, trong khi dong
+                    chu nho (rong het co) lai dung giua. Do la ly do hai dong
+                    khong thang hang nhau. */}
                 <h1
-                  className="display max-w-3xl whitespace-pre-line"
+                  className="display mx-auto max-w-3xl whitespace-pre-line"
                   style={c.s('home.hero.title')}
                 >
                   {heroTitle}
@@ -180,7 +187,7 @@ function Home() {
                 */}
                 {!hero.hideSubtitle && subtitle && (
                   <p
-                    className="mt-6 max-w-xl text-base leading-relaxed md:text-lg"
+                    className="mx-auto mt-6 max-w-xl text-base leading-relaxed md:text-lg"
                     style={c.s('home.hero.subtitle')}
                   >
                     {subtitle}

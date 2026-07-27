@@ -157,9 +157,27 @@ export function heroAppearance(t: (k: string, f: string) => string) {
     /** Mau chu chinh. Ap cho ca tieu de va doan mo ta. */
     textStyle: {
       color: fg,
-      // Bong do chi co nghia khi chu sang nam tren anh. Chu toi tren nen sang
-      // ma them bong do thi nhin ban.
-      textShadow: light ? '0 1px 24px rgba(0,0,0,0.45)' : 'none',
+      /*
+        VIEN MO QUANH CHU, khong phai vien net.
+        Chu sang nam tren anh chup se chim bat cu khi nao phia sau no tinh co
+        la mot vung sang — mot manh troi, mot buc tuong trang. Lop phu chung
+        khong cuu duoc, vi lam lop phu du dam de cuu chu thi anh bi dim mat.
+
+        BA LOP CHONG NHAU, moi lop mot viec:
+          1. 0 1px 2px   — vien sat chan chu, tach net chu khoi nen
+          2. 0 2px 10px  — quang toi vua, do la thu lam chu "noi len"
+          3. 0 4px 32px  — quang rat rong va rat mo, dim nhe ca vung sau chu
+
+        Do mo tong cong van thap (0.30 / 0.30 / 0.35) nen mat khong nhan ra co
+        bong; no chi thay chu ro han. Vien NET (-webkit-text-stroke) thi nguoc
+        lai: no lam chu day len va mat het net manh cua kieu chu, nhin ra ngay
+        la mot thu duoc dap them vao.
+
+        Chi ap khi chu SANG. Chu toi tren nen sang ma them bong do thi nhin ban.
+      */
+      textShadow: light
+        ? '0 1px 2px rgba(0,0,0,0.30), 0 2px 10px rgba(0,0,0,0.30), 0 4px 32px rgba(0,0,0,0.35)'
+        : 'none',
     } as React.CSSProperties,
 
     /** Mau cho chu phu: nhat hon chu chinh nhung van cung tong. */

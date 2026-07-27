@@ -73,27 +73,41 @@ export function FieldStyleRow({
 
   return (
     <div className="mt-2">
+      {/* NUT NAY PHAI NHIN RA NUT.
+          Ban truoc no la kieu `btn-quiet` — khong vien, chu xam nhat — nen chu
+          website nhin vao khong biet no bam duoc, va bao la "khong cho chon
+          size, font, mau". Dung mot loi da mac o nut viet mo ta bang AI.
+          Co vien, co mui ten chi ra day la thu mo duoc, va chu noi thang no
+          lam gi thay vi mot cai ten chung chung. */}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
-          className="btn btn-sm btn-quiet"
+          className="btn btn-sm"
+          aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? 'Ẩn kiểu chữ' : 'Kiểu chữ riêng'}
+          <span
+            className="inline-block text-xs transition-transform"
+            style={open ? { transform: 'rotate(180deg)' } : undefined}
+            aria-hidden="true"
+          >
+            ▾
+          </span>
+          Đổi font, cỡ, màu, đậm nhạt
         </button>
         {!open && changed && (
-          <span className="muted-2 text-xs">
+          <span className="text-xs" style={{ color: 'var(--color-ok)' }}>
             Ô này đang có kiểu riêng: {describe(st)}
           </span>
         )}
         {!open && !changed && (
-          <span className="muted-2 text-xs">Đang theo kiểu chung</span>
+          <span className="muted-2 text-xs">Đang theo kiểu chung của website</span>
         )}
       </div>
 
       {open && (
         <div className="mt-3 border p-4" style={{ borderColor: 'var(--line)' }}>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
             <Select label="Font" value={st.font ?? ''} onChange={(v) => set({ font: v })}
                     options={Object.keys(FONT_LABEL)} labels={FONT_LABEL} />
             <Select label="Cỡ" value={st.size ?? ''} onChange={(v) => set({ size: v })}
@@ -112,6 +126,18 @@ export function FieldStyleRow({
               >
                 <option value="">Thẳng (theo kiểu chung)</option>
                 <option value="1">Nghiêng</option>
+              </select>
+            </div>
+            <div>
+              <label className="label">Chữ hoa</label>
+              <select
+                className="field"
+                value={st.case ?? ''}
+                onChange={(e) => set({ case: e.target.value })}
+              >
+                <option value="">Theo kiểu chung</option>
+                <option value="nhu-go">Như bạn gõ</option>
+                <option value="in-hoa">IN HOA TOÀN BỘ</option>
               </select>
             </div>
           </div>
@@ -166,6 +192,8 @@ function describe(s: FieldStyle): string {
   if (s.weight) parts.push(WEIGHT_LABEL[s.weight] ?? s.weight);
   if (s.color) parts.push(COLOR_LABEL[s.color] ?? s.color);
   if (s.italic) parts.push('nghiêng');
+  if (s.case === 'in-hoa') parts.push('IN HOA');
+  if (s.case === 'nhu-go') parts.push('như gõ');
   return parts.join(' · ');
 }
 

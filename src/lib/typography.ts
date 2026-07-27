@@ -170,6 +170,8 @@ export interface FieldStyle {
   weight?: string;
   color?: string;
   italic?: boolean;
+  /** 'nhu-go' | 'in-hoa'. Vai tro chung cung co thuoc tinh nay; day la ghi de. */
+  case?: string;
 }
 
 /** Doc chuoi ma hoa. Chuoi rong, sai dinh dang, hay khoa la deu ra {} — mot o
@@ -186,6 +188,7 @@ export function parseFieldStyle(raw: string): FieldStyle {
     else if (k === 'weight' && WEIGHT[v]) out.weight = v;
     else if (k === 'color' && v in TEXT_COLOR) out.color = v;
     else if (k === 'italic') out.italic = v === '1';
+    else if (k === 'case' && CASE[v]) out.case = v;
   }
   return out;
 }
@@ -197,6 +200,7 @@ export function encodeFieldStyle(s: FieldStyle): string {
   if (s.weight) parts.push(`weight=${s.weight}`);
   if (s.color) parts.push(`color=${s.color}`);
   if (s.italic) parts.push('italic=1');
+  if (s.case) parts.push(`case=${s.case}`);
   return parts.join(';');
 }
 
@@ -218,6 +222,9 @@ export function fieldStyleCss(s: FieldStyle): React.CSSProperties {
   if (s.weight && WEIGHT[s.weight]) css.fontWeight = Number(WEIGHT[s.weight]);
   if (s.color && TEXT_COLOR[s.color]) css.color = TEXT_COLOR[s.color];
   if (s.italic) css.fontStyle = 'italic';
+  if (s.case && CASE[s.case]) {
+    css.textTransform = CASE[s.case] as React.CSSProperties['textTransform'];
+  }
   return css;
 }
 
