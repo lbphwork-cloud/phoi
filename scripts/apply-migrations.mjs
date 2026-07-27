@@ -1,5 +1,5 @@
 /**
- * Chay ca 7 migration vao Supabase bang mot lenh, roi tu kiem tra ket qua.
+ * Chay tat ca migration vao Supabase bang mot lenh, roi tu kiem tra ket qua.
  *
  *     npm run db:apply
  *     npm run db:apply -- --self-test      (khong can database, chay tren PGlite)
@@ -26,7 +26,7 @@
  *   da sua co the mat du lieu, do la quyet dinh cua nguoi, khong phai cua script.
  *
  * VI SAO BANG THEO DOI NAM O SCHEMA RIENG
- *   `phoi_meta`, khong phai `public`. De `public` giu dung 18 bang — con so do
+ *   `phoi_meta`, khong phai `public`. De `public` giu dung so bang biet truoc — con so do
  *   duoc dung lam phep kiem tra ben duoi va trong tai lieu.
  */
 
@@ -75,13 +75,14 @@ create table if not exists phoi_meta.applied_migrations (
 async function runChecks(db) {
   console.log('\n=== Kiem tra ket qua ===');
 
-  // 0001 — 18 bang. Bang theo doi nam o schema khac nen khong tinh vao day.
+  // 19 bang: 18 tu 0001, cong site_content tu 0008. Bang theo doi migration nam
+  // o schema phoi_meta nen khong tinh vao day.
   {
     const [r] = await db.rows(
       `select count(*)::int as n from information_schema.tables
         where table_schema = 'public' and table_type = 'BASE TABLE'`,
     );
-    report('0001 — 18 bang trong schema public', r.n === 18, `co ${r.n}`);
+    report('0001+0008 — 19 bang trong schema public', r.n === 19, `co ${r.n}`);
   }
 
   // 0002 — RLS. Day la phep kiem tra quan trong nhat ve bao mat: thieu no thi

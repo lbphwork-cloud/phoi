@@ -11,6 +11,7 @@ const TABS = [
   { href: '/admin/kiem-duyet', label: 'Kiểm duyệt' },
   { href: '/admin/outfit', label: 'Outfit' },
   { href: '/admin/san-pham', label: 'Sản phẩm' },
+  { href: '/admin/noi-dung', label: 'Nội dung' },
   { href: '/admin/nguoi-dung', label: 'Người dùng' },
   { href: '/admin/ai', label: 'AI' },
 ];

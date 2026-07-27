@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useTaxonomy, useUserContext } from '@/lib/hooks';
 import { useOutfits, type OutfitFilters } from '@/lib/useOutfits';
+import { useContent } from '@/lib/content';
 import { OutfitCard } from '@/components/outfit';
 import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
@@ -13,11 +14,25 @@ import { formatVnd } from '@/lib/format';
 /** Cac buoc gia bam san, thay cho thanh truot — de bam tren dien thoai hon. */
 const PRICE_STEPS: Array<{ label: string; min: number | null; max: number | null }> = [
   { label: 'Tất cả', min: null, max: null },
-  { label: 'Dưới 1 triệu', min: null, max: 1_000_000 },
-  { label: '1 – 1,5 triệu', min: 1_000_000, max: 1_500_000 },
-  { label: '1,5 – 2 triệu', min: 1_500_000, max: 2_000_000 },
+  { label: 'Dưới 200k', min: null, max: 200_000 },
+  { label: '200 – 400k', min: 200_000, max: 400_000 },
+  { label: '400 – 700k', min: 400_000, max: 700_000 },
+  { label: '700k – 1 triệu', min: 700_000, max: 1_000_000 },
+  { label: '1 – 2 triệu', min: 1_000_000, max: 2_000_000 },
   { label: 'Trên 2 triệu', min: 2_000_000, max: null },
 ];
+
+/**
+ * Doc phong cach tu dia chi: /kham-pha?style=toi-gian
+ *
+ * Trang chu dan sang day kem san phong cach. Doc bang window thay vi
+ * useSearchParams de khong phai boc trang trong <Suspense> — ban xuat tinh bat
+ * buoc dieu do, va o day chi can doc mot lan luc mo trang.
+ */
+function styleFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('style');
+}
 
 export default function DiscoverPage() {
   if (!isSupabaseConfigured) return <SetupNotice />;
@@ -26,9 +41,15 @@ export default function DiscoverPage() {
 
 function Discover() {
   const tax = useTaxonomy();
+  const c = useContent();
   const { ctx, privateData } = useUserContext();
 
-  const [filters, setFilters] = useState<OutfitFilters>({});
+  // Doc mot lan luc mo trang. Khoi tao lazy de khong cham window khi render
+  // tren may chu luc dung san trang tinh.
+  const [filters, setFilters] = useState<OutfitFilters>(() => {
+    const s = styleFromUrl();
+    return s ? { styleSlug: s } : {};
+  });
   const [priceStep, setPriceStep] = useState(0);
   const [menhOnly, setMenhOnly] = useState(false);
 
@@ -81,8 +102,15 @@ function Discover() {
   return (
     <div className="shell py-12 md:py-16">
       <div className="mb-10">
-        <p className="eyebrow mb-4">Khám phá</p>
-        <h1 className="display-sm">Tất cả outfit</h1>
+        <p className="eyebrow mb-4">{c.t('discover.title', 'Khám phá')}</p>
+        <h1 className="display-sm mb-4">Tất cả outfit</h1>
+        <p className="muted max-w-2xl text-sm leading-relaxed">
+          {c.t(
+            'discover.subtitle',
+            'Lọc theo phong cách, dịp, màu và khoảng giá. ' +
+              'Gu của bạn luôn được ưu tiên hơn gợi ý theo mệnh.',
+          )}
+        </p>
       </div>
 
       {/* ------------------------------------------------------------------ */}
@@ -103,7 +131,18 @@ function Discover() {
           ))}
         </Group>
 
-        <Group label="Dịp sử dụng">
+        {/* Ba nhom nay thu gon mac dinh. Ly do: mo het ra la 33 nut, day toan
+            bo ket qua xuong duoi man hinh dien thoai — nguoi dung phai cuon
+            qua bo loc moi nhin thay cai ho vao de xem. Nhan hien so dang chon
+            de thu gon khong lam mat dau vet nguoi dung da loc gi.          */}
+        <Collapsible
+          label="Dịp sử dụng"
+          selected={
+            filters.occasionSlug
+              ? tax.occasions.find((o) => o.slug === filters.occasionSlug)?.label
+              : undefined
+          }
+        >
           {tax.occasions.map((o) => (
             <button
               key={o.slug}
@@ -115,25 +154,35 @@ function Discover() {
               {o.label}
             </button>
           ))}
-        </Group>
+        </Collapsible>
 
-        <Group label="Màu">
-          {tax.colors.map((c) => (
+        <Collapsible
+          label="Màu"
+          selected={
+            filters.colorSlug
+              ? tax.colors.find((x) => x.slug === filters.colorSlug)?.label
+              : undefined
+          }
+        >
+          {tax.colors.map((x) => (
             <button
-              key={c.slug}
+              key={x.slug}
               type="button"
               className="chip"
-              aria-pressed={filters.colorSlug === c.slug}
-              onClick={() => toggle('colorSlug', c.slug)}
-              title={c.element ? `Thuộc hành ${NGU_HANH_LABEL[c.element]}` : undefined}
+              aria-pressed={filters.colorSlug === x.slug}
+              onClick={() => toggle('colorSlug', x.slug)}
+              title={x.element ? `Thuộc hành ${NGU_HANH_LABEL[x.element]}` : undefined}
             >
-              <span className="swatch" style={{ background: c.hex }} />
-              {c.label}
+              <span className="swatch" style={{ background: x.hex }} />
+              {x.label}
             </button>
           ))}
-        </Group>
+        </Collapsible>
 
-        <Group label="Khoảng giá cả set">
+        <Collapsible
+          label="Khoảng giá cả set"
+          selected={priceStep > 0 ? PRICE_STEPS[priceStep].label : undefined}
+        >
           {PRICE_STEPS.map((p, i) => (
             <button
               key={p.label}
@@ -145,7 +194,7 @@ function Discover() {
               {p.label}
             </button>
           ))}
-        </Group>
+        </Collapsible>
 
         {/* Bo loc theo menh chi hien khi nguoi dung DA nhap ngay sinh va
             CHUA tat goi y theo menh. Khong quang cao tinh nang ho khong dung. */}
@@ -227,5 +276,49 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
       <p className="eyebrow shrink-0 sm:w-40 sm:pt-2">{label}</p>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Nhom bo loc thu gon duoc, mac dinh dong.
+ *
+ * Khi dong van hien TEN LUA CHON DANG AP DUNG. Neu khong, nguoi dung loc mot
+ * mau roi cuon xuong, quay len thay nhom dong lai va tuong minh chua loc gi —
+ * roi khong hieu vi sao ket qua it di.
+ *
+ * Dung <details>/<summary> that thay vi tu quan ly trang thai: no mo duoc bang
+ * ban phim, doc duoc bang trinh doc man hinh, va tim-trong-trang cua trinh
+ * duyet tu mo ra khi tu khoa nam ben trong. Ba thu do neu tu lam se phai viet
+ * them kha nhieu ma de sai.
+ */
+function Collapsible({
+  label,
+  selected,
+  children,
+}: {
+  label: string;
+  selected?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group">
+      <summary className="flex cursor-pointer list-none items-center gap-3 py-1">
+        <span className="eyebrow shrink-0 sm:w-40">{label}</span>
+        {selected ? (
+          <span className="text-sm" style={{ color: 'var(--fg)' }}>
+            {selected}
+          </span>
+        ) : (
+          <span className="muted-2 text-sm">Tất cả</span>
+        )}
+        <span
+          className="muted-2 ml-auto text-xs transition-transform group-open:rotate-180"
+          aria-hidden="true"
+        >
+          ▾
+        </span>
+      </summary>
+      <div className="mt-3 flex flex-wrap gap-2 sm:ml-40 sm:pl-6">{children}</div>
+    </details>
   );
 }

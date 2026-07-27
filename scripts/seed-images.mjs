@@ -121,6 +121,53 @@ function productSvg(hex, seed) {
   </svg>`);
 }
 
+/**
+ * Anh lon cho phan mo dau va cho tung khoi phong cach.
+ *
+ * Dung nhieu lop hon anh san pham: nen chuyen sac, mot khoi lon lech tam, mot
+ * dai ngang, mot duong manh, va mot lop toi dan o day. Ly do: hai anh nay
+ * chiem gan het man hinh va co CHU DE LEN TREN. Mot o mau phang o kich thuoc
+ * do trong nhu trang loi, va chu trang tren nen sang thi khong doc duoc.
+ *
+ * Lop toi o day anh cung chinh la thu giup chu luon doc duoc ma khong phai
+ * doan xem anh sang hay toi.
+ */
+function editorialSvg(hexes, w, h, seed) {
+  const base = hexes[0] ?? '#E8E4DC';
+  const accent = hexes[1] ?? shift(base, -0.4);
+  const third = hexes[2] ?? shift(base, 0.3);
+
+  const cx = w * (0.34 + ((seed % 5) * 0.07));
+  const cy = h * (0.38 + ((seed * 3) % 4) * 0.06);
+  const r = Math.min(w, h) * (0.34 + ((seed * 7) % 3) * 0.05);
+
+  return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="0.6" y2="1">
+        <stop offset="0%"   stop-color="${shift(base, 0.45)}"/>
+        <stop offset="55%"  stop-color="${shift(base, 0.12)}"/>
+        <stop offset="100%" stop-color="${shift(base, -0.18)}"/>
+      </linearGradient>
+      <radialGradient id="blob" cx="40%" cy="35%" r="72%">
+        <stop offset="0%"   stop-color="${shift(accent, 0.28)}"/>
+        <stop offset="100%" stop-color="${shift(accent, -0.24)}"/>
+      </radialGradient>
+      <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="55%"  stop-color="#000" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0.28"/>
+      </linearGradient>
+    </defs>
+
+    <rect width="${w}" height="${h}" fill="url(#bg)"/>
+    <ellipse cx="${cx}" cy="${cy}" rx="${r * 1.12}" ry="${r}" fill="url(#blob)" opacity="0.9"/>
+    <rect x="${w * 0.58}" y="${h * 0.14}" width="${w * 0.34}" height="${h * 0.52}"
+          fill="${third}" opacity="0.3"/>
+    <rect x="0" y="${h * 0.72}" width="${w}" height="1.5" fill="${shift(base, -0.45)}" opacity="0.35"/>
+    <rect x="${w * 0.08}" y="${h * 0.82}" width="${w * 0.12}" height="2" fill="${shift(base, -0.55)}" opacity="0.5"/>
+    <rect width="${w}" height="${h}" fill="url(#fade)"/>
+  </svg>`);
+}
+
 /** Tai mot file len Storage bang JWT cua nguoi dung. */
 async function upload(bucket, path, buf, token) {
   const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}/${path}`, {
@@ -194,10 +241,65 @@ async function main() {
   }
   console.log(`\nDoi ${links.length} link mau sang 2 link Shopee that.`);
 
+  // ---- Anh mo dau trang chu (21:9) va anh tung phong cach (4:5) ---------
+  // Ghi vao site_content de quan tri vien thay chung trong /admin/noi-dung va
+  // doi duoc bang tay sau nay.
+  console.log('\nTao anh mo dau va anh cac phong cach...');
+
+  const styleRows = await q('select slug, label, sort_order from styles order by sort_order');
+
+  // Bang mau chung cho anh mo dau: lay mau hay gap nhat trong cac set do.
+  const topColors = await q(`
+    select c.hex
+      from outfits o, unnest(o.color_slugs) cs
+      join colors c on c.slug = cs
+     where o.is_seed
+     group by c.hex
+     order by count(*) desc
+     limit 3`);
+
+  const heroBuf = await sharp(editorialSvg(topColors.map((r) => r.hex), 2400, 1030, 1))
+    .webp({ quality: 84 })
+    .toBuffer();
+  const heroUrl = await upload('outfit-images', `${userId}/trang-chu-hero.webp`, heroBuf, token);
+  await client.query("update site_content set value = $1 where key = 'home.hero.image'", [heroUrl]);
+  console.log('  mo dau 2400x1030 — xong');
+
+  for (const [i, s] of styleRows.entries()) {
+    // Bang mau rieng cua tung phong cach, lay tu chinh cac set do thuoc no.
+    const pal = await q(
+      `select c.hex
+         from outfits o, unnest(o.color_slugs) cs
+         join colors c on c.slug = cs
+        where o.style_slug = $1
+        group by c.hex
+        order by count(*) desc
+        limit 3`,
+      [s.slug],
+    );
+
+    const buf = await sharp(editorialSvg(pal.map((r) => r.hex), 1200, 1500, i + 2))
+      .webp({ quality: 82 })
+      .toBuffer();
+
+    const url = await upload('outfit-images', `${userId}/phong-cach-${s.slug}.webp`, buf, token);
+    await client.query('update site_content set value = $1 where key = $2', [
+      url,
+      `home.style.${s.slug}.image`,
+    ]);
+    process.stdout.write(`  phong cach ${i + 1}/${styleRows.length}\r`);
+  }
+  console.log(`  phong cach ${styleRows.length}/${styleRows.length} — xong`);
+
   const [c] = await q(`
     select (select count(*) from outfits  where hero_image_url <> '')::int as set_co_anh,
-           (select count(*) from products where image_url     <> '')::int as sp_co_anh`);
-  console.log(`\nKet qua: ${c.set_co_anh}/20 set do co anh, ${c.sp_co_anh}/45 san pham co anh.`);
+           (select count(*) from products where image_url     <> '')::int as sp_co_anh,
+           (select count(*) from site_content
+             where kind = 'image' and value <> '')::int as noi_dung_co_anh`);
+  console.log(
+    `\nKet qua: ${c.set_co_anh}/20 set do, ${c.sp_co_anh}/45 san pham, ` +
+      `${c.noi_dung_co_anh} anh trong noi dung trang.`,
+  );
 
   await client.end();
 }

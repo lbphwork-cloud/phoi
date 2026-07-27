@@ -6,7 +6,7 @@ import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { SetupNotice, Spinner } from '@/components/site';
 import { useAuth, useTaxonomy, useUserContext } from '@/lib/hooks';
 import { analyzeBirthDate, explainMenh, NGU_HANH_LABEL } from '@/lib/nguhanh';
-import { formatVnd } from '@/lib/format';
+
 
 export default function ProfilePage() {
   if (!isSupabaseConfigured) return <SetupNotice />;
@@ -46,7 +46,6 @@ function Profile() {
     <ProfileForm
       key={session.user.id}
       userId={session.user.id}
-      email={session.user.email ?? null}
       initialName={profile?.display_name ?? ''}
       initialStyles={prefs?.style_slugs ?? []}
       initialColors={prefs?.color_slugs ?? []}
@@ -61,7 +60,6 @@ function Profile() {
 
 interface ProfileFormProps {
   userId: string;
-  email: string | null;
   initialName: string;
   initialStyles: string[];
   initialColors: string[];
@@ -74,7 +72,6 @@ interface ProfileFormProps {
 
 function ProfileForm({
   userId,
-  email,
   initialName,
   initialStyles,
   initialColors,
@@ -89,8 +86,10 @@ function ProfileForm({
   const [name, setName] = useState(initialName);
   const [styles, setStyles] = useState<string[]>(initialStyles);
   const [colors, setColors] = useState<string[]>(initialColors);
-  const [priceMin, setPriceMin] = useState(initialPriceMin);
-  const [priceMax, setPriceMax] = useState(initialPriceMax);
+  // Khoi chon khoang gia da bo khoi trang nay, nhung gia tri cu VAN duoc gui
+  // khi luu — nguoi da dat truoc do khong bi mat thiet lap.
+  const [priceMin] = useState(initialPriceMin);
+  const [priceMax] = useState(initialPriceMax);
   const [birthDate, setBirthDate] = useState(initialBirthDate);
   const [menhEnabled, setMenhEnabled] = useState(initialMenhEnabled);
 
@@ -153,64 +152,13 @@ function ProfileForm({
       return;
     }
 
-    setMsg('Đã lưu.');
+    setMsg('Đã lưu thay đổi.');
     onSaved();
   };
 
-  /** Xoa du lieu ca nhan. Di qua ham SQL de xoa dung va day du trong 1 giao dich. */
-  const eraseData = async () => {
-    const sb = getSupabase();
-    if (!sb) return;
-    if (!window.confirm(
-      'Xoá toàn bộ dữ liệu cá nhân: ngày sinh, niên mệnh, gu đã chọn và lịch sử phản hồi.\n\n' +
-      'Các bài bạn đã đăng vẫn được giữ nhưng chuyển sang khuyết danh.\n\nTiếp tục?'
-    )) return;
+  // eraseData / exportData da chuyen sang src/app/du-lieu-cua-toi/page.tsx
 
-    setSaving(true);
-    const { error } = await sb.rpc('erase_my_personal_data');
-    setSaving(false);
-
-    if (error) { setErr(error.message); return; }
-    setMsg('Đã xoá dữ liệu cá nhân.');
-    setBirthDate('');
-    setStyles([]);
-    setColors([]);
-    onSaved();
-  };
-
-  /** Xuat du lieu ca nhan ra file JSON, khong can cho admin xu ly. */
-  const exportData = async () => {
-    const sb = getSupabase();
-    if (!sb) return;
-
-    const uid = userId;
-    const [pr, pf, pv, fb, ou] = await Promise.all([
-      sb.from('profiles').select('*').eq('id', uid).maybeSingle(),
-      sb.from('user_preferences').select('*').eq('user_id', uid).maybeSingle(),
-      sb.from('user_private').select('*').eq('user_id', uid).maybeSingle(),
-      sb.from('feedback_events').select('*').eq('user_id', uid),
-      sb.from('outfits').select('*').eq('author_id', uid),
-    ]);
-
-    const blob = new Blob(
-      [JSON.stringify({
-        xuat_luc: new Date().toISOString(),
-        email,
-        ho_so: pr.data,
-        so_thich: pf.data,
-        du_lieu_rieng: pv.data,
-        phan_hoi: fb.data,
-        bai_dang: ou.data,
-      }, null, 2)],
-      { type: 'application/json' },
-    );
-
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `phoi-du-lieu-ca-nhan-${uid.slice(0, 8)}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
+  // eraseData va exportData da chuyen sang src/app/du-lieu-cua-toi/page.tsx
 
   return (
     <div className="shell-narrow py-12 md:py-16">
@@ -268,38 +216,9 @@ function ProfileForm({
         </div>
       </Section>
 
-      {/* ------------------------------------------------------------------ */}
-      <Section title="Khoảng giá cả set" note="Tổng tạm tính của tất cả các món trong một set.">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label" htmlFor="pmin">Từ</label>
-            <input
-              id="pmin"
-              type="number"
-              min={0}
-              step={50_000}
-              value={priceMin}
-              onChange={(e) => setPriceMin(Number(e.target.value))}
-              className="field"
-            />
-          </div>
-          <div>
-            <label className="label" htmlFor="pmax">Đến</label>
-            <input
-              id="pmax"
-              type="number"
-              min={0}
-              step={50_000}
-              value={priceMax}
-              onChange={(e) => setPriceMax(Number(e.target.value))}
-              className="field"
-            />
-          </div>
-        </div>
-        <p className="hint">
-          Hiện tại: {formatVnd(Math.min(priceMin, priceMax))} – {formatVnd(Math.max(priceMin, priceMax))}
-        </p>
-      </Section>
+      {/* Khoi "Khoang gia" da bo khoi trang nay theo yeu cau: nguoi dung loc gia
+          ngay tren /kham-pha tien hon nhieu. Gia tri cu VAN duoc giu va van gui
+          khi luu, nen ai da dat roi thi khong bi mat. */}
 
       {/* ------------------------------------------------------------------ */}
       {/* Ngu hanh                                                           */}
@@ -367,36 +286,46 @@ function ProfileForm({
         </label>
       </Section>
 
-      {msg && <div className="notice notice-ok mb-6">{msg}</div>}
       {err && <div className="notice notice-danger mb-6">{err}</div>}
 
-      <button type="button" onClick={save} disabled={saving} className="btn btn-solid w-full">
-        {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
-      </button>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Quyen doi voi du lieu ca nhan (Nghi dinh 13/2023)                  */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="mt-20 border-t pt-10" style={{ borderColor: 'var(--line)' }}>
-        <p className="eyebrow mb-4">Dữ liệu cá nhân của bạn</p>
-        <p className="muted mb-6 text-sm">
-          Bạn có quyền xem, tải về và xoá dữ liệu cá nhân của mình bất cứ lúc nào,
-          không cần chờ quản trị viên xử lý.
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={exportData} className="btn btn-sm">
-            Tải dữ liệu của tôi (JSON)
-          </button>
-          <button type="button" onClick={eraseData} disabled={saving} className="btn btn-sm btn-danger">
-            Xoá dữ liệu cá nhân
-          </button>
+      {/* Man hinh xac nhan sau khi luu.
+          Chi hien mot dong chu nho thi rat de bo lo, nhat la khi nut Luu nam
+          cuoi mot trang dai — nguoi dung bam xong khong biet da an chua. Khoi
+          nay chiem cho han va co duong di tiep ro rang. */}
+      {msg ? (
+        <div className="notice notice-ok">
+          <p className="display-xs mb-2">{msg}</p>
+          <p className="muted mb-5 text-sm">
+            Gu mới đã được áp dụng. Thứ tự gợi ý sẽ đổi theo ngay từ lần xem tiếp theo.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/kham-pha" className="btn btn-sm btn-solid">
+              Xem outfit theo gu mới
+            </Link>
+            <Link href="/" className="btn btn-sm">
+              Về trang chủ
+            </Link>
+            <button type="button" onClick={() => setMsg(null)} className="btn btn-sm btn-quiet">
+              Chỉnh tiếp
+            </button>
+          </div>
         </div>
-        <p className="muted-2 mt-4 text-xs leading-relaxed">
-          Xoá dữ liệu cá nhân sẽ xoá ngày sinh, niên mệnh, gu đã chọn và toàn bộ
-          lịch sử phản hồi. Các bài bạn đã đăng công khai vẫn được giữ lại nhưng
-          chuyển sang khuyết danh, để không làm vỡ những set đồ người khác đang xem.
-        </p>
-      </div>
+      ) : (
+        <button type="button" onClick={save} disabled={saving} className="btn btn-solid w-full">
+          {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+        </button>
+      )}
+
+      {/* Khoi quyen du lieu ca nhan da chuyen sang trang rieng /du-lieu-cua-toi.
+          Bo khoi trang nay theo yeu cau — nhin nang ne va lam loang muc dich
+          chinh cua trang la chon gu. KHONG bo han: Nghi dinh 13/2023 yeu cau
+          nguoi dung phai co duong tu xem va tu xoa du lieu ca nhan. */}
+      <p className="muted-2 mt-16 border-t pt-8 text-xs" style={{ borderColor: 'var(--line)' }}>
+        Muốn tải về hoặc xoá dữ liệu cá nhân?{' '}
+        <Link href="/du-lieu-cua-toi" className="underline">
+          Dữ liệu của tôi
+        </Link>
+      </p>
     </div>
   );
 }

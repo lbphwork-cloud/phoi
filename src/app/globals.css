@@ -26,14 +26,27 @@
   --color-ok:       #3d6b45;
 
   /* --- Chu ----------------------------------------------------------------
-     KHONG tai font tu ben ngoai. Ly do: giam mot vong yeu cau mang o lan vao
-     dau tien, va khong phu thuoc host la. Font he thong tren macOS/iOS va
-     Android deu du dep. Muon doi sang font that thi xem README.
-     Serif cho tieu de tao cam giac editorial, sans cho phan doc.           */
-  --font-display: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino,
-                  Georgia, "Times New Roman", serif;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-               "Helvetica Neue", Arial, sans-serif;
+     Be Vietnam Pro, tai ve va tu luu tai may chu qua next/font. Khong co mot
+     yeu cau nao di ra Google luc nguoi dung mo trang.
+
+     VI SAO BO FONT HE THONG (ban truoc dung ui-serif -> Palatino / Iowan)
+       Nhung font serif do KHONG co bo ky tu tieng Viet that. Trinh duyet phai
+       ghep dau tu font khac, nen dau bi lech va chong len chu — thay ro nhat o
+       cac chu nhieu dau nhu "Mac gi", "nguoi", "phoi". Do la loi font, khong
+       phai loi CSS, va khong sua duoc bang cach chinh khoang cach dong.
+
+     VI SAO LA BE VIETNAM PRO
+       Font hinh hoc, net sach, ít chi tiet thua — dung tinh than trang Chanel
+       ma nguoi dung muon. Font rieng cua Chanel (ABChanel Corpo) la font dat
+       hang, khong ban ra ngoai va cung khong co tieng Viet, nen khong dung lai
+       duoc. Be Vietnam Pro do nguoi Viet thiet ke rieng cho tieng Viet nen dau
+       duoc ve san trong tung con chu, khong phai ghep.
+
+     Doi sang font khac chi can sua bien nay va phan khai bao trong layout.tsx.
+                                                                            */
+  --font-display: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-be-vietnam), -apple-system, BlinkMacSystemFont,
+               "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 :root {
@@ -123,25 +136,32 @@ body {
 
 /* --- Chu --------------------------------------------------------------- */
 
-/* clamp() de khong can breakpoint rieng cho tung co chu. */
+/* clamp() de khong can breakpoint rieng cho tung co chu.
+
+   Net MANH (300) chu khong phai 400. Doi tu serif sang sans hinh hoc thi chu
+   dam len ro ret o co lon; net manh giu lai cam giac thoang va cao cap. Day
+   cung la cach cac trang thoi trang cao cap dat tieu de.
+
+   Gian chu duong nhe thay vi am. Serif co the bop lai cho chat; sans hinh hoc
+   bop lai thi cac chu tron dinh nhau, va tieng Viet co dau chong len nhau.  */
 .display {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
+  font-weight: 300;
+  letter-spacing: -0.005em;
+  line-height: 1.08;
   font-size: clamp(2.25rem, 6vw, 4.5rem);
 }
 .display-sm {
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: -0.015em;
-  line-height: 1.15;
+  font-weight: 300;
+  letter-spacing: 0;
+  line-height: 1.2;
   font-size: clamp(1.5rem, 3.2vw, 2.25rem);
 }
 .display-xs {
   font-family: var(--font-display);
   font-weight: 400;
-  line-height: 1.25;
+  line-height: 1.3;
   font-size: 1.125rem;
 }
 
@@ -391,3 +411,66 @@ table.data th {
   white-space: nowrap;
   border-width: 0;
 }
+
+/* --- Tran het chieu ngang ------------------------------------------------
+   Dung trong mot the nam trong .shell ma van muon tran ra mep man hinh.
+   100vw tinh ca thanh cuon nen phai tru di, khong thi trang bi cuon ngang.  */
+.bleed {
+  width: 100vw;
+  max-width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* Khung anh lon co chu de len tren. Lop phu toi dan tu duoi len de chu luon
+   doc duoc du anh sang hay toi — khong dua vao viec anh "chac la du toi".   */
+.hero-media {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.hero-media > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hero-media::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.62) 0%,
+    rgba(0, 0, 0, 0.34) 42%,
+    rgba(0, 0, 0, 0.06) 78%
+  );
+}
+.hero-body {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+}
+/* Chu trang tren anh: bong do rat nhe de tach khoi vung anh sang.           */
+.hero-body .display,
+.hero-body .display-sm,
+.hero-body p {
+  color: #fff;
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Nut sang tren nen anh toi. */
+.btn-onmedia {
+  background: #fff;
+  color: #14120f;
+  border-color: #fff;
+}
+.btn-onmedia:hover { background: rgba(255, 255, 255, 0.86); }
+
+.btn-ghost-onmedia {
+  background: transparent;
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.7);
+}
+.btn-ghost-onmedia:hover { background: rgba(255, 255, 255, 0.14); }
