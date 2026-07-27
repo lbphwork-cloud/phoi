@@ -11,15 +11,24 @@ import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
 import { formatVnd } from '@/lib/format';
 
-/** Cac buoc gia bam san, thay cho thanh truot — de bam tren dien thoai hon. */
+/**
+ * Cac buoc gia bam san, thay cho thanh truot — de bam tren dien thoai hon.
+ *
+ * TINH THEO TONG GIA CA SET, khong phai gia tung mon.
+ *   Mot set thuong 4 mon, moi mon 150.000 – 700.000d, nen tong roi vao khoang
+ *   1 – 2 trieu. Cac buoc duoi bam theo do.
+ *
+ *   Neu sau nay muon loc theo GIA TUNG MON thi phai doi ca cach truy van trong
+ *   useOutfits — bang outfits chi luu total_price_vnd, khong luu gia mon le.
+ */
 const PRICE_STEPS: Array<{ label: string; min: number | null; max: number | null }> = [
   { label: 'Tất cả', min: null, max: null },
-  { label: 'Dưới 200k', min: null, max: 200_000 },
-  { label: '200 – 400k', min: 200_000, max: 400_000 },
-  { label: '400 – 700k', min: 400_000, max: 700_000 },
-  { label: '700k – 1 triệu', min: 700_000, max: 1_000_000 },
-  { label: '1 – 2 triệu', min: 1_000_000, max: 2_000_000 },
-  { label: 'Trên 2 triệu', min: 2_000_000, max: null },
+  { label: 'Dưới 500k', min: null, max: 500_000 },
+  { label: '500k – 1 triệu', min: 500_000, max: 1_000_000 },
+  { label: '1 – 1,5 triệu', min: 1_000_000, max: 1_500_000 },
+  { label: '1,5 – 2 triệu', min: 1_500_000, max: 2_000_000 },
+  { label: '2 – 3 triệu', min: 2_000_000, max: 3_000_000 },
+  { label: 'Trên 3 triệu', min: 3_000_000, max: null },
 ];
 
 /**
