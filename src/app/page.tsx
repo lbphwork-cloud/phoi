@@ -28,7 +28,6 @@ import { useTaxonomy, useUserContext, useReveal } from '@/lib/hooks';
 import { useOutfits } from '@/lib/useOutfits';
 import { useContent, heroAppearance } from '@/lib/content';
 import { SetupNotice } from '@/components/site';
-import { NGU_HANH_LABEL } from '@/lib/nguhanh';
 
 /**
  * Bao nhieu phong cach dau danh sach duoc khoi lon.
@@ -47,7 +46,7 @@ export default function HomePage() {
 function Home() {
   const tax = useTaxonomy();
   const c = useContent();
-  const { ctx, privateData, prefs, loading: ctxLoading } = useUserContext();
+  const { ctx, prefs, loading: ctxLoading } = useUserContext();
   const { outfits } = useOutfits({}, ctx, tax.colorElements, 60);
 
   const heroRef = useReveal<HTMLDivElement>();
@@ -58,6 +57,7 @@ function Home() {
   const heroImage = c.t('home.hero.image', '') || outfits[0]?.hero_image_url || '';
   const heroTitle = c.t('home.hero.title', 'Mặc gì hôm nay,\nđã có người phối sẵn.');
   const hero = heroAppearance(c.t);
+  const subtitle = c.t('home.hero.subtitle', '').trim();
 
   // Danh sach phong cach hien o trang chu, do quan tri vien quyet dinh.
   const styleSlugs = c.list(
@@ -145,20 +145,29 @@ function Home() {
             <div className={hero.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
               <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : ''}
                    style={hero.boxStyle}>
-                <p className="eyebrow mb-5" style={{ color: hero.dimColor }}>
+                <p className="eyebrow mb-4" style={{ color: hero.dimColor }}>
                   {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
                 </p>
 
                 {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
                 <h1 className="display max-w-3xl whitespace-pre-line">{heroTitle}</h1>
 
-                {!hero.hideSubtitle && (
-                  <p className="mt-7 max-w-xl text-base leading-relaxed md:text-lg">
-                    {c.t(
-                      'home.hero.subtitle',
-                      'Những set đồ hoàn chỉnh trong khoảng 150.000 – 700.000đ mỗi món. ' +
-                        'Chọn gu của bạn, hệ thống xếp lại thứ tự cho riêng bạn.',
-                    )}
+                {/*
+                  DOAN MO TA CO BAN DU PHONG LA CHUOI RONG, khac moi doan chu
+                  khac tren trang nay.
+
+                  Quy tac chung cua he thong noi dung la luon co ban du phong,
+                  de database ngu thi trang van day chu. Nhung quy tac do co mot
+                  he qua: XOA HET CHU TRONG O NHAP thi doan mac dinh quay lai,
+                  nen khong co cach nao bo han mot doan.
+
+                  Voi phan mo dau thi bo han la mot lua chon bo cuc chinh dang —
+                  hai hang chu va mot cai nut doc manh hon bon hang chu. Nen rieng
+                  o nay, rong nghia la rong that.
+                */}
+                {!hero.hideSubtitle && subtitle && (
+                  <p className="mt-6 max-w-xl text-base leading-relaxed md:text-lg">
+                    {subtitle}
                   </p>
                 )}
 
@@ -174,24 +183,6 @@ function Home() {
           </div>
         </div>
 
-        {/*
-          DONG VE MENH DA RA KHOI KHUNG ANH.
-          Truoc day no nam duoi nut CTA ben trong anh. Khi nut dinh xuong day
-          thi dong nay het cho, va no cung khong phai mot cau quang cao — no la
-          mot ghi chu ve trang thai ca nhan. Dat ngay duoi anh thi van thay,
-          ma khong phai chen vao mot bo cuc dang can bang.
-        */}
-        {privateData?.element && privateData.element_enabled && (
-          <div className="shell pt-4">
-            <p className="muted-2 text-sm">
-              Đang ưu tiên màu hợp mệnh {NGU_HANH_LABEL[privateData.element]}
-              {privateData.element_label && ` (${privateData.element_label})`}.{' '}
-              <Link href="/ho-so" className="underline">
-                Tắt gợi ý theo mệnh
-              </Link>
-            </p>
-          </div>
-        )}
       </section>
 
       {/* ================================================================== */}

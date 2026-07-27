@@ -51,7 +51,8 @@ const CHOICE_LABELS: Record<string, string> = {
 
 /** Ten nhom hien cho nguoi dung. Khoa la cot `page` trong database. */
 const PAGE_LABELS: Record<string, string> = {
-  'chung': 'Dùng chung — tên trang, chân trang',
+  'kieu-chu': 'Kiểu chữ — font, cỡ, màu cho toàn website',
+  'chung': 'Dùng chung — logo, tên trang, chân trang',
   'trang-chu': 'Trang chủ',
   'kham-pha': 'Trang khám phá',
   'ho-so': 'Trang hồ sơ',
@@ -61,6 +62,16 @@ const PAGE_LABELS: Record<string, string> = {
   'outfit': 'Trang chi tiết set đồ',
   'bai-cua-toi': 'Trang bài của tôi',
 };
+
+/**
+ * Thu tu cac nhom hien tren man hinh.
+ *
+ * TRUOC DAY THU TU LAY TU DATABASE, tuc la sap theo bang chu cai cua ma nhom.
+ * Voi 89 o chia 10 nhom thi nguoi sua phai cuon qua ca danh sach de tim, va
+ * nhom quan trong nhat co the nam bat ky dau. Kieu chu va nhung thu dung chung
+ * cho ca website len dau; cac trang cu the theo sau.
+ */
+const PAGE_ORDER = Object.keys(PAGE_LABELS);
 
 export default function ContentAdminPage() {
   const { session } = useAuth();
@@ -138,7 +149,13 @@ export default function ContentAdminPage() {
     setSavingKey(null);
   };
 
-  const pages = [...new Set(c.rows.map((r) => r.page))];
+  // Nhom nao co trong PAGE_ORDER thi theo thu tu do; nhom la (them sau nay ma
+  // quen khai bao) van hien, xep o cuoi — khong bao gio bi mat khoi man hinh.
+  const found = [...new Set(c.rows.map((r) => r.page))];
+  const pages = [
+    ...PAGE_ORDER.filter((p) => found.includes(p)),
+    ...found.filter((p) => !PAGE_ORDER.includes(p)),
+  ];
   const shown = activePage === 'tat-ca' ? pages : pages.filter((p) => p === activePage);
 
   // Dien mao tinh tu gia tri DANG GO: doi o chon la ban xem truoc doi ngay.
@@ -166,6 +183,10 @@ export default function ContentAdminPage() {
         <p className="muted max-w-2xl text-sm leading-relaxed">
           Mỗi ô lưu riêng. Để trống một ô thì trang dùng lại nội dung mặc định viết
           sẵn trong mã nguồn, nên không bao giờ có chỗ trắng.
+        </p>
+        <p className="muted-2 mt-2 max-w-2xl text-sm leading-relaxed">
+          Font, cỡ chữ, độ đậm và màu chữ cho <strong>toàn website</strong> nằm ở nhóm
+          đầu tiên — <em>Kiểu chữ</em>. Logo nằm ở nhóm <em>Dùng chung</em>.
         </p>
       </div>
 
