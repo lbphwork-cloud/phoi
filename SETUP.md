@@ -114,7 +114,7 @@ Bật lại sau khi bạn có SMTP riêng (Resend, Brevo — cả hai có gói m
 
 Cố ý dùng anon key, không dùng service role — job này chỉ đọc một bảng công khai.
 
-### 7. Triển khai lên Cloudflare Pages
+### 7. Triển khai lên Cloudflare Pages — XONG (https://phoi.pages.dev)
 
 **Không dùng Vercel.** Gói Hobby của Vercel cấm dùng cho mục đích thương mại, mà
 website affiliate là thương mại. Cloudflare cho phép.

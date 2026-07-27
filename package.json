@@ -8,6 +8,8 @@
     "build": "next build",
     "//build:static": "Build để triển khai lên Cloudflare Pages. Kết quả ở out/.",
     "build:static": "BUILD_STATIC=1 next build",
+    "//deploy": "Build lai roi day len Cloudflare Pages. Can CLOUDFLARE_API_TOKEN trong .env.local.",
+    "deploy": "npm run build:static && node scripts/deploy-pages.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -44,7 +46,8 @@
     "eslint-config-next": "16.2.12",
     "pg": "^8.22.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.114.0"
   },
   "description": "PHỐI — gợi ý phối đồ nam theo gu và theo mệnh, gắn link affiliate Shopee / TikTok Shop"
 }
