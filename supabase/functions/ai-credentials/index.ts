@@ -78,17 +78,24 @@ function hintOf(key: string): string {
   return `${key.slice(0, 5)}…${key.slice(-4)}`;
 }
 
-/** Kiem tra so bo dinh dang key theo tung nha cung cap. */
+/**
+ * Kiem tra so bo dinh dang key.
+ *
+ * CO Y KIEM TRA RAT LONG. Ban truoc bat key Gemini phai bat dau bang "AIza",
+ * va no da TU CHOI KEY THAT cua nguoi dung — Google phat key theo it nhat hai
+ * dinh dang, "AIza..." kieu cu va "AQ.Ab8..." kieu moi, va ho co the doi tiep
+ * bat cu luc nao ma khong bao ai.
+ *
+ * Bai hoc: doan dinh dang cua mot he thong ben ngoai roi CHAN dua tren phong
+ * doan do la cach chac chan de mot ngay nao do chan nham nguoi dung that. Chi
+ * chan nhung gi chac chan sai — qua ngan, co khoang trang, co xuong dong. Con
+ * key co dung khong thi nha cung cap tra loi chinh xac hon ta nhieu, ngay o
+ * lan goi dau tien.
+ */
 function looksValid(provider: string, key: string): string | null {
   if (provider === 'local_comfyui') return null;
   if (key.length < 20) return 'Key quá ngắn, có vẻ không đúng.';
-  if (/\s/.test(key)) return 'Key không được chứa khoảng trắng.';
-  if (provider === 'gemini' && !key.startsWith('AIza')) {
-    return 'Key của Google Gemini thường bắt đầu bằng "AIza".';
-  }
-  if (provider === 'openai' && !key.startsWith('sk-')) {
-    return 'Key của OpenAI thường bắt đầu bằng "sk-".';
-  }
+  if (/\s/.test(key)) return 'Key không được chứa khoảng trắng hay xuống dòng.';
   return null;
 }
 

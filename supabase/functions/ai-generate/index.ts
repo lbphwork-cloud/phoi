@@ -256,8 +256,11 @@ async function generateWithOpenAI(
  * khoa API da duoc ma hoa va giai ma o day roi; tach ra nghia la nhan doi doan
  * ma cham vao khoa, ma cang it noi cham vao khoa cang tot.
  */
+// gemini-2.5-flash da bi Google ngung cap cho tai khoan MOI (tra 404 kem loi
+// "no longer available to new users"), nen mac dinh la 2.0-flash. Ten mo hinh
+// van nhan tu tham so `model` de doi duoc ma khong phai trien khai lai.
 const DEFAULT_TEXT_MODEL: Record<string, string> = {
-  gemini: 'gemini-2.5-flash',
+  gemini: 'gemini-2.0-flash',
   openai: 'gpt-4o-mini',
 };
 
