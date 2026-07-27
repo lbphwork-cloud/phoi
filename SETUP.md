@@ -24,7 +24,7 @@ không làm thay được. Phần còn lại đã tự động hoá thành lện
 
 ## B. Phần bạn phải tự làm
 
-### 1. Tạo project Supabase
+### 1. Tạo project Supabase — XONG
 
 Cần trình duyệt và email của bạn, tôi không làm thay được.
 
@@ -34,7 +34,7 @@ Cần trình duyệt và email của bạn, tôi không làm thay được.
 - [x] Đặt mật khẩu database, lưu lại. Bước 2 cần nó.
 - [x] Chờ khoảng 2 phút cho project khởi tạo xong
 
-### 2. Lấy 3 giá trị và điền vào `.env.local`
+### 2. Lấy 3 giá trị và điền vào `.env.local` — XONG
 
 - [x] **Project Settings → API**, lấy 2 giá trị:
       - `Project URL` → điền vào `NEXT_PUBLIC_SUPABASE_URL`
@@ -70,9 +70,9 @@ tác hoàn toàn, không còn trạng thái nửa vời.
 
 Muốn dán tay 7 file thay vì dùng lệnh thì xem hướng dẫn trong `README.md`.
 
-### 4. Tắt xác nhận email
+### 4. Tắt xác nhận email — XONG
 
-- [ ] Supabase → **Authentication → Sign In / Providers → Email** → tắt
+- [x] Supabase → **Authentication → Sign In / Providers → Email** → tắt
       **Confirm email** → Save
 
 Đây là chỗ hay tắc nhất. SMTP dùng chung của gói miễn phí Supabase chỉ cho vài
@@ -81,28 +81,28 @@ không bao giờ tới.
 
 Bật lại sau khi bạn có SMTP riêng (Resend, Brevo — cả hai có gói miễn phí).
 
-### 5. Đăng ký tài khoản và tự cấp quyền admin
+### 5. Đăng ký tài khoản và tự cấp quyền admin — XONG
 
-- [ ] ```bash
+- [x] ```bash
       npm run dev
       ```
-- [ ] Mở http://localhost:3000/dang-nhap → đăng ký bằng `lbph.work@gmail.com`
-- [ ] Mở terminal thứ hai:
+- [x] Mở http://localhost:3000/dang-nhap → đăng ký bằng `lbph.work@gmail.com`
+- [x] Mở terminal thứ hai:
       ```bash
       npm run db:grant-admin -- --email=lbph.work@gmail.com
       ```
-- [ ] Kiểm tra: http://localhost:3000/admin phải vào được
+- [x] Kiểm tra: http://localhost:3000/admin phải vào được
 
 **Đến đây website đã chạy đầy đủ trên máy bạn.** `/kham-pha` có 20 set đồ,
 `/ho-so` nhập ngày sinh sẽ ra mệnh và màu gợi ý.
 
-### 6. Bật chống Supabase tự ngủ — BẮT BUỘC
+### 6. Bật chống Supabase tự ngủ — XONG (đã chạy thử, success)
 
 **Gói miễn phí Supabase tự tạm dừng project sau khoảng 7 ngày không có hoạt
 động.** Website chết, không cảnh báo, phải vào bảng điều khiển bấm khôi phục tay.
 Đây là cái bẫy phổ biến nhất của gói miễn phí.
 
-- [ ] ```bash
+- [x] ```bash
       gh secret set SUPABASE_URL      --body "$(grep '^NEXT_PUBLIC_SUPABASE_URL='      .env.local | cut -d= -f2-)"
       gh secret set SUPABASE_ANON_KEY --body "$(grep '^NEXT_PUBLIC_SUPABASE_ANON_KEY=' .env.local | cut -d= -f2-)"
       ```
