@@ -3,7 +3,7 @@ import {
   Be_Vietnam_Pro, Inter, Manrope, Montserrat, Playfair_Display, EB_Garamond, Oswald,
 } from 'next/font/google';
 import './globals.css';
-import { SiteFooter, SiteHeader, TypographyStyle } from '@/components/site';
+import { PageTransition, SiteFooter, SiteHeader, TypographyStyle } from '@/components/site';
 
 /**
  * next/font TAI FONT VE VA TU LUU TAI MAY CHU luc build, roi phuc vu tu chinh
@@ -107,7 +107,9 @@ export default function RootLayout({
             Dat TRUOC moi thu khac de chu khong nhay kieu sau khi tai xong. */}
         <TypographyStyle />
         <SiteHeader />
-        <main className="flex-1">{children}</main>
+        <main className="flex-1">
+          <PageTransition>{children}</PageTransition>
+        </main>
         <SiteFooter />
       </body>
     </html>

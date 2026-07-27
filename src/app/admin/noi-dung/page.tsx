@@ -27,6 +27,7 @@ import { uploadImage } from '@/lib/storage';
 import { IMAGE_LIMITS } from '@/lib/format';
 import { UploadButton } from '@/components/UploadButton';
 import { FONT_LABEL } from '@/lib/typography';
+import { FieldStyleRow } from '@/components/FieldStyleRow';
 import { Spinner, EmptyState } from '@/components/site';
 
 /** Nhan tieng Viet cho cac gia tri cua o `choice`. */
@@ -196,12 +197,12 @@ export default function ContentAdminPage() {
       <div className="mb-10 flex flex-wrap gap-2">
         <button type="button" className="chip" aria-pressed={activePage === 'tat-ca'}
                 onClick={() => setActivePage('tat-ca')}>
-          Tất cả ({c.rows.length})
+          Tất cả ({c.rows.filter((r) => r.kind !== 'style').length})
         </button>
         {pages.map((p) => (
           <button key={p} type="button" className="chip" aria-pressed={activePage === p}
                   onClick={() => setActivePage(p)}>
-            {PAGE_LABELS[p] ?? p} ({c.rows.filter((r) => r.page === p).length})
+            {PAGE_LABELS[p] ?? p} ({c.rows.filter((r) => r.page === p && r.kind !== 'style').length})
           </button>
         ))}
       </div>
@@ -273,10 +274,15 @@ export default function ContentAdminPage() {
 
           <div className="flex flex-col gap-8">
             {c.rows
-              .filter((r) => r.page === page)
+              // O kieu chu khong hien thanh muc rieng: no duoc gan ngay duoi o
+              // chu ma no thuoc ve. Hien ca hai se thanh mot danh sach dai gap
+              // doi ma mot nua khong doc duoc ten.
+              .filter((r) => r.page === page && r.kind !== 'style')
               .map((r) => {
                 const dirty = draft[r.key] !== undefined && draft[r.key] !== r.value;
                 const busy = savingKey === r.key;
+                // Quy uoc khoa: o kieu chu = khoa cua o chu + ".style".
+                const styleRow = c.rows.find((x) => x.key === `${r.key}.style`);
 
                 return (
                   <div key={r.key}>
@@ -353,6 +359,19 @@ export default function ContentAdminPage() {
                         </a>
                         .
                       </p>
+                    )}
+
+                    {/* Kieu chu rieng cua chinh o nay. Chi cac o CHU moi co —
+                        anh, danh sach va o chon khong co chu de dat kieu. */}
+                    {styleRow && (
+                      <FieldStyleRow
+                        value={val(styleRow)}
+                        sampleText={val(r)}
+                        saving={savingKey === styleRow.key}
+                        saved={savedKey === styleRow.key}
+                        onChange={(next) => set(styleRow.key, next)}
+                        onSave={() => void save(styleRow)}
+                      />
                     )}
 
                     <div className="mt-2 flex items-center gap-3">

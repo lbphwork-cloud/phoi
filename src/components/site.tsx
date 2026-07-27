@@ -30,6 +30,22 @@ export function TypographyStyle() {
   return <style dangerouslySetInnerHTML={{ __html: typographyCss(c.t) }} />;
 }
 
+/**
+ * Lop boc noi dung, chay lai hieu ung mo dan moi lan doi trang.
+ *
+ * `key={pathname}` la ca co che: doi khoa thi React vut bo cay cu va dung cay
+ * moi, nen hieu ung CSS chay lai tu dau. Khong co no thi React tai su dung
+ * phan tu cu va hieu ung chi chay dung mot lan trong ca phien.
+ *
+ * KHONG dung thu vien chuyen dong nao. Mot hieu ung mo dan 0.45s khong dang
+ * de them mot goi vao goi phai tai ve — va goi do se nam trong duong tai cua
+ * moi trang, ke ca trang khong co hieu ung gi.
+ */
+export function PageTransition({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  return <div key={pathname} className="page-in">{children}</div>;
+}
+
 export function SiteHeader() {
   const { session, profile, isAdmin, loading, signOut } = useAuth();
   const { theme, cycle } = useTheme();

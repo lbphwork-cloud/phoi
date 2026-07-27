@@ -140,3 +140,124 @@ export function typographyCss(t: (key: string, fallback: string) => string): str
 
   return `:root{${lines.join('')}}`;
 }
+
+// ---------------------------------------------------------------------------
+// GHI DE KIEU CHU CHO TUNG O
+//
+// Bon vai tro o tren la NEN CHUNG cho ca website. Phan duoi day la lop ghi de:
+// mot o chu cu the co the tu quyet font, co, do dam, nghieng va mau cua rieng
+// no, bat ke vai tro noi gi.
+//
+// VI SAO CAN CA HAI TANG
+//   Chi co vai tro thi khong pha cach duoc o cho can. Chi co ghi de tung o thi
+//   doi font toan site tro thanh bon muoi thao tac, va chi can quen mot o la
+//   trang mat dong bo. Hai tang giai quyet ca hai: mac dinh theo vai tro, ghi
+//   de khi co ly do.
+//
+// MOT DONG DU LIEU CHO CA CUM, KHONG PHAI NAM DONG
+//   Tach nam dong thi 47 o se de ra 235 dong trong bang noi dung — dung cai me
+//   cung ma chu website vua phai loi qua de tim muc "Kieu chu". Ca cum duoc ma
+//   hoa vao mot chuoi ngan: "font=playfair;size=lon;weight=dam;italic=1".
+//
+//   Dinh dang tu dat chu khong dung JSON: gia tri nay nam trong mot cot text ma
+//   con nguoi co the doc va sua thang trong SQL editor. JSON co dau ngoac kep
+//   va dau phay lam viec do kho hon han ma khong duoc them gi.
+// ---------------------------------------------------------------------------
+
+export interface FieldStyle {
+  font?: string;
+  size?: string;
+  weight?: string;
+  color?: string;
+  italic?: boolean;
+}
+
+/** Doc chuoi ma hoa. Chuoi rong, sai dinh dang, hay khoa la deu ra {} — mot o
+ *  kieu chu hong khong duoc phep lam mat chu tren trang. */
+export function parseFieldStyle(raw: string): FieldStyle {
+  const out: FieldStyle = {};
+  if (!raw || !raw.trim()) return out;
+
+  for (const part of raw.split(';')) {
+    const [k, v] = part.split('=').map((x) => x?.trim());
+    if (!k || !v) continue;
+    if (k === 'font' && FONT_STACK[v]) out.font = v;
+    else if (k === 'size' && SIZE_SCALE[v]) out.size = v;
+    else if (k === 'weight' && WEIGHT[v]) out.weight = v;
+    else if (k === 'color' && v in TEXT_COLOR) out.color = v;
+    else if (k === 'italic') out.italic = v === '1';
+  }
+  return out;
+}
+
+export function encodeFieldStyle(s: FieldStyle): string {
+  const parts: string[] = [];
+  if (s.font) parts.push(`font=${s.font}`);
+  if (s.size) parts.push(`size=${s.size}`);
+  if (s.weight) parts.push(`weight=${s.weight}`);
+  if (s.color) parts.push(`color=${s.color}`);
+  if (s.italic) parts.push('italic=1');
+  return parts.join(';');
+}
+
+/**
+ * Doi cum ghi de thanh thuoc tinh style cua React.
+ *
+ * Thuoc tinh nao khong duoc dat thi KHONG XUAT HIEN trong ket qua — de nguyen
+ * cho quy tac CSS cua vai tro chay. Dat `undefined` cung khong duoc: React van
+ * ghi de va xoa mat gia tri thua ke.
+ *
+ * Co chu dung `em` chu khong phai he so tren mot so tuyet doi: `em` nhan vao co
+ * chu ma phan tu do dang co san, nen mot tieu de lon va mot dong chu nho cung
+ * chon "Lon" se to len cung mot ty le, moi cai theo diem xuat phat cua no.
+ */
+export function fieldStyleCss(s: FieldStyle): React.CSSProperties {
+  const css: React.CSSProperties = {};
+  if (s.font && FONT_STACK[s.font]) css.fontFamily = FONT_STACK[s.font];
+  if (s.size && SIZE_SCALE[s.size]) css.fontSize = `${SIZE_SCALE[s.size]}em`;
+  if (s.weight && WEIGHT[s.weight]) css.fontWeight = Number(WEIGHT[s.weight]);
+  if (s.color && TEXT_COLOR[s.color]) css.color = TEXT_COLOR[s.color];
+  if (s.italic) css.fontStyle = 'italic';
+  return css;
+}
+
+/**
+ * Do sang cam nhan duoc cua mot mau, theo cong thuc WCAG.
+ *
+ * Dung de canh bao khi chu gan nhu chim vao nen. KHONG chan nguoi dung: co
+ * nhung luc chu mo la co y (chu chim tren anh toi mau chang han), va mot phep
+ * do khong biet phia sau la anh gi.
+ */
+function luminance(hex: string): number {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+
+/** Ty le tuong phan giua hai mau. 1 = giong het, 21 = den tren trang. */
+export function contrastRatio(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/**
+ * Cau canh bao khi mau chu kho doc tren nen giay cua website, hoac null.
+ *
+ * Chi do voi nen SANG (#faf9f6). Nen toi khong do vi chu tren anh thi nen la
+ * buc anh chu khong phai mau nen — do voi mau nen se ra ket qua sai.
+ */
+export function contrastWarning(colorKey: string): string | null {
+  const hex = TEXT_COLOR[colorKey];
+  if (!hex) return null;
+
+  const ratio = contrastRatio(hex, '#faf9f6');
+  if (ratio >= 4.5) return null;
+  if (ratio >= 3) {
+    return 'Màu này hơi nhạt trên nền sáng — chữ nhỏ sẽ khó đọc.';
+  }
+  return 'Màu này gần như chìm vào nền sáng. Chỉ dùng khi chữ nằm trên ảnh tối.';
+}

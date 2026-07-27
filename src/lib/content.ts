@@ -21,13 +21,14 @@
 
 import { useMemo } from 'react';
 import { useAsyncData } from './hooks';
+import { fieldStyleCss, parseFieldStyle } from './typography';
 
 export interface ContentRow {
   key: string;
   page: string;
   label: string;
   hint: string;
-  kind: 'text' | 'textarea' | 'image' | 'url' | 'list' | 'choice';
+  kind: 'text' | 'textarea' | 'image' | 'url' | 'list' | 'choice' | 'style';
   value: string;
   /** Cac gia tri hop le khi kind = 'choice'. Rong voi cac kieu khac. */
   options: string[];
@@ -64,10 +65,14 @@ export const HERO_ALIGN: Record<string, string> = {
   'duoi-trai': 'items-end justify-start text-left',
   'giua': 'items-center justify-center text-center',
   'duoi-giua': 'items-end justify-center text-center',
-  // Kieu thu tu: chu nam GIUA khung anh, nut CTA dinh DAY. Khac ba kieu tren o
-  // cho chu va nut khong con di lien mot khoi — chung duoc tach ra hai dau cua
-  // khung. Xem `splitCta` trong heroAppearance.
-  'giua-nut-day': 'items-center justify-center text-center',
+  // Kieu thu tu: ca cum chu va nut DON XUONG PHAN DUOI anh, canh giua theo
+  // chieu ngang, khoang cach deu nhau.
+  //
+  // Ban dau kieu nay dat chu giua khung roi day rieng nut xuong sat day. Nhin
+  // ra hai cum roi nhau: mot cum lo lung giua anh, mot cum dinh day, va khoang
+  // trong giua chung lon hon moi khoang trong khac tren trang. Dong ca cum
+  // xuong duoi thi mat doc lien mach tu chu nho -> tieu de -> nut.
+  'giua-nut-day': 'items-end justify-center text-center',
 };
 
 export interface Content {
@@ -75,6 +80,15 @@ export interface Content {
   t: (key: string, fallback: string) => string;
   /** Nhu `t` nhung cat theo dau phay, dung cho `kind = 'list'`. */
   list: (key: string, fallback: string) => string[];
+  /**
+   * Kieu chu rieng cua mot o, neu quan tri vien da dat.
+   *
+   * Tra ve mot doi tuong RONG khi chua dat gi — khong phai undefined. Nho vay
+   * cho goi luon viet duoc `style={c.s('key')}` ma khong can kiem tra, va o
+   * nao chua dat thi khong co thuoc tinh nao bi ghi de, tuc la van theo vai
+   * tro chung.
+   */
+  s: (key: string) => React.CSSProperties;
   rows: ContentRow[];
   loading: boolean;
   reload: () => void;
@@ -112,7 +126,12 @@ export function useContent(): Content {
         .map((s) => s.trim())
         .filter(Boolean);
 
-    return { t, list, rows, loading, reload };
+    // Khoa cua o kieu chu la khoa cua o chu cong ".style". Quy uoc nay giu cho
+    // hai o luon di cung nhau ma khong can them mot cot lien ket nao.
+    const s = (key: string): React.CSSProperties =>
+      fieldStyleCss(parseFieldStyle(map.get(`${key}.style`) ?? ''));
+
+    return { t, list, s, rows, loading, reload };
   }, [map, rows, loading, reload]);
 }
 
@@ -155,11 +174,10 @@ export function heroAppearance(t: (k: string, f: string) => string) {
     alignClass: HERO_ALIGN[alignKey] ?? HERO_ALIGN['duoi-trai'],
 
     /**
-     * Nut CTA co bi tach ra khoi khoi chu de dinh xuong day khung khong.
+     * Ca cum chu va nut co duoc dong xuong phan duoi anh khong.
      *
-     * Chi dung o kieu 'giua-nut-day'. Ba kieu con lai giu nut ngay duoi chu —
-     * gan nhau thi cau chu va hanh dong con doc duoc nhu mot y; tach ra chi
-     * hop khi chu da nam giua va con nhieu khoang trong ben duoi.
+     * Chi dung o kieu 'giua-nut-day'. Ten thuoc tinh giu nguyen de khong phai
+     * sua ba noi dang dung no; hanh vi thi da doi — xem chu thich o HERO_ALIGN.
      */
     splitCta: alignKey === 'giua-nut-day',
 

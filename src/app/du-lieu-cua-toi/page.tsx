@@ -118,11 +118,11 @@ function MyData() {
   return (
     <div className="shell-narrow py-12 md:py-16">
       <p className="eyebrow mb-4">Quyền của bạn</p>
-      <h1 className="display-sm mb-6">
+      <h1 className="display-sm mb-6" style={c.s('privacy.title')}>
         {c.t('privacy.title', 'Dữ liệu cá nhân của bạn')}
       </h1>
 
-      <p className="muted mb-10 leading-relaxed">
+      <p className="muted mb-10 leading-relaxed" style={c.s('privacy.desc')}>
         {c.t(
           'privacy.desc',
           'Bạn có quyền xem, tải về và xoá dữ liệu cá nhân của mình bất cứ lúc nào, ' +
@@ -142,7 +142,7 @@ function MyData() {
         </button>
       </div>
 
-      <p className="muted-2 mt-8 text-sm leading-relaxed">
+      <p className="muted-2 mt-8 text-sm leading-relaxed" style={c.s('privacy.warning')}>
         {c.t(
           'privacy.warning',
           'Xoá dữ liệu cá nhân sẽ xoá ngày sinh, niên mệnh, gu đã chọn và toàn bộ lịch sử ' +

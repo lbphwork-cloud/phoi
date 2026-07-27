@@ -93,10 +93,17 @@ function Home() {
    * bo trang thai ben trong no.
    */
   const heroCta = (
-    <div className={`flex flex-wrap gap-3 ${hero.splitCta ? 'justify-center' : 'mt-9'}`}>
+    <div
+      className={`flex flex-wrap gap-3 ${
+        // Khoang cach chu nho -> tieu de va tieu de -> nut phai BANG NHAU, neu
+        // khong ba dong se nhin nhu hai cum roi nhau chu khong phai mot khoi.
+        hero.splitCta ? 'mt-8 justify-center' : 'mt-9'
+      }`}
+    >
       <Link
         href={c.t('home.hero.cta_href', '/kham-pha')}
         className={`btn ${hero.buttonClass}`}
+        style={c.s('home.hero.cta_label')}
       >
         {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
       </Link>
@@ -134,23 +141,29 @@ function Home() {
             />
           )}
 
-          {/* Khi nut duoc tach xuong day, khoi chu phai chiem het chieu cao
-              de con canh giua that su — neu khong no chi giua phan con lai. */}
+          {/* O kieu "don xuong duoi", chu va nut nam trong CUNG mot cot doc
+              voi khoang cach bang nhau — khong con hai cum roi nhau. */}
           <div
-            className={`hero-body shell flex w-full flex-col ${
-              hero.splitCta ? 'h-full py-14 md:py-20' : 'pb-14 md:pb-20'
-            }`}
+            className="hero-body shell flex w-full flex-col pb-14 md:pb-20"
             style={hero.textStyle}
           >
-            <div className={hero.splitCta ? 'flex flex-1 items-center justify-center' : ''}>
+            <div>
               <div className={hero.boxStyle ? 'inline-block max-w-3xl p-8 md:p-10' : ''}
                    style={hero.boxStyle}>
-                <p className="eyebrow mb-4" style={{ color: hero.dimColor }}>
+                <p
+                  className={hero.splitCta ? 'eyebrow mb-8' : 'eyebrow mb-4'}
+                  style={{ color: hero.dimColor, ...c.s('home.hero.eyebrow') }}
+                >
                   {c.t('home.hero.eyebrow', 'Phối đồ nam · Việt Nam')}
                 </p>
 
                 {/* Xuong dong theo dung cho quan tri vien bam Enter trong o nhap */}
-                <h1 className="display max-w-3xl whitespace-pre-line">{heroTitle}</h1>
+                <h1
+                  className="display max-w-3xl whitespace-pre-line"
+                  style={c.s('home.hero.title')}
+                >
+                  {heroTitle}
+                </h1>
 
                 {/*
                   DOAN MO TA CO BAN DU PHONG LA CHUOI RONG, khac moi doan chu
@@ -166,20 +179,17 @@ function Home() {
                   o nay, rong nghia la rong that.
                 */}
                 {!hero.hideSubtitle && subtitle && (
-                  <p className="mt-6 max-w-xl text-base leading-relaxed md:text-lg">
+                  <p
+                    className="mt-6 max-w-xl text-base leading-relaxed md:text-lg"
+                    style={c.s('home.hero.subtitle')}
+                  >
                     {subtitle}
                   </p>
                 )}
 
-                {/* O ba kieu cu, nut di lien voi chu. */}
-                {!hero.splitCta && heroCta}
+                {heroCta}
               </div>
             </div>
-
-            {/* O kieu 'giua-nut-day', nut nam rieng o day khung. */}
-            {hero.splitCta && (
-              <div className="flex justify-center">{heroCta}</div>
-            )}
           </div>
         </div>
 
@@ -191,7 +201,9 @@ function Home() {
       {styles.length > 0 && (
         <section className="pt-20 md:pt-28">
           <div className="shell mb-12 md:mb-16">
-            <p className="eyebrow">{c.t('home.styles.eyebrow', 'Theo phong cách')}</p>
+            <p className="eyebrow" style={c.s('home.styles.eyebrow')}>
+              {c.t('home.styles.eyebrow', 'Theo phong cách')}
+            </p>
           </div>
 
           <div className="flex flex-col gap-20 md:gap-28">
@@ -206,7 +218,7 @@ function Home() {
               anh va mot duong dan rieng, chi khong doi mot man hinh moi cai. */}
           {styles.length > BIG_BLOCKS && (
             <div className="shell mt-20 md:mt-28">
-              <p className="eyebrow mb-8">
+              <p className="eyebrow mb-8" style={c.s('home.styles.more_eyebrow')}>
                 {c.t('home.styles.more_eyebrow', 'Còn nữa')}
               </p>
               <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
@@ -227,18 +239,20 @@ function Home() {
         style={{ borderColor: 'var(--line)' }}
       >
         <div className="shell">
-          <p className="eyebrow mb-10">{c.t('home.steps.heading', 'Cách hoạt động')}</p>
+          <p className="eyebrow mb-10" style={c.s('home.steps.heading')}>
+            {c.t('home.steps.heading', 'Cách hoạt động')}
+          </p>
           <div className="grid gap-10 md:grid-cols-3">
             {[1, 2, 3].map((n) => (
               <div key={n}>
                 <p className="eyebrow mb-3">{String(n).padStart(2, '0')}</p>
-                <p className="display-xs mb-2">
+                <p className="display-xs mb-2" style={c.s(`home.step${n}.title`)}>
                   {c.t(
                     `home.step${n}.title`,
                     ['Chọn gu', 'Xem và phản hồi', 'Mua trên sàn'][n - 1],
                   )}
                 </p>
-                <p className="muted text-sm leading-relaxed">
+                <p className="muted text-sm leading-relaxed" style={c.s(`home.step${n}.desc`)}>
                   {c.t(
                     `home.step${n}.desc`,
                     [
@@ -282,7 +296,7 @@ function StyleBlock({
       >
         <Link href={href} className="group block">
           <div
-            className="hero-media"
+            className="hero-media drift"
             style={{ aspectRatio: '4 / 5', maxHeight: '40rem' }}
           >
             {style.image && (
@@ -327,7 +341,7 @@ function StyleTile({
       href={`/kham-pha?style=${encodeURIComponent(style.slug)}`}
       className="group block"
     >
-      <div className="hero-media mb-3" style={{ aspectRatio: '4 / 5' }}>
+      <div className="hero-media drift mb-3" style={{ aspectRatio: '4 / 5' }}>
         {style.image && (
           // eslint-disable-next-line @next/next/no-img-element
           <img

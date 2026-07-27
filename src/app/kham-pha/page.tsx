@@ -145,9 +145,11 @@ function Discover() {
   return (
     <div className="shell py-12 md:py-16">
       <div className="mb-10">
-        <p className="eyebrow mb-4">{c.t('discover.title', 'Khám phá')}</p>
+        <p className="eyebrow mb-4" style={c.s('discover.title')}>
+          {c.t('discover.title', 'Khám phá')}
+        </p>
         <h1 className="display-sm mb-4">Tất cả outfit</h1>
-        <p className="muted max-w-2xl text-sm leading-relaxed">
+        <p className="muted max-w-2xl text-sm leading-relaxed" style={c.s('discover.subtitle')}>
           {c.t(
             'discover.subtitle',
             'Lọc theo phong cách, dịp, màu và khoảng giá. ' +
