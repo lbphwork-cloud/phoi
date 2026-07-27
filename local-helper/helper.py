@@ -164,8 +164,17 @@ CAPTCHA_WAIT_SEC = 90
 MAX_ATTEMPTS = 2
 
 
-def load_env() -> tuple[str, str]:
-    """Doc .env don gian, khong can thu vien ngoai."""
+def load_env() -> dict[str, str]:
+    """
+    Doc .env don gian, khong can thu vien ngoai.
+
+    Chap nhan HAI cach xac thuc, xem chu thich trong Supabase.__init__:
+      A. SUPABASE_SERVICE_ROLE_KEY
+      B. SUPABASE_ANON_KEY + SUPABASE_EMAIL + SUPABASE_PASSWORD
+
+    Cach B du cho website mot nguoi van hanh va khong phai giu tren may mot
+    khoa bo qua duoc toan bo Row Level Security.
+    """
     env_path = HERE / ".env"
     values: dict[str, str] = {}
 
@@ -177,21 +186,36 @@ def load_env() -> tuple[str, str]:
             k, v = line.split("=", 1)
             values[k.strip()] = v.strip().strip('"').strip("'")
 
-    url = os.environ.get("SUPABASE_URL") or values.get("SUPABASE_URL", "")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or values.get(
-        "SUPABASE_SERVICE_ROLE_KEY", ""
-    )
+    def get(name: str) -> str:
+        return os.environ.get(name) or values.get(name, "")
 
-    if not url or not key:
+    cfg = {
+        "url": get("SUPABASE_URL").rstrip("/"),
+        "service_key": get("SUPABASE_SERVICE_ROLE_KEY"),
+        "anon_key": get("SUPABASE_ANON_KEY"),
+        "email": get("SUPABASE_EMAIL"),
+        "password": get("SUPABASE_PASSWORD"),
+    }
+
+    if not cfg["url"]:
+        sys.exit("Thieu SUPABASE_URL trong .env.\n\n  cp .env.example .env")
+
+    has_a = bool(cfg["service_key"])
+    has_b = bool(cfg["anon_key"] and cfg["email"] and cfg["password"])
+
+    if not has_a and not has_b:
         sys.exit(
-            "Thieu cau hinh.\n\n"
-            "  cp .env.example .env\n"
-            "  # roi dien SUPABASE_URL va SUPABASE_SERVICE_ROLE_KEY\n\n"
-            "Lay o Supabase: Project Settings -> API -> service_role key.\n"
-            "KHONG dat khoa nay vao file .env.local cua Next.js."
+            "Thieu cau hinh xac thuc. Chon MOT trong hai cach trong .env:\n\n"
+            "  A. SUPABASE_SERVICE_ROLE_KEY=...\n"
+            "     (Supabase -> Project Settings -> API Keys -> Secret key)\n\n"
+            "  B. SUPABASE_ANON_KEY=...      (khoa publishable, khong phai bi mat)\n"
+            "     SUPABASE_EMAIL=...         (tai khoan QUAN TRI tren website)\n"
+            "     SUPABASE_PASSWORD=...\n\n"
+            "Cach B khong can khoa bo qua bao mat, du cho website mot nguoi van hanh.\n"
+            "KHONG dat khoa service role vao .env.local cua Next.js."
         )
 
-    return url.rstrip("/"), key
+    return cfg
 
 
 # ==============================================================================
@@ -355,16 +379,84 @@ class Supabase:
     It phu thuoc hon va de doc hon khi can go loi.
     """
 
-    def __init__(self, url: str, service_key: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        service_key: str = "",
+        anon_key: str = "",
+        email: str = "",
+        password: str = "",
+    ) -> None:
+        """
+        Hai cach xac thuc. Uu tien khoa service role neu co.
+
+        1. KHOA SERVICE ROLE — bo qua Row Level Security. Doc duoc job cua moi
+           nguoi dung. Bat buoc neu website co nhieu nguoi dang bai.
+
+        2. DANG NHAP BANG TAI KHOAN QUAN TRI — khong can khoa service role.
+           Policy fetch_jobs_all_own cho phep `requested_by = auth.uid() OR
+           is_admin()`, nen mot tai khoan admin doc va ghi duoc MOI job. Voi
+           website mot nguoi van hanh thi cach nay du, va co mot loi that:
+           khong phai giu tren may mot khoa bo qua duoc toan bo bao mat.
+
+           Danh doi: JWT het han sau khoang mot gio, nen phai dang nhap lai.
+           Xu ly o `_ensure_token`.
+        """
+        self.url = url
         self.rest = f"{url}/rest/v1"
-        self.client = httpx.Client(
-            headers={
-                "apikey": service_key,
-                "Authorization": f"Bearer {service_key}",
-                "Content-Type": "application/json",
-            },
-            timeout=20.0,
+        self.anon_key = anon_key
+        self.email = email
+        self.password = password
+        self.service_key = service_key
+        self._token = ""
+        self._token_at = 0.0
+
+        self.client = httpx.Client(timeout=20.0)
+
+        if service_key:
+            self.mode = "service_role"
+            self.client.headers.update(
+                {
+                    "apikey": service_key,
+                    "Authorization": f"Bearer {service_key}",
+                    "Content-Type": "application/json",
+                }
+            )
+        else:
+            self.mode = "admin_login"
+            self.client.headers.update(
+                {"apikey": anon_key, "Content-Type": "application/json"}
+            )
+            self._ensure_token(force=True)
+
+    def _ensure_token(self, force: bool = False) -> None:
+        """
+        Lay JWT moi neu chua co hoac sap het han.
+
+        Lay lai sau 45 phut thay vi cho den khi bi tu choi: mot job dang chay
+        ma token het han giua chung thi ket qua da doc duoc bi mat, va nguoi
+        dung tren website chi thay bao loi khong ro rang.
+        """
+        if self.mode != "admin_login":
+            return
+        if not force and self._token and (time.time() - self._token_at) < 45 * 60:
+            return
+
+        r = self.client.post(
+            f"{self.url}/auth/v1/token",
+            params={"grant_type": "password"},
+            json={"email": self.email, "password": self.password},
+            headers={"apikey": self.anon_key, "Content-Type": "application/json"},
         )
+        if r.status_code != 200:
+            raise RuntimeError(
+                f"Dang nhap that bai ({r.status_code}). Kiem tra SUPABASE_EMAIL "
+                f"va SUPABASE_PASSWORD trong .env."
+            )
+
+        self._token = r.json()["access_token"]
+        self._token_at = time.time()
+        self.client.headers["Authorization"] = f"Bearer {self._token}"
 
     def claim_next_job(self) -> dict[str, Any] | None:
         """
@@ -374,6 +466,7 @@ class Supabase:
         'pending' (dieu kien eq.pending trong URL). Nho vay neu ban chay hai
         ban Local Helper cung luc thi moi job chi bi lam mot lan.
         """
+        self._ensure_token()
         r = self.client.get(
             f"{self.rest}/fetch_jobs",
             params={
@@ -407,6 +500,7 @@ class Supabase:
         return job if upd.json() else None
 
     def finish(self, job_id: str, result: dict[str, Any]) -> None:
+        self._ensure_token()
         self.client.patch(
             f"{self.rest}/fetch_jobs",
             params={"id": f"eq.{job_id}"},
@@ -420,6 +514,7 @@ class Supabase:
 
     def fail(self, job_id: str, message: str, retry: bool) -> None:
         """retry=True thi tra job ve 'pending' de thu lai lan sau."""
+        self._ensure_token()
         self.client.patch(
             f"{self.rest}/fetch_jobs",
             params={"id": f"eq.{job_id}"},
@@ -949,8 +1044,15 @@ def main() -> None:
     if args.test_url:
         sys.exit(run_test_url(args.test_url, args.headless))
 
-    url, key = load_env()
-    sb = Supabase(url, key)
+    cfg = load_env()
+    url = cfg["url"]
+    sb = Supabase(
+        url,
+        service_key=cfg["service_key"],
+        anon_key=cfg["anon_key"],
+        email=cfg["email"],
+        password=cfg["password"],
+    )
     interactive = not args.headless
 
     signal.signal(signal.SIGINT, _handle_stop)
@@ -960,6 +1062,8 @@ def main() -> None:
     print("  PHOI Local Helper")
     print("=" * 72)
     print(f"  Database   : {url}")
+    print(f"  Xac thuc   : "
+          f"{'khoa service role' if sb.mode == 'service_role' else 'dang nhap tai khoan quan tri'}")
     print(f"  Che do     : {'co cua so (giai CAPTCHA duoc)' if interactive else 'khong cua so'}")
     print(f"  Nhip hoi   : {args.interval}s")
     print(f"  Phien luu o: {PROFILE_DIR}")
