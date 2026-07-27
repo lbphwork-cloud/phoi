@@ -313,20 +313,27 @@ export function SiteHeader() {
 /**
  * Chan trang.
  *
- * BO CUC MOT COT DOC, KHONG PHAI BA COT NGANG
- *   Logo va cau dinh vi len tren cung. Ben duoi la khoi cong bo, dan ngang het
- *   be ngang — dung bang be ngang cua khoi "Cach hoat dong" ngay phia tren, va
- *   chia dung ba cot khop cot voi 01 / 02 / 03. Hai khoi lien nhau ma le cot
- *   khac nhau se nhin nhu hai trang bi dan vao nhau.
+ * BA KHOI XEP DOC: nhan dien — cach hoat dong — cong bo.
  *
- * KHONG CON COT "TRANG"
- *   Bon duong dan o do lap y nguyen thanh menu ngay phia tren dau trang. Mot
- *   danh sach duong dan chi de lap lai mot danh sach khac la cho chiem cho.
+ * VI SAO "CACH HOAT DONG" NAM O DAY CHU KHONG O TRANG CHU
+ *   No tung la mot khoi cua rieng trang chu. Nhung phan lon nguoi vao website
+ *   nay se vao thang mot trang chi tiet set do qua duong dan ban be gui, va ho
+ *   khong bao gio di qua trang chu. Ba buoc giai thich website hoat dong the
+ *   nao ma chi hien o mot trang thi phan lon nguoi can no se khong thay no.
+ *
+ *   Do la ly do no o trong chan trang: chan trang la thu duy nhat co mat o moi
+ *   trang.
+ *
+ * KHOI CONG BO LA MOT KHOI TRAN NGANG, KHONG CHIA COT
+ *   Ba doan xep doc trong mot khoi rong het be ngang. Chia ba cot thi mat phai
+ *   quet ngang de doc het mot y, ma day la ba y KHONG lien quan nhau — chung
+ *   chi tinh co cung la cong bo.
  *
  * DUONG KE DEN CHU KHONG PHAI XAM NHAT
  *   Thanh menu dung `--fg` (den dam), chan trang truoc day dung `--line` (xam
- *   rat nhat). Hai duong ke gioi han tren va duoi cua ca trang ma khac hin
- *   nhau thi trang nhin nhu chua dong lai. Gio ca hai giong nhau.
+ *   rat nhat). Hai duong ke gioi han tren va duoi cua ca trang ma khac han
+ *   nhau thi trang nhin nhu chua dong lai. Gio ca hai giong nhau — va do la
+ *   duong ke DUY NHAT cua chan trang.
  */
 export function SiteFooter() {
   const c = useContent();
@@ -342,29 +349,28 @@ export function SiteFooter() {
     <footer className="py-14" style={{ borderTop: '1px solid var(--fg)' }}>
       <div className="shell">
         {/*
-          CANH GIUA TREN MAY TINH, SAT LE TRAI TREN DIEN THOAI.
+          LOGO CANH GIUA O CA HAI BAN; CHU THI CHI CANH GIUA TREN MAY TINH.
 
-          Man hinh rong thi logo dung giua la mot dau cham het — mat di het mot
-          hang roi dung lai o giua. Man hinh hep thi khong con "giua" de noi:
-          moi thu deu gan giua, va canh giua chi lam logo lech so voi cac dong
-          chu canh trai ngay ben duoi no.
-
-          `md:mx-auto` dat tren chinh the anh chu khong chi text-center: anh la
-          mot khoi co be ngang rieng, `text-center` khong dieu khien duoc no.
+          `mx-auto` nam tren chinh the anh nen no khong phu thuoc vao
+          `text-center` cua the boc — anh la mot khoi co be ngang rieng, thuoc
+          tinh canh chu khong dieu khien duoc no. Nho vay tren dien thoai logo
+          van dung giua trong khi cau chu ben duoi sat le trai.
         */}
-        <div className="text-left md:text-center">
-          <div className="mb-3">
+        <div className="md:text-center">
+          {/* Sat len voi logo: chi con mot nhip 4px. File logo con vien trong
+              o hai canh nen khoang cach nhin ra van rong hon con so nay. */}
+          <div className="mb-1">
             {logoLight ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoLight} alt="PHỐI" className="logo-light w-auto md:mx-auto"
+                <img src={logoLight} alt="PHỐI" className="logo-light mx-auto w-auto"
                      style={{ height: logoPx }} />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logoDark} alt="PHỐI" className="logo-dark w-auto md:mx-auto"
+                <img src={logoDark} alt="PHỐI" className="logo-dark mx-auto w-auto"
                      style={{ height: logoPx }} />
               </>
             ) : (
-              <p className="display-xs" style={{ letterSpacing: '0.28em' }}>
+              <p className="display-xs text-center" style={{ letterSpacing: '0.28em' }}>
                 <span style={c.s('site.name')}>{c.t('site.name', 'PHỐI')}</span>
               </p>
             )}
@@ -378,6 +384,52 @@ export function SiteFooter() {
               )}
             </span>
           </p>
+          <p className="mt-3 text-sm">
+            <Link href="/gioi-thieu" className="muted hover:underline">
+              <span style={c.s('about.link_label')}>
+                {c.t('about.link_label', 'Giới thiệu')}
+              </span>
+            </Link>
+          </p>
+        </div>
+
+        {/*
+          Ba buoc. Bo cuc ba cot tren may tinh, xep doc tren dien thoai — giong
+          het luc no con o trang chu, chi doi cho dat.
+        */}
+        <div className="mt-14">
+          <p className="eyebrow mb-8">
+            <span style={c.s('home.steps.heading')}>
+              {c.t('home.steps.heading', 'Cách hoạt động')}
+            </span>
+          </p>
+          <div className="grid gap-10 md:grid-cols-3">
+            {[1, 2, 3].map((n) => (
+              <div key={n}>
+                <p className="eyebrow mb-3">{String(n).padStart(2, '0')}</p>
+                <p className="mb-2 text-sm font-medium leading-relaxed">
+                  <span style={c.s(`home.step${n}.title`)}>
+                    {c.t(
+                      `home.step${n}.title`,
+                      ['Chọn gu', 'Xem và phản hồi', 'Mua trên sàn'][n - 1],
+                    )}
+                  </span>
+                </p>
+                <p className="muted text-sm leading-relaxed">
+                  <span style={c.s(`home.step${n}.desc`)}>
+                    {c.t(
+                      `home.step${n}.desc`,
+                      [
+                        'Phong cách, màu, khoảng giá. Thêm ngày sinh nếu muốn gợi ý theo mệnh — không bắt buộc, và tắt được bất cứ lúc nào.',
+                        'Bốn nút: không thích màu, không thích phong cách, không thích cách phối, ẩn outfit. Mỗi lần bấm là thứ tự gợi ý đổi theo.',
+                        'Bấm vào món bạn muốn để sang Shopee hoặc TikTok Shop. PHỐI không bán hàng và không giữ tiền của bạn.',
+                      ][n - 1],
+                    )}
+                  </span>
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/*
@@ -385,10 +437,10 @@ export function SiteFooter() {
           minh bach voi nguoi tieu dung, va la thu can co truoc khi website mo
           cho nguoi that vao.
 
-          Ca ba doan cung 14px voi phan doc cua khoi "Cach hoat dong" ngay tren.
-          Truoc day chung la 12px va mau nhat hon — tuc la thong tin phap ly
-          duoc trinh bay nhu mot thu dang co giau di. Neu da noi la minh bach
-          thi phai doc duoc.
+          Ca ba doan cung 14px voi phan doc cua khoi ba buoc ngay tren. Truoc
+          day chung la 12px va mau nhat hon — tuc la thong tin phap ly duoc
+          trinh bay nhu mot thu dang co giau di. Neu da noi la minh bach thi
+          phai doc duoc.
         */}
         <div className="mt-14">
           <p className="eyebrow mb-6">
@@ -396,7 +448,7 @@ export function SiteFooter() {
               {c.t('footer.disclosure_heading', 'Công bố')}
             </span>
           </p>
-          <div className="grid gap-10 md:grid-cols-3">
+          <div className="flex flex-col gap-4">
             <p className="muted text-sm leading-relaxed">
               <span style={c.s('footer.affiliate')}>
                 {c.t(

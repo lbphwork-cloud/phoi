@@ -61,6 +61,7 @@ const PAGE_LABELS: Record<string, string> = {
   'kieu-chu': 'Kiểu chữ — font, cỡ, màu cho toàn website',
   'chung': 'Dùng chung — chữ trên thanh menu và chân trang',
   'trang-chu': 'Trang chủ',
+  'gioi-thieu': 'Trang giới thiệu',
   'kham-pha': 'Trang khám phá',
   'ho-so': 'Trang hồ sơ',
   'dang-nhap': 'Trang đăng nhập',
@@ -225,6 +226,39 @@ export default function ContentAdminPage() {
     return fieldStyleCss(parseFieldStyle(draft[row.key] ?? row.value));
   };
 
+  /**
+   * Thu tu hien cua cac o "Phong cach X" — bam theo thu tu THAT tren trang chu.
+   *
+   * VI SAO PHAI TINH LUC HIEN CHU KHONG DUA VAO sort_order
+   *   Thu tu cac phong cach o trang chu do o `home.styles.list` quyet dinh, va
+   *   o do sua duoc. sort_order trong database thi dat mot lan luc tao. Hai thu
+   *   nay lech nhau ngay lan dau tien co nguoi doi thu tu tren trang chu — va
+   *   lech roi thi khong co gi keo chung ve nhau nua.
+   *
+   *   Migration 0021 da sap lai mot lan cho khop. Nhung sap mot lan chi chua
+   *   duoc trieu chung; doc thang tu `home.styles.list` moi la chua nguyen
+   *   nhan. Chu website doi thu tu tren trang chu bao nhieu lan cung duoc, danh
+   *   sach ben nay tu theo.
+   */
+  const styleRank = new Map(
+    (c.rows.find((r) => r.key === 'home.styles.list')?.value ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((slug, i) => [slug, i] as const),
+  );
+
+  /** Khoa sap xep cua mot dong. Dong thuong thi giu nguyen sort_order. */
+  const rowRank = (key: string, sortOrder: number) => {
+    const m = key.match(/^home\.style\.(.+?)\.(image|desc)/);
+    if (!m) return sortOrder;
+    const rank = styleRank.get(m[1]);
+    // Phong cach khong nam trong danh sach trang chu (da bo khoi trang chu
+    // nhung o noi dung van con) xep sau cung, khong bi mat.
+    if (rank === undefined) return 1900 + sortOrder;
+    return 1000 + rank * 10 + (m[2] === 'image' ? 0 : 1);
+  };
+
   // Gom cac khoa cua phan mo dau de dung khoi xem truoc.
   const hero = {
     eyebrow: c.rows.find((r) => r.key === 'home.hero.eyebrow'),
@@ -372,6 +406,10 @@ export default function ContentAdminPage() {
                   r.kind !== 'style' &&
                   !r.key.endsWith('.mobile'),
               )
+              // Sap lai theo thu tu that tren trang chu. `toSorted` chu khong
+              // `sort`: `sort` sua thang mang goc, ma mang o day den tu c.rows
+              // dung chung cho ca trang — sua no la sua ca khoi xem truoc.
+              .toSorted((a, b) => rowRank(a.key, a.sort_order) - rowRank(b.key, b.sort_order))
               .map((r) => {
                 // Quy uoc khoa: o kieu chu = khoa + ".style", o dien thoai =
                 // khoa + ".mobile". Nho quy uoc nay ma khong can them cot lien

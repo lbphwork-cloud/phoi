@@ -445,18 +445,26 @@ body {
   background: var(--bg-2);
   aspect-ratio: 3 / 4;
 }
+/* DUNG THUOC TINH `scale` CHO HIEU UNG DI CHUOT QUA, KHONG DUNG `transform`.
+
+   Anh trong khung nay co the dang chay hieu ung `drift-sm` — mot animation ghi
+   len `transform`. Animation luon thang khai bao thuong, nen mot quy tac hover
+   dung `transform` se bi nuot hoan toan: di chuot qua khong co gi xay ra.
+
+   `scale` la mot thuoc tinh RIENG, trinh duyet nhan no rieng roi ghep vao cung
+   transform. Nho vay hai hieu ung song song ma khong cai nao de len cai nao. */
 .frame > img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: scale 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .frame-square { aspect-ratio: 1 / 1; }
 .frame-wide   { aspect-ratio: 16 / 10; }
 
 /* Chuyen dong nhe: chi phong 3%, trong 0.7s. */
-a:hover .frame > img { transform: scale(1.03); }
+a:hover .frame > img { scale: 1.03; }
 
 img { max-width: 100%; height: auto; }
 
@@ -508,12 +516,20 @@ img { max-width: 100%; height: auto; }
    1.06 -> 1 trong 1,8 giay. Bat dau tu lon hon roi thu nho lai chu khong nguoc
    lai: phong to dan lam anh nhu bi keo vao mat nguoi xem, con thu nho lai tao
    cam giac anh dang lang xuong dung cho. */
+/* 1.2 -> 1 trong 4 giay, KHONG phai 1.12 trong 2.1 giay nhu truoc.
+
+   Ban cu chay xong truoc khi mat kip nhan ra co gi dang chuyen dong: bien do
+   nho cong thoi gian ngan thi ket qua la mot cu chinh anh, khong phai mot
+   chuyen dong. Chu website noi dung y do — "hinh anh khong co hieu ung gi".
+
+   Keo dai gap doi va tang bien do la cach dung: cham thi mat theo kip, va vi
+   no cham nen bien do lon van khong bi coi la mau me. */
 @keyframes hero-settle {
-  from { transform: scale(1.12) translateY(-1.6%); }
+  from { transform: scale(1.2) translateY(-2.2%); }
   to   { transform: scale(1) translateY(0); }
 }
 .hero-media > img {
-  animation: hero-settle 2.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: hero-settle 4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* Chu trong anh mo dau hien sau anh mot nhip. Do tre 0.25s la co y: mat nguoi
@@ -564,6 +580,70 @@ img { max-width: 100%; height: auto; }
       to   { transform: translateY(11%) scale(1.28); }
     }
 
+    /*
+      DONG NAY TUNG BI THIEU, VA DO LA CA LOI.
+
+      `@keyframes drift` duoc dinh nghia o tren, moi anh phong cach o trang chu
+      deu da mang lop `drift` — nhung khong co quy tac nao noi hai thu do lai.
+      Ket qua: chu chay theo cuon, anh dung yen. Chu website bao "hinh anh khong
+      co hieu ung gi" va do la mo ta chinh xac cua trang thai code.
+
+      Manh nay mat trong lan mot script sua file chet giua chung; toi va phan
+      khac cua khoi chuyen dong nhung bo sot dung day. Bai hoc la mot lop CSS
+      duoc gan trong TSX khong chung minh duoc rang co quy tac nao dung den no
+      — chi doc file CSS da DUNG XONG moi biet.
+
+      `cover 0% -> cover 100%`: chay suot tu luc anh cham mep duoi man hinh den
+      luc roi khoi mep tren. Nho vay anh luon dang di trong khi no con trong
+      tam mat, khong phai chi nhuc mot cai luc vua vao.
+    */
+    /*
+      TEN TIMELINE DAT TREN KHUNG, KHONG PHAI TREN ANH — day la mau chot.
+
+      `view()` do do THAY DUOC BAO NHIEU cua chinh phan tu do, tinh trong KHUNG
+      CUON GAN NHAT bao no. Anh o day nam trong `.hero-media` / `.frame`, ma ca
+      hai deu co `overflow: hidden` — tuc la ban than chung DA la mot khung cuon
+      theo dinh nghia cua trinh duyet.
+
+      Anh lai lap kin dung khung do (`inset: 0`). Nen xet trong khung cuon cua
+      no, anh LUC NAO CUNG hien 100%: tien do khong bao gio doi, va animation
+      dung im o mot vi tri. Da do bang trinh duyet that — transform giong het
+      nhau o hai vi tri cuon cach nhau ca man hinh.
+
+      Do chinh la ly do "hinh anh khong co hieu ung gi". Quy tac co that, chay
+      that, chi la chay tren mot thuoc do khong bao gio nhuc.
+
+      Cach chua: dat TEN cho timeline tren chinh cai khung — khung thi nam trong
+      luong cuon cua ca trang — roi bao anh dung timeline mang ten do. Phan tu
+      con duoc phep goi ten timeline cua to tien no.
+    */
+    .drift,
+    .drift-sm { view-timeline-name: --khung-anh; }
+
+    .drift > img {
+      animation: drift linear both;
+      animation-timeline: --khung-anh;
+      animation-range: cover 0% cover 100%;
+    }
+
+    /*
+      Ban nhe cho anh nam trong khung `.frame` — the o trang kham pha, anh dai
+      dien trang chi tiet set do.
+
+      Bien do nho hon han ban lon: khung 3/4 da cat anh san roi, phong them
+      1.28 nua thi nhan vat trong anh bi cat mat dau hoac mat chan. 1.12 va 5%
+      la muc con thay duoc chuyen dong ma khong an mat noi dung.
+    */
+    .drift-sm > img {
+      animation: drift-sm linear both;
+      animation-timeline: --khung-anh;
+      animation-range: cover 0% cover 100%;
+    }
+    @keyframes drift-sm {
+      from { transform: translateY(-5%) scale(1.12); }
+      to   { transform: translateY(5%) scale(1.12); }
+    }
+
     /* --- Khoi noi dung vao va roi khung nhin --------------------------------
        HAI HIEU UNG TRONG MOT KHAI BAO, khong phai hai quy tac `.reveal` roi
        nhau. Viet hai quy tac thi bo rut gon CSS luc dung trang gop chung lai
@@ -575,14 +655,23 @@ img { max-width: 100%; height: auto; }
        la thu tao cam giac manh ma khong can bien do den muc chong mat.
 
        Luc RA bien do nho hon luc VAO: thu dang di ra khong duoc phep tranh cho
-       voi thu dang di vao.                                                    */
+       voi thu dang di vao.
+
+       BIEN DO GIAM MANH SO VOI BAN TRUOC (96px/0.9 -> 44px/0.985). Ban cu la
+       chuyen dong cua CA KHOI, tuc la ca chu ben trong — va chu chay 96px roi
+       co lai 10% khi cuon thi doc khong noi. Chu website goi dung ten no: "hieu
+       ung cua chu qua manh".
+
+       Chuyen dong manh gio nam o dung cho no phai nam: BEN TRONG anh (`.drift`
+       ngay tren). Khoi thi di nhe, anh trong khoi thi di manh — hai lop hai toc
+       do la thu tao chieu sau, chu khong phai mot lop di that manh.             */
     @keyframes settle-in {
-      from { opacity: 0.2;  transform: translateY(96px) scale(0.9); }
+      from { opacity: 0.4;  transform: translateY(44px) scale(0.985); }
       to   { opacity: 1;    transform: translateY(0) scale(1); }
     }
     @keyframes settle-out {
       from { opacity: 1;    transform: translateY(0) scale(1); }
-      to   { opacity: 0.3;  transform: translateY(-56px) scale(0.95); }
+      to   { opacity: 0.55; transform: translateY(-22px) scale(0.995); }
     }
     .reveal {
       animation: settle-in linear both, settle-out linear both;
@@ -600,20 +689,29 @@ img { max-width: 100%; height: auto; }
       from { transform: scale(1);    filter: brightness(1); }
       to   { transform: scale(1.2);  filter: brightness(0.5); }
     }
+    /* Cung mot cai bay: anh nen va khoi chu deu nam TRONG `.hero-media`, nen
+       `view()` do chung trong chinh cai khung do chu khong trong man hinh. Dat
+       ten timeline tren khung roi goi ten — giong het phan `.drift` o tren. */
+    .hero-parallax { view-timeline-name: --khung-mo-dau; }
+
     .hero-parallax > img {
-      animation: hero-settle 2.1s cubic-bezier(0.16, 1, 0.3, 1) both,
+      animation: hero-settle 4s cubic-bezier(0.16, 1, 0.3, 1) both,
                  hero-leave linear both;
-      animation-timeline: auto, view();
+      animation-timeline: auto, --khung-mo-dau;
       animation-range: normal, exit 0% exit 100%;
     }
 
+    /* 110px -> 60px. Chu bay len gan bang chieu cao mot khoi chu khi cuon la
+       phan lon cua cam giac "chu chay qua manh": no di nhanh hon toc do mat
+       dang doc. Anh nen thi van phong to 1.2 nhu cu — o do bien do lon dung
+       cho, vi anh khong phai thu dang duoc doc. */
     @keyframes hero-text-leave {
-      from { transform: translateY(0);      opacity: 1; }
-      to   { transform: translateY(-110px); opacity: 0; }
+      from { transform: translateY(0);     opacity: 1; }
+      to   { transform: translateY(-60px); opacity: 0; }
     }
     .hero-parallax .hero-body {
       animation: hero-text-leave linear both;
-      animation-timeline: view();
+      animation-timeline: --khung-mo-dau;
       animation-range: exit 0% exit 85%;
     }
   }
@@ -627,7 +725,7 @@ img { max-width: 100%; height: auto; }
     scroll-behavior: auto !important;
   }
   .reveal[data-reveal="pending"] { opacity: 1; transform: none; }
-  a:hover .frame > img { transform: none; }
+  a:hover .frame > img { scale: 1; }
 
   /* Tat han thay vi rut ngan: mot hieu ung chay trong 0.01ms van la mot cu
      nhay, va cu nhay do chinh la thu gay kho chiu. */
@@ -639,9 +737,11 @@ img { max-width: 100%; height: auto; }
   .hero-body > * > * > *,
   .reveal,
   .page-in,
-  .drift > img {
+  .drift > img,
+  .drift-sm > img {
     animation: none !important;
     transform: none !important;
+    scale: none !important;
     opacity: 1 !important;
   }
 }

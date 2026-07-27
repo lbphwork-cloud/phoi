@@ -123,7 +123,10 @@ export function OutfitCard({
       )}
 
       <Link href={href ?? `/outfit/${outfit.slug}`} className="group block">
-        <div className="frame mb-3">
+        {/* `drift-sm`: anh troi nhe nguoc chieu cuon. Hieu ung phong to khi di
+            chuot qua van chay song song — no dung thuoc tinh `scale` rieng chu
+            khong tranh cho tren `transform`. Xem chu thich .frame > img. */}
+        <div className="frame drift-sm mb-3">
           {outfit.hero_image_url ? (
             // Dung <img> thay vi next/image: voi output static export thi
             // toi uu anh cua Next bi tat, nen next/image chi them phuc tap.

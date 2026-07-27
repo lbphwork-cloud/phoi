@@ -280,61 +280,15 @@ function Home() {
         </section>
       )}
 
-      {/* ================================================================== */}
-      {/* 3. Ba buoc — giai thich cach website hoat dong                     */}
-      {/* ================================================================== */}
       {/*
-        KHONG CON KHOANG TRANG THUA O DAY.
+        KHOI "CACH HOAT DONG" DA CHUYEN VAO CHAN TRANG (src/components/site.tsx).
 
-        Truoc day khoi nay co `py-20` roi chan trang lai co `mt-24` — cong lai
-        la 176px trang khong o giua ba cot va duong ke chan trang, nen khoi nay
-        nhin nhu dang lung lo giua trang chu khong phai dang ket lai. Chan trang
-        gio khong con le tren; duong ke den la thu ngan cach, khong phai khoang
-        trang.
-
-        MOT CO CHU CHO CA KHOI. Ten buoc va mo ta buoc cung 14px — chi khac mau,
-        khong khac co. Nhan ("Cach hoat dong", "01") la thu duy nhat to hon, va
-        do la ca y do: nhin vao biet ngay dau la muc luc, dau la phan doc.
+        Ly do day du nam trong chu thich cua SiteFooter, tom tat: phan lon nguoi
+        vao website nay se vao thang mot trang chi tiet set do qua duong dan ban
+        be gui va khong bao gio di qua trang chu. Loi giai thich website hoat
+        dong the nao thi phai co mat o moi trang, va chan trang la thu duy nhat
+        thoa dieu do.
       */}
-      <section
-        className="mt-24 border-t pb-16 pt-14 md:mt-32"
-        style={{ borderColor: 'var(--line)' }}
-      >
-        <div className="shell">
-          <p className="eyebrow mb-8">
-            <span style={c.s('home.steps.heading')}>
-              {c.t('home.steps.heading', 'Cách hoạt động')}
-            </span>
-          </p>
-          <div className="grid gap-10 md:grid-cols-3">
-            {[1, 2, 3].map((n) => (
-              <div key={n}>
-                <p className="eyebrow mb-3">{String(n).padStart(2, '0')}</p>
-                <p className="mb-2 text-sm font-medium leading-relaxed">
-                  <span style={c.s(`home.step${n}.title`)}>
-                  {c.t(
-                    `home.step${n}.title`,
-                    ['Chọn gu', 'Xem và phản hồi', 'Mua trên sàn'][n - 1],
-                  )}
-                  </span>
-                </p>
-                <p className="muted text-sm leading-relaxed">
-                  <span style={c.s(`home.step${n}.desc`)}>
-                  {c.t(
-                    `home.step${n}.desc`,
-                    [
-                      'Phong cách, màu, khoảng giá. Thêm ngày sinh nếu muốn gợi ý theo mệnh — không bắt buộc, và tắt được bất cứ lúc nào.',
-                      'Bốn nút: không thích màu, không thích phong cách, không thích cách phối, ẩn outfit. Mỗi lần bấm là thứ tự gợi ý đổi theo.',
-                      'Bấm vào món bạn muốn để sang Shopee hoặc TikTok Shop. PHỐI không bán hàng và không giữ tiền của bạn.',
-                    ][n - 1],
-                  )}
-                  </span>
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </>
   );
 }
