@@ -124,7 +124,7 @@ function Home() {
       <section className="bleed">
         <div
           ref={heroRef}
-          className={`hero-media reveal flex ${hero.alignClass}`}
+          className={`hero-media hero-parallax reveal flex ${hero.alignClass}`}
           style={{ minHeight: 'clamp(30rem, 82vh, 48rem)' }}
         >
           {heroImage && (
@@ -211,38 +211,68 @@ function Home() {
       {/* 2. Cac khoi phong cach — moi khoi mot anh, mot nut                 */}
       {/* ================================================================== */}
       {styles.length > 0 && (
-        <section className="pt-20 md:pt-28">
-          <div className="shell mb-12 md:mb-16">
-            <p className="eyebrow">
+        <section className={c.isMobile ? 'pt-10' : 'pt-20 md:pt-28'}>
+          {/* Tren dien thoai: chu nho canh GIUA va lay mau chu cua trang thay
+              vi mau xam nhat. Khoang trang tren duoi cung rut lai — o khung
+              hep, mot khoang trang bang nua man hinh khong con la "thoang" ma
+              thanh mot cho nguoi ta phai cuon qua. */}
+          <div className={c.isMobile ? 'mb-5 text-center' : 'shell mb-12 md:mb-16'}>
+            <p className="eyebrow" style={c.isMobile ? { color: 'var(--fg)' } : undefined}>
               <span style={c.s('home.styles.eyebrow')}>
                 {c.t('home.styles.eyebrow', 'Theo phong cách')}
               </span>
             </p>
           </div>
 
-          <div className={`flex flex-col ${c.isMobile ? "gap-0" : "gap-20 md:gap-28"}`}>
-            {styles.slice(0, BIG_BLOCKS).map((s, i) => (
-              <StyleBlock key={s.slug} style={s} flip={i % 2 === 1} isMobile={c.isMobile} />
-            ))}
-          </div>
+          {c.isMobile ? (
+            /*
+              MOT KHOI LIEN, KHONG CO KHOANG TRANG.
 
-          {/* Phan duoi: cac phong cach con lai, o nho xep luoi.
-              Chin khoi lon la chin man hinh phai cuon moi het — den khoi thu
-              sau thi khong con ai cuon nua. O nho van cho moi phong cach mot
-              anh va mot duong dan rieng, chi khong doi mot man hinh moi cai. */}
-          {styles.length > BIG_BLOCKS && (
-            <div className="shell mt-20 md:mt-28">
-              <p className="eyebrow mb-8">
-                <span style={c.s('home.styles.more_eyebrow')}>
-                  {c.t('home.styles.more_eyebrow', 'Còn nữa')}
-                </span>
-              </p>
-              <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
-                {styles.slice(BIG_BLOCKS).map((s) => (
-                  <StyleTile key={s.slug} style={s} />
+              `gap: 1px` cong nen mau `var(--bg)` la cach tao duong ke ma khong
+              phai ve them gi: khe ho de lo mau nen cua trang, nen no tu la
+              trang o che do sang va den o che do toi. Ve mot duong border thi
+              phai tu doi mau theo che do; cach nay khong bao gio sai mau.
+            */
+            <div className="bleed grid" style={{ gap: '1px', background: 'var(--bg)' }}>
+              {styles.slice(0, BIG_BLOCKS).map((st) => (
+                <StyleBlock key={st.slug} style={st} flip={false} isMobile />
+              ))}
+
+              {styles.length > BIG_BLOCKS && (
+                <div className="grid grid-cols-2" style={{ gap: '1px', background: 'var(--bg)' }}>
+                  {styles.slice(BIG_BLOCKS).map((st) => (
+                    <StyleTile key={st.slug} style={st} isMobile />
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-20 md:gap-28">
+                {styles.slice(0, BIG_BLOCKS).map((st, i) => (
+                  <StyleBlock key={st.slug} style={st} flip={i % 2 === 1} isMobile={false} />
                 ))}
               </div>
-            </div>
+
+              {/* Phan duoi: cac phong cach con lai, o nho xep luoi.
+                  Chin khoi lon la chin man hinh phai cuon moi het — den khoi
+                  thu sau thi khong con ai cuon nua. O nho van cho moi phong
+                  cach mot anh va mot duong dan rieng. */}
+              {styles.length > BIG_BLOCKS && (
+                <div className="shell mt-20 md:mt-28">
+                  <p className="eyebrow mb-8">
+                    <span style={c.s('home.styles.more_eyebrow')}>
+                      {c.t('home.styles.more_eyebrow', 'Còn nữa')}
+                    </span>
+                  </p>
+                  <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
+                    {styles.slice(BIG_BLOCKS).map((st) => (
+                      <StyleTile key={st.slug} style={st} isMobile={false} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
@@ -324,7 +354,7 @@ function StyleBlock({
   */
   if (isMobile) {
     return (
-      <div ref={ref} className="reveal bleed">
+      <div ref={ref} className="reveal">
         <Link href={href} className="group block">
           {/* `flex items-end` nam o DAY chu khong phai o hero-body.
               .hero-media la `position: relative` va cac con cua no chay theo
@@ -410,17 +440,56 @@ function StyleBlock({
  * CA O LA MOT DUONG DAN, khong phai anh mot noi va nut mot noi. O nho khong du
  * cho de dat mot cai nut cho ra hon, ma dat nut be ti thi tren dien thoai bam
  * truot — ca o la vung bam thi khong bao gio truot.
+ *
+ * HAI BAN KHAC NHAU O CHO DAT CHU
+ *   May tinh: chu nam DUOI anh. O do co khoang trang de tho, va chu duoi anh
+ *   doc nhanh hon chu de len anh.
+ *   Dien thoai: chu nam TRONG anh. Khung hep thi moi dong chu duoi anh la mot
+ *   dai trang cat doi mach anh, va bon o thanh bon dai trang.
  */
 function StyleTile({
   style,
+  isMobile,
 }: {
   style: { slug: string; label: string; desc: string; image: string };
+  isMobile: boolean;
 }) {
+  const href = `/kham-pha?style=${encodeURIComponent(style.slug)}`;
+
+  if (isMobile) {
+    return (
+      <Link href={href} className="group block">
+        <div className="hero-media drift flex items-end" style={{ aspectRatio: '3 / 4' }}>
+          {style.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={style.image} alt={style.label} loading="lazy" />
+          )}
+
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.2) 48%, rgba(0,0,0,0) 74%)',
+            }}
+            aria-hidden="true"
+          />
+
+          <div
+            className="hero-body w-full px-3 pb-5 text-center"
+            style={{
+              color: '#fff',
+              textShadow: '0 1px 2px rgba(0,0,0,0.4), 0 2px 12px rgba(0,0,0,0.45)',
+            }}
+          >
+            <p className="display-xs">{style.label}</p>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
   return (
-    <Link
-      href={`/kham-pha?style=${encodeURIComponent(style.slug)}`}
-      className="group block"
-    >
+    <Link href={href} className="group block">
       <div className="hero-media drift mb-3" style={{ aspectRatio: '4 / 5' }}>
         {style.image && (
           // eslint-disable-next-line @next/next/no-img-element

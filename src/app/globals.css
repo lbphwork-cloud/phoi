@@ -234,38 +234,36 @@ body {
 
 /* Nut luu vao gio. Cung goc voi nut khong thich nhung nam ben trai no, de hai
    quyet dinh nguoc chieu nhau khong bam nham vao nhau. */
+/* HAI NUT GOC ANH PHAI NHIN THAY DUOC NGAY.
+   Ban truoc chung mo va chi hien ro khi ro chuot vao the — chu website bao la
+   "qua chim". Dung: mot nut chi hien khi ro chuot vao thi tren dien thoai
+   khong co cach nao biet no ton tai, con tren may tinh thi phai tinh co ro
+   trung vao moi thay. Gio chung luon hien, nen dam, va co bong de noi len tren
+   moi buc anh — ke ca anh sang mau. */
 .btn-save {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  font-size: 1rem;
+  width: 38px;
+  height: 38px;
+  font-size: 1.25rem;
   line-height: 1;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  background: rgba(20, 18, 15, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(12, 11, 9, 0.62);
   color: #fff;
   cursor: pointer;
-  backdrop-filter: blur(3px);
-  transition: background 0.2s ease, opacity 0.2s ease;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  transition: background 0.2s ease, transform 0.2s ease;
 }
-.btn-save:hover:not(:disabled) { background: rgba(20, 18, 15, 0.72); }
+.btn-save:hover:not(:disabled) { background: #14120f; transform: scale(1.08); }
 .btn-save[aria-pressed="true"] { background: #fff; color: #14120f; border-color: #fff; }
 
-/* Tren the outfit: hien mo, ro han khi ro chuot vao the. Tren dien thoai
-   khong co "ro chuot vao" nen luon hien ro — day la ly do dung media query
-   thay vi chi dua vao :hover. */
 .btn-save-card {
   position: absolute;
   top: 0.5rem;
   left: 0.5rem;
   z-index: 2;
-  opacity: 1;
-}
-@media (hover: hover) {
-  .btn-save-card { opacity: 0; }
-  .group\/card:hover .btn-save-card,
-  .btn-save-card:focus-visible { opacity: 1; }
 }
 
 /* --- Logo hai phien ban --------------------------------------------------
@@ -543,29 +541,67 @@ img { max-width: 100%; height: auto; }
    co hieu ung — trang van dung y nguyen.                                     */
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
+    /* --- Anh troi nguoc chieu cuon -----------------------------------------
+       Bien do lon hon han ban truoc: anh phong 1.28 va chay 11% chieu cao khi
+       cuon qua. Anh bi khung cat (`overflow: hidden`) nen phan tran ra khong ai
+       thay — cai nguoi ta thay la NOI DUNG anh truot cham hon khung, dung cam
+       giac chieu sau ma bien do nho khong tao ra duoc.                        */
     @keyframes drift {
-      from { transform: translateY(-7%) scale(1.16); }
-      to   { transform: translateY(7%) scale(1.16); }
+      from { transform: translateY(-11%) scale(1.28); }
+      to   { transform: translateY(11%) scale(1.28); }
     }
 
-    /* Khoi noi dung phong nhe va sang dan khi cuon vao khung nhin.
-       Chay theo tien do cuon chu khong theo dong ho, nen no bam sat tay nguoi
-       dung — do la thu tao cam giac "manh" ma khong can bien do lon. */
+    /* --- Khoi noi dung vao va roi khung nhin --------------------------------
+       HAI HIEU UNG TRONG MOT KHAI BAO, khong phai hai quy tac `.reveal` roi
+       nhau. Viet hai quy tac thi bo rut gon CSS luc dung trang gop chung lai
+       va chi giu mot — da mac dung loi do, va no im lang khong bao gi.
+
+       Chay theo TIEN DO CUON chu khong theo dong ho. Day la diem mau chot:
+       chuyen dong theo dong ho thi chay xong la het, con chuyen dong theo cuon
+       thi bam sat tay nguoi dung — keo len keo xuong deu thay no dap lai. Do
+       la thu tao cam giac manh ma khong can bien do den muc chong mat.
+
+       Luc RA bien do nho hon luc VAO: thu dang di ra khong duoc phep tranh cho
+       voi thu dang di vao.                                                    */
     @keyframes settle-in {
-      from { opacity: 0.55; transform: translateY(36px) scale(0.97); }
-      to   { opacity: 1; transform: translateY(0) scale(1); }
+      from { opacity: 0.2;  transform: translateY(96px) scale(0.9); }
+      to   { opacity: 1;    transform: translateY(0) scale(1); }
+    }
+    @keyframes settle-out {
+      from { opacity: 1;    transform: translateY(0) scale(1); }
+      to   { opacity: 0.3;  transform: translateY(-56px) scale(0.95); }
     }
     .reveal {
-      animation: settle-in linear both;
-      animation-timeline: view();
-      animation-range: entry 0% entry 65%;
+      animation: settle-in linear both, settle-out linear both;
+      animation-timeline: view(), view();
+      animation-range: entry 0% entry 75%, exit 20% exit 100%;
     }
-    /* Chi ap cho anh trong cac khoi phong cach, KHONG cho anh mo dau: anh mo
-       dau da co hieu ung rieng, chong hai hieu ung len nhau se giat. */
-    .drift > img {
-      animation: drift linear both;
+
+    /* --- Anh mo dau bam theo cuon ------------------------------------------
+       Phong to dan va toi di khi bi day len khoi man hinh; chu ben trong troi
+       len NHANH HON anh. Hai lop di hai toc do la cach re nhat de tao chieu
+       sau, va no chi hop o phan mo dau — do la khoi duy nhat chiem gan het man
+       hinh, nen la cho duy nhat mot chuyen dong lon khong lam nguoi ta mat dau
+       vet dang doc toi dau.                                                   */
+    @keyframes hero-leave {
+      from { transform: scale(1);    filter: brightness(1); }
+      to   { transform: scale(1.2);  filter: brightness(0.5); }
+    }
+    .hero-parallax > img {
+      animation: hero-settle 2.1s cubic-bezier(0.16, 1, 0.3, 1) both,
+                 hero-leave linear both;
+      animation-timeline: auto, view();
+      animation-range: normal, exit 0% exit 100%;
+    }
+
+    @keyframes hero-text-leave {
+      from { transform: translateY(0);      opacity: 1; }
+      to   { transform: translateY(-110px); opacity: 0; }
+    }
+    .hero-parallax .hero-body {
+      animation: hero-text-leave linear both;
       animation-timeline: view();
-      animation-range: cover 0% cover 100%;
+      animation-range: exit 0% exit 85%;
     }
   }
 }
@@ -583,6 +619,8 @@ img { max-width: 100%; height: auto; }
   /* Tat han thay vi rut ngan: mot hieu ung chay trong 0.01ms van la mot cu
      nhay, va cu nhay do chinh la thu gay kho chiu. */
   .hero-media > img,
+  .hero-parallax > img,
+  .hero-parallax .hero-body,
   .hero-body,
   .hero-body > * > *,
   .hero-body > * > * > *,
@@ -710,21 +748,20 @@ table.data th {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  font-size: 0.8125rem;
+  width: 38px;
+  height: 38px;
+  font-size: 1rem;
   line-height: 1;
-  color: var(--fg);
-  background: rgba(250, 249, 246, 0.9);
-  border: 1px solid var(--line-2);
+  color: #fff;
+  background: rgba(12, 11, 9, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.2s ease, background 0.2s ease;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  transition: background 0.2s ease, transform 0.2s ease;
 }
-.group\/card:hover .btn-dismiss,
-.btn-dismiss:focus-visible { opacity: 1; }
-.btn-dismiss:hover { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
-
-@media (hover: none) {
-  .btn-dismiss { opacity: 1; }
+.btn-dismiss:hover {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  transform: scale(1.08);
 }

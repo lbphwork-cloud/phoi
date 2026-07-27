@@ -134,8 +134,15 @@ export function OutfitCard({
           )}
         </div>
 
+        {/* NHAN "Du lieu mau" DA BO KHOI THE OUTFIT.
+            No chiem dung cho de thay nhat tren the ma khong giup nguoi xem
+            quyet dinh gi — va toan bo du lieu mau roi se duoc thay bang hang
+            that. Nhan van con trong cac trang quan tri, noi no thuc su co ich:
+            do la cho quan tri vien biet con bao nhieu bai can thay.
+
+            NHAN "Anh tao boi AI" THI GIU. Do la cam ket voi nguoi xem chu khong
+            phai mot chi tiet giao dien — bo di la noi doi. */}
         <div className="flex flex-wrap items-center gap-1.5">
-          {outfit.is_seed && <SeedTag />}
           {outfit.ai_generated && <AiTag />}
           {outfit.status !== 'published' && <StatusTag status={outfit.status} />}
         </div>
@@ -159,6 +166,14 @@ export function OutfitCard({
           ))}
         </div>
       </Link>
+
+      {/* Nut them vao gio dang DAY DU, dat ngay duoi phan chu.
+          Nut tron o goc anh van con — no danh cho nguoi luot nhanh. Nut nay
+          danh cho nguoi da doc ten va gia roi moi quyet dinh, va no khong the
+          bi nham voi bat ky thu gi khac vi no co chu. */}
+      <div className="mt-3">
+        <SaveButton outfitId={outfit.id} full className="btn-sm w-full" />
+      </div>
 
       {dismissError && <p className="hint-error">{dismissError}</p>}
 
