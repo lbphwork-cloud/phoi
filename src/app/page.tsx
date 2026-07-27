@@ -30,6 +30,15 @@ import { useContent, heroAppearance } from '@/lib/content';
 import { SetupNotice } from '@/components/site';
 import { NGU_HANH_LABEL } from '@/lib/nguhanh';
 
+/**
+ * Bao nhieu phong cach dau danh sach duoc khoi lon.
+ *
+ * Khong lam thanh mot o cau hinh rieng: thu tu trong `home.styles.list` DA
+ * quyet dinh cai nao lon cai nao nho roi. Them mot o nua thi quan tri vien
+ * phai giu hai thu khop nhau bang tay — va co ngay chung se lech.
+ */
+const BIG_BLOCKS = 5;
+
 export default function HomePage() {
   if (!isSupabaseConfigured) return <SetupNotice />;
   return <Home />;
@@ -53,7 +62,8 @@ function Home() {
   // Danh sach phong cach hien o trang chu, do quan tri vien quyet dinh.
   const styleSlugs = c.list(
     'home.styles.list',
-    'smart-casual, streetwear, toi-gian, co-dien, thanh-lich, pha-cach',
+    'smart-casual, streetwear, toi-gian, co-dien, pha-cach, ' +
+      'thanh-lich, vintage, the-thao, workwear',
   );
 
   const styles = styleSlugs
@@ -155,10 +165,27 @@ function Home() {
           </div>
 
           <div className="flex flex-col gap-20 md:gap-28">
-            {styles.map((s, i) => (
+            {styles.slice(0, BIG_BLOCKS).map((s, i) => (
               <StyleBlock key={s.slug} style={s} flip={i % 2 === 1} />
             ))}
           </div>
+
+          {/* Phan duoi: cac phong cach con lai, o nho xep luoi.
+              Chin khoi lon la chin man hinh phai cuon moi het — den khoi thu
+              sau thi khong con ai cuon nua. O nho van cho moi phong cach mot
+              anh va mot duong dan rieng, chi khong doi mot man hinh moi cai. */}
+          {styles.length > BIG_BLOCKS && (
+            <div className="shell mt-20 md:mt-28">
+              <p className="eyebrow mb-8">
+                {c.t('home.styles.more_eyebrow', 'Còn nữa')}
+              </p>
+              <div className="grid grid-cols-2 gap-6 md:grid-cols-4 md:gap-8">
+                {styles.slice(BIG_BLOCKS).map((s) => (
+                  <StyleTile key={s.slug} style={s} />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -250,5 +277,40 @@ function StyleBlock({
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * O nho cho cac phong cach o cuoi trang.
+ *
+ * CA O LA MOT DUONG DAN, khong phai anh mot noi va nut mot noi. O nho khong du
+ * cho de dat mot cai nut cho ra hon, ma dat nut be ti thi tren dien thoai bam
+ * truot — ca o la vung bam thi khong bao gio truot.
+ */
+function StyleTile({
+  style,
+}: {
+  style: { slug: string; label: string; desc: string; image: string };
+}) {
+  return (
+    <Link
+      href={`/kham-pha?style=${encodeURIComponent(style.slug)}`}
+      className="group block"
+    >
+      <div className="hero-media mb-3" style={{ aspectRatio: '4 / 5' }}>
+        {style.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={style.image}
+            alt={style.label}
+            className="transition-transform duration-700 group-hover:scale-[1.03]"
+          />
+        )}
+      </div>
+      <p className="display-xs">{style.label}</p>
+      {style.desc && (
+        <p className="muted-2 mt-1 line-clamp-2 text-xs leading-relaxed">{style.desc}</p>
+      )}
+    </Link>
   );
 }

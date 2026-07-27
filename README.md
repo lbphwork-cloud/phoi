@@ -413,7 +413,7 @@ và hiện badge "Dữ liệu mẫu" trong admin.
 Làm vậy vì nguyên tắc "không tự bịa tên, giá hoặc thông tin sản phẩm" — dữ liệu
 mẫu phải tự nó tỏ ra là dữ liệu mẫu.
 
-Thay dần bằng dữ liệu thật trong `/admin/san-pham`. Sửa tay một sản phẩm là
+Thay dần bằng dữ liệu thật: mở set đồ trong `/admin/outfit` rồi sửa từng món bên trong. Sửa tay một sản phẩm là
 `is_seed` tự chuyển thành `false`. Xoá sạch khi không cần nữa:
 
 ```sql
@@ -520,7 +520,7 @@ phải dự đoán vận mệnh.
 
 1. Chạy 7 migration, điền `.env.local`, tự cấp quyền admin.
 2. Bật `keep-alive.yml` — nếu bỏ qua, một tuần sau website sẽ chết.
-3. Vào `/admin/san-pham`, thay 20 set đồ mẫu bằng link và ảnh thật.
+3. Vào `/admin/outfit`, bấm vào từng set để mở các món bên trong, thay 20 set đồ mẫu bằng link và ảnh thật.
 4. Bật đăng nhập Google.
 5. Triển khai lên Cloudflare Pages với đủ hai biến môi trường.
 

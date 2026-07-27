@@ -167,7 +167,7 @@ async function main() {
   console.log('='.repeat(60));
 
   if (dead.length > 0) {
-    console.log('\nCac link da chet, can thay trong trang /admin/san-pham:');
+    console.log('\nCac link da chet. Mo set do trong /admin/outfit de sua link tung mon:');
     for (const u of dead) console.log(`  ${u}`);
     // Bao that bai de GitHub gui thong bao — day la thu can biet ngay.
     console.log(`\n::error::Co ${dead.length} link affiliate da chet.`);

@@ -164,7 +164,7 @@ trong khi máy bạn vẫn chạy tốt — và bạn sẽ đi tìm lỗi ở ch
 - [ ] **Tiện ích Chrome** — `chrome-extension/README.md`. Đường tin cậy nhất cho
       link mà cả hai bậc trên không đọc được, vì chạy trong phiên duyệt web thật.
 
-- [ ] **Thay dữ liệu mẫu bằng dữ liệu thật** — `/admin/san-pham`. Dữ liệu hiện tại
+- [ ] **Thay dữ liệu mẫu bằng dữ liệu thật** — `/admin/outfit` (bấm vào một set để mở các món bên trong). Dữ liệu hiện tại
       có nhãn "Dữ liệu mẫu" để bạn không lẫn.
 
 - [ ] **Tài khoản affiliate** Shopee / TikTok Shop. Có rồi thì link bạn dán vào đã

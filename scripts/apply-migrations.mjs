@@ -149,15 +149,24 @@ async function runChecks(db) {
   }
 
   // 0006 — du lieu mau
+  //
+  // CHI DEM DONG CO is_seed. Truoc day dem tat ca, nen den luc co nguoi dang
+  // bai that len database that thi phep kiem tra nay bao FAIL — trong khi
+  // migration 0006 van dung y nguyen. Mot phep kiem tra do bang chinh viec
+  // website duoc su dung la mot phep kiem tra sai.
+  //
+  // outfit_items khong co cot is_seed nen phai nhin sang set do cha no.
   {
     const [r] = await db.rows(`
-      select (select count(*) from products)::int        as products,
-             (select count(*) from outfits)::int         as outfits,
-             (select count(*) from affiliate_links)::int as links,
-             (select count(*) from outfit_items)::int    as items
+      select (select count(*) from products        where is_seed)::int as products,
+             (select count(*) from outfits         where is_seed)::int as outfits,
+             (select count(*) from affiliate_links where is_seed)::int as links,
+             (select count(*) from outfit_items oi
+                join outfits o on o.id = oi.outfit_id
+               where o.is_seed)::int as items
     `);
     report(
-      '0006 — 45 san pham / 20 set do / 45 link / 80 mon',
+      '0006 — 45 san pham / 20 set do / 45 link / 80 mon (chi dem du lieu mau)',
       r.products === 45 && r.outfits === 20 && r.links === 45 && r.items === 80,
       `${r.products} / ${r.outfits} / ${r.links} / ${r.items}`,
     );

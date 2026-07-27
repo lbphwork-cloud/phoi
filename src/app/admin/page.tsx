@@ -87,9 +87,9 @@ export default function AdminHome() {
             )}
             {c.deadLinks > 0 && (
               <Todo
-                href="/admin/san-pham"
+                href="/admin/outfit"
                 label={`${c.deadLinks} link affiliate có thể đã hỏng`}
-                note="Link chết là mất tiền trực tiếp — ưu tiên cao hơn mọi việc khác."
+                note="Link chết là mất tiền trực tiếp — ưu tiên cao hơn mọi việc khác. Mở set đồ ra để sửa link của từng món."
               />
             )}
             {c.openRequests > 0 && (
@@ -116,8 +116,9 @@ export default function AdminHome() {
         {c.seedProducts > 0 && (
           <div className="notice notice-warn mt-4">
             Còn {c.seedProducts} sản phẩm mẫu. Tên và giá là dữ liệu mô tả, link trỏ
-            tới trang tìm kiếm của sàn. Thay dần bằng dữ liệu thật trong{' '}
-            <Link href="/admin/san-pham" className="underline">trang sản phẩm</Link>.
+            tới trang tìm kiếm của sàn. Thay dần bằng dữ liệu thật: mở set đồ trong{' '}
+            <Link href="/admin/outfit" className="underline">trang outfit</Link> rồi sửa
+            từng món bên trong.
           </div>
         )}
       </section>

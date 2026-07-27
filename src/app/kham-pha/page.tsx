@@ -108,6 +108,30 @@ function Discover() {
     (priceStep > 0 ? 1 : 0) +
     (menhOnly ? 1 : 0);
 
+  /**
+   * Nhung gi dang loc BEN TRONG muc "Nang cao", viet ra de doc khi muc dang
+   * dong.
+   *
+   * Gom ba bo loc vao mot cho co mot cai gia: dong lai la khong con thay minh
+   * dang loc gi. Nguoi dung loc mau den, cuon xuong xem, cuon nguoc len thay
+   * mot dong "Nang cao" tron tru — roi khong hieu vi sao ket qua it di.
+   *
+   * Viet TEN chu khong viet so ("Nang cao · 2"). Con so noi rang co gi do dang
+   * bat nhung khong noi la gi, van phai mo ra xem.
+   */
+  const advancedSummary =
+    [
+      filters.occasionSlug
+        ? tax.occasions.find((o) => o.slug === filters.occasionSlug)?.label
+        : null,
+      filters.colorSlug
+        ? tax.colors.find((x) => x.slug === filters.colorSlug)?.label
+        : null,
+      priceStep > 0 ? PRICE_STEPS[priceStep].label : null,
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined;
+
   return (
     <div className="shell py-12 md:py-16">
       <div className="mb-10">
@@ -140,69 +164,60 @@ function Discover() {
           ))}
         </Group>
 
-        {/* Ba nhom nay thu gon mac dinh. Ly do: mo het ra la 33 nut, day toan
-            bo ket qua xuong duoi man hinh dien thoai — nguoi dung phai cuon
-            qua bo loc moi nhin thay cai ho vao de xem. Nhan hien so dang chon
-            de thu gon khong lam mat dau vet nguoi dung da loc gi.          */}
-        <Collapsible
-          label="Dịp sử dụng"
-          selected={
-            filters.occasionSlug
-              ? tax.occasions.find((o) => o.slug === filters.occasionSlug)?.label
-              : undefined
-          }
-        >
-          {tax.occasions.map((o) => (
-            <button
-              key={o.slug}
-              type="button"
-              className="chip"
-              aria-pressed={filters.occasionSlug === o.slug}
-              onClick={() => toggle('occasionSlug', o.slug)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </Collapsible>
+        {/* BA NHOM CON LAI NAM CHUNG TRONG MOT MUC "NANG CAO", DONG MAC DINH.
+            Ly do: mo het ra la 33 nut, day toan bo ket qua xuong duoi man hinh
+            dien thoai — nguoi dung phai cuon qua bo loc moi nhin thay cai ho
+            vao de xem. Truoc day ba nhom thu gon rieng, van la ba dong chiem
+            cho ma dong nao cung ghi "Tat ca", nhin nhu ba o trong.
 
-        <Collapsible
-          label="Màu"
-          selected={
-            filters.colorSlug
-              ? tax.colors.find((x) => x.slug === filters.colorSlug)?.label
-              : undefined
-          }
-        >
-          {tax.colors.map((x) => (
-            <button
-              key={x.slug}
-              type="button"
-              className="chip"
-              aria-pressed={filters.colorSlug === x.slug}
-              onClick={() => toggle('colorSlug', x.slug)}
-              title={x.element ? `Thuộc hành ${NGU_HANH_LABEL[x.element]}` : undefined}
-            >
-              <span className="swatch" style={{ background: x.hex }} />
-              {x.label}
-            </button>
-          ))}
-        </Collapsible>
+            Phong cach thi KHONG gom vao day: no la bo loc duoc dung nhieu nhat
+            va la thu trang chu dan sang, phai thay ngay. */}
+        <Collapsible label="Nâng cao" summary={advancedSummary}>
+          <div className="flex w-full flex-col gap-5">
+            <Group label="Dịp sử dụng">
+              {tax.occasions.map((o) => (
+                <button
+                  key={o.slug}
+                  type="button"
+                  className="chip"
+                  aria-pressed={filters.occasionSlug === o.slug}
+                  onClick={() => toggle('occasionSlug', o.slug)}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </Group>
 
-        <Collapsible
-          label="Khoảng giá cả set"
-          selected={priceStep > 0 ? PRICE_STEPS[priceStep].label : undefined}
-        >
-          {PRICE_STEPS.map((p, i) => (
-            <button
-              key={p.label}
-              type="button"
-              className="chip"
-              aria-pressed={priceStep === i}
-              onClick={() => applyPrice(i)}
-            >
-              {p.label}
-            </button>
-          ))}
+            <Group label="Màu">
+              {tax.colors.map((x) => (
+                <button
+                  key={x.slug}
+                  type="button"
+                  className="chip"
+                  aria-pressed={filters.colorSlug === x.slug}
+                  onClick={() => toggle('colorSlug', x.slug)}
+                  title={x.element ? `Thuộc hành ${NGU_HANH_LABEL[x.element]}` : undefined}
+                >
+                  <span className="swatch" style={{ background: x.hex }} />
+                  {x.label}
+                </button>
+              ))}
+            </Group>
+
+            <Group label="Khoảng giá cả set">
+              {PRICE_STEPS.map((p, i) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  className="chip"
+                  aria-pressed={priceStep === i}
+                  onClick={() => applyPrice(i)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </Group>
+          </div>
         </Collapsible>
 
         {/* Bo loc theo menh chi hien khi nguoi dung DA nhap ngay sinh va
@@ -298,9 +313,13 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
 /**
  * Nhom bo loc thu gon duoc, mac dinh dong.
  *
- * Khi dong van hien TEN LUA CHON DANG AP DUNG. Neu khong, nguoi dung loc mot
+ * Khi dong van hien NHUNG GI DANG LOC ben trong. Neu khong, nguoi dung loc mot
  * mau roi cuon xuong, quay len thay nhom dong lai va tuong minh chua loc gi —
  * roi khong hieu vi sao ket qua it di.
+ *
+ * KHONG GHI "TAT CA" KHI CHUA LOC GI. Chu do khong mang thong tin nao — chua
+ * loc thi hien nhien la tat ca — ma lai lam moi dong trong nhin nhu mot o dang
+ * cho dien. Mui ten da noi du: co cai gi do mo ra duoc.
  *
  * Dung <details>/<summary> that thay vi tu quan ly trang thai: no mo duoc bang
  * ban phim, doc duoc bang trinh doc man hinh, va tim-trong-trang cua trinh
@@ -309,32 +328,31 @@ function Group({ label, children }: { label: string; children: React.ReactNode }
  */
 function Collapsible({
   label,
-  selected,
+  summary,
   children,
 }: {
   label: string;
-  selected?: string;
+  /** Nhung gi dang loc ben trong, hien khi dang dong. */
+  summary?: string;
   children: React.ReactNode;
 }) {
   return (
     <details className="group">
       <summary className="flex cursor-pointer list-none items-center gap-3 py-1">
         <span className="eyebrow shrink-0 sm:w-40">{label}</span>
-        {selected ? (
+        {summary && (
           <span className="text-sm" style={{ color: 'var(--fg)' }}>
-            {selected}
+            {summary}
           </span>
-        ) : (
-          <span className="muted-2 text-sm">Tất cả</span>
         )}
         <span
-          className="muted-2 ml-auto text-xs transition-transform group-open:rotate-180"
+          className="muted-2 ml-auto text-sm transition-transform group-open:rotate-180"
           aria-hidden="true"
         >
           ▾
         </span>
       </summary>
-      <div className="mt-3 flex flex-wrap gap-2 sm:ml-40 sm:pl-6">{children}</div>
+      <div className="mt-4 flex flex-wrap gap-2 sm:ml-40 sm:pl-6">{children}</div>
     </details>
   );
 }

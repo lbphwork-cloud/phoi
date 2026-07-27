@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase/client';
 import { EmptyState, Spinner } from '@/components/site';
 import { StatusTag } from '@/components/outfit';
+import { AdminOutfitItems } from '@/components/AdminOutfitItems';
+import { OrphanProducts } from '@/components/AdminOrphanProducts';
 import { useAsyncData, useTaxonomy } from '@/lib/hooks';
 import { formatRelative, formatVnd } from '@/lib/format';
 import { STATUS_LABEL } from '@/lib/supabase/types';
@@ -18,6 +20,8 @@ export default function AdminOutfitsPage() {
   const tax = useTaxonomy();
   const [status, setStatus] = useState<OutfitStatus | 'all'>('all');
   const [q, setQ] = useState('');
+  /** Set do dang mo xem san pham ben trong. Moi luc chi mot. */
+  const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -124,7 +128,11 @@ export default function AdminOutfitsPage() {
             </thead>
             <tbody>
               {visible.map((o) => (
-                <tr key={o.id}>
+                <Fragment key={o.id}>
+                <tr
+                  className="cursor-pointer"
+                  onClick={() => setOpenId((x) => (x === o.id ? null : o.id))}
+                >
                   <td>
                     <div className="frame frame-square w-14">
                       {o.hero_image_url ? (
@@ -136,7 +144,16 @@ export default function AdminOutfitsPage() {
                     </div>
                   </td>
                   <td>
-                    <span className="font-medium">{o.title}</span>
+                    <span className="font-medium">
+                      <span
+                        className="muted-2 mr-2 inline-block text-xs transition-transform"
+                        style={openId === o.id ? { transform: 'rotate(180deg)' } : undefined}
+                        aria-hidden="true"
+                      >
+                        ▾
+                      </span>
+                      {o.title}
+                    </span>
                     <span className="muted-2 block text-xs">
                       {o.is_seed && 'dữ liệu mẫu · '}
                       {o.ai_generated && 'ảnh AI · '}
@@ -147,7 +164,9 @@ export default function AdminOutfitsPage() {
                   <td className="whitespace-nowrap">{formatVnd(o.total_price_vnd)}</td>
                   <td><StatusTag status={o.status} /></td>
                   <td className="muted-2 whitespace-nowrap text-xs">{formatRelative(o.created_at)}</td>
-                  <td>
+                  {/* Cac nut o day KHONG duoc lam mo/dong dong. stopPropagation
+                      chan su kien bam noi len hang cha. */}
+                  <td onClick={(e) => e.stopPropagation()}>
                     <div className="flex flex-wrap gap-1">
                       {o.status !== 'published' && (
                         <button
@@ -173,6 +192,22 @@ export default function AdminOutfitsPage() {
                     </div>
                   </td>
                 </tr>
+
+                {/* Cac mon trong set, mo ra ngay duoi dong. Truoc day phai sang
+                    mot trang "San pham" rieng — o do nhin mot dong san pham
+                    khong biet no thuoc bai nao, nen sua thi khong biet minh dang
+                    lam hong bai nao. */}
+                {openId === o.id && (
+                  <tr>
+                    <td colSpan={7} className="bg-transparent">
+                      <div className="py-4">
+                        <p className="eyebrow mb-4">Sản phẩm trong set</p>
+                        <AdminOutfitItems outfitId={o.id} />
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -180,11 +215,14 @@ export default function AdminOutfitsPage() {
       )}
 
       <p className="muted-2 mt-8 text-xs leading-relaxed">
-        Mọi thao tác đổi trạng thái ở đây đều được ghi vào nhật ký quản trị. Để
-        duyệt bài kèm lý do cho tác giả, dùng trang{' '}
+        Bấm vào một dòng để mở các sản phẩm bên trong và sửa trực tiếp. Mọi thao tác
+        đổi trạng thái ở đây đều được ghi vào nhật ký quản trị. Để duyệt bài kèm lý do
+        cho tác giả, dùng trang{' '}
         <Link href="/admin/kiem-duyet" className="underline">Kiểm duyệt</Link> — trang đó
         ghi cả lý do vào hồ sơ bài đăng để tác giả đọc được.
       </p>
+
+      <OrphanProducts />
     </div>
   );
 }

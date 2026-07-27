@@ -55,7 +55,7 @@ function Login() {
 
     const { error: e } = await sb.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/ho-so/` },
+      options: { redirectTo: `${window.location.origin}/` },
     });
 
     if (e) {
@@ -87,14 +87,14 @@ function Login() {
       const { data, error: err } = await sb.auth.signUp({
         email: email.trim(),
         password,
-        options: { emailRedirectTo: `${window.location.origin}/ho-so/` },
+        options: { emailRedirectTo: `${window.location.origin}/` },
       });
 
       setBusy(false);
       if (err) { setError(err.message); return; }
 
       // Neu Supabase bat xac thuc email thi chua co session ngay.
-      if (data.session) router.push('/ho-so');
+      if (data.session) router.push('/');
       else {
         setInfo(
           'Đã tạo tài khoản. Kiểm tra email để xác thực. Lưu ý: gói miễn phí của ' +
@@ -119,7 +119,13 @@ function Login() {
       );
       return;
     }
-    router.push('/ho-so');
+
+    // VE TRANG CHU, KHONG VAO HO SO.
+    //   Nguoi ta dang nhap de XEM DO, khong phai de khai bao ho so. Da vao ho
+    //   so thi phai bam tiep mot lan nua moi ra cho co noi dung — mot buoc thua
+    //   dat dung luc nguoi dung dang muon xem nhat. Ai can sua ho so thi menu
+    //   luon co san duong vao.
+    router.push('/');
   };
 
   return (
