@@ -26,6 +26,11 @@ import {
 } from '@/lib/fetchProduct';
 import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
+import {
+  SCENES, MODEL_TYPES, buildImagePrompt, requestAiImage,
+  buildDescriptionPrompt, requestAiDescription, explainPromptVi,
+  type AiProviderId,
+} from '@/lib/aiImage';
 import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import type { ItemRole, Platform, ProductCategory } from '@/lib/supabase/types';
 
@@ -135,6 +140,23 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   const [heroPreview, setHeroPreview] = useState<string>('');
   const [heroError, setHeroError] = useState<string | null>(null);
 
+  // Anh tung mon: tai len ngay, nen can biet mon nao dang tai.
+  const [itemUploading, setItemUploading] = useState<string | null>(null);
+  const [itemUploadError, setItemUploadError] = useState<string | null>(null);
+
+  // Tao anh bang AI. `heroUrlDirect` la anh AI da chon: no da nam tren
+  // Storage roi nen khong phai tai len lai luc luu.
+  const [aiProvider, setAiProvider] = useState<AiProviderId>('gemini');
+  const [sceneId, setSceneId] = useState<string>(SCENES[0].id);
+  const [modelTypeId, setModelTypeId] = useState<string>(MODEL_TYPES[1].id);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState<string | null>(null);
+  const [aiUrls, setAiUrls] = useState<string[]>([]);
+  const [heroUrlDirect, setHeroUrlDirect] = useState<string>('');
+  const [descBusy, setDescBusy] = useState(false);
+  const [descMessage, setDescMessage] = useState<string | null>(null);
+  const [showPromptVi, setShowPromptVi] = useState(false);
+
   // Doc du lieu tu tien ich Chrome NGAY TRONG ham khoi tao state.
   //
   // Truoc day viec nay nam trong useEffect va goi setItems — tuc la setState
@@ -183,6 +205,76 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     const r = await uploadImage('outfit-images', uid, heroFile);
     if (!r.ok) throw new Error(r.message);
     return r.url;
+  };
+
+  /**
+   * Tai anh cho MOT mon len ngay lap tuc.
+   *
+   * Khac anh dai dien: anh dai dien doi den luc bam Luu moi tai len, vi luc do
+   * moi biet bai co duoc tao khong. Anh tung mon tai ngay de nguoi dung thay
+   * duoc no truoc khi bam tao anh AI — cai nut do can co anh that de tham chieu.
+   */
+  /**
+   * Goi AI dung anh set do tu chinh du lieu dang nhap trong form.
+   *
+   * Cau lenh duoc dung tu ten cac mon, mau, phong cach va dip — nen anh ra bam
+   * theo bai nay chu khong phai mot anh thoi trang chung chung.
+   */
+  /** Du lieu dung chung cho ca cau lenh tao anh lan cau lenh viet mo ta. */
+  const promptInput = () => ({
+    outfitTitle: title,
+    styleLabel: tax.styleLabel(styleSlug),
+    occasionLabel: tax.occasionLabel(occasionSlug),
+    colorLabels: colorSlugs.map((s) => tax.colorLabel(s)),
+    items: items
+      .filter((i) => i.name.trim())
+      .map((i) => ({
+        roleLabel: ITEM_ROLE_LABEL[i.role],
+        name: i.name.trim(),
+        colorLabel: i.colorSlug ? tax.colorLabel(i.colorSlug) : undefined,
+      })),
+    sceneId,
+    modelTypeId,
+  });
+
+  /** AI viet mo ta bang tieng Viet. Ket qua la BAN NHAP, nguoi dung sua lai. */
+  const generateDescription = async () => {
+    setDescBusy(true);
+    setDescMessage(null);
+    const r = await requestAiDescription({
+      provider: aiProvider,
+      prompt: buildDescriptionPrompt(promptInput()),
+    });
+    setDescBusy(false);
+    setDescMessage(r.message);
+    if (r.ok && r.text) setDescription(r.text);
+  };
+
+  const generateAiImage = async () => {
+    setAiBusy(true);
+    setAiMessage(null);
+
+    const prompt = buildImagePrompt(promptInput());
+
+    const r = await requestAiImage({ provider: aiProvider, prompt });
+    setAiBusy(false);
+    setAiMessage(r.message);
+
+    if (r.ok && r.urls.length > 0) setAiUrls(r.urls);
+  };
+
+  const uploadItemImage = async (it: DraftItem, file: File) => {
+    const userId = session?.user.id;
+    if (!userId) { setItemUploadError('Cần đăng nhập để tải ảnh lên.'); return; }
+
+    setItemUploading(it.key);
+    setItemUploadError(null);
+
+    const r = await uploadImage('product-images', userId, file);
+    setItemUploading(null);
+
+    if (!r.ok || !r.url) { setItemUploadError(r.message); return; }
+    patch(it.key, { imageUrl: r.url });
   };
 
   // -------------------------------------------------------------------------
@@ -270,7 +362,9 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
     try {
       setProgress('Đang tải ảnh…');
-      const heroUrl = await uploadHero(uid);
+      // Anh AI da nam tren Storage roi, khong phai tai len lai. Anh nguoi
+      // dung tu chon tu may thi moi phai upload.
+      const heroUrl = heroUrlDirect || (await uploadHero(uid));
 
       setProgress('Đang tạo set đồ…');
       const { data: outfit, error: e1 } = await sb
@@ -391,6 +485,20 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           placeholder="Vì sao cách phối này hợp lý. Một hai câu là đủ."
         />
 
+        {/* AI viet mo ta bang TIENG VIET — khac cau lenh tao anh, xem chu
+            thich buildDescriptionPrompt trong src/lib/aiImage.ts. */}
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            disabled={descBusy || items.every((i) => !i.name.trim())}
+            onClick={() => void generateDescription()}
+          >
+            {descBusy ? 'Đang viết…' : 'Để AI viết mô tả (tiếng Việt)'}
+          </button>
+          {descMessage && <span className="muted-2 text-xs">{descMessage}</span>}
+        </div>
+
         <div className="mb-5 grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="style">Phong cách</label>
@@ -448,6 +556,122 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             </div>
           </div>
         )}
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Tao anh set do bang AI                                            */}
+        {/*                                                                   */}
+        {/* Day la duong TUY CHON. Ai khong muon dung AI thi tai anh cua minh */}
+        {/* len o tren, hoac de trong — bai van dang duoc. Khong bao gio bat  */}
+        {/* buoc phai co key AI moi dung duoc website.                        */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="mt-8 border-t pt-6" style={{ borderColor: 'var(--line)' }}>
+          <p className="eyebrow mb-3">Hoặc để AI dựng ảnh set đồ</p>
+          <p className="hint mb-4">
+            AI dựng một ảnh minh hoạ theo phong cách, màu và các món bạn đã nhập.
+            Ảnh sinh ra là <strong>ảnh minh hoạ</strong>, không phải ảnh sản phẩm thật:
+            nó không giữ đúng logo, chữ in hay hoạ tiết nhỏ. Ảnh luôn được gắn nhãn
+            &ldquo;Ảnh tạo bởi AI&rdquo; và vẫn phải qua kiểm duyệt.
+          </p>
+
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="label" htmlFor="ai-provider">Dịch vụ</label>
+              <select
+                id="ai-provider"
+                className="field"
+                value={aiProvider}
+                onChange={(e) => setAiProvider(e.target.value as AiProviderId)}
+              >
+                <option value="gemini">Gemini (có gói miễn phí)</option>
+                <option value="openai">OpenAI (trả tiền mỗi ảnh)</option>
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="ai-scene">Bối cảnh</label>
+              <select
+                id="ai-scene"
+                className="field"
+                value={sceneId}
+                onChange={(e) => setSceneId(e.target.value)}
+              >
+                {SCENES.map((s) => (
+                  <option key={s.id} value={s.id}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="ai-model">Dáng người mẫu</label>
+              <select
+                id="ai-model"
+                className="field"
+                value={modelTypeId}
+                onChange={(e) => setModelTypeId(e.target.value)}
+              >
+                {MODEL_TYPES.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={aiBusy || items.every((i) => !i.name.trim())}
+            onClick={() => void generateAiImage()}
+          >
+            {aiBusy ? 'Đang tạo ảnh…' : 'Tạo ảnh set đồ bằng AI'}
+          </button>
+
+          {items.every((i) => !i.name.trim()) && (
+            <p className="hint">Nhập tên ít nhất một món trước đã — AI cần biết dựng gì.</p>
+          )}
+
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet ml-2"
+            onClick={() => setShowPromptVi((v) => !v)}
+          >
+            {showPromptVi ? 'Ẩn yêu cầu gửi cho AI' : 'Xem yêu cầu gửi cho AI'}
+          </button>
+
+          {showPromptVi && (
+            <div className="notice mt-4">
+              <p className="eyebrow mb-2">Đang yêu cầu AI những gì</p>
+              <ul className="muted flex list-disc flex-col gap-1 pl-5 text-sm">
+                {explainPromptVi(promptInput()).map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              <p className="hint mt-3">
+                Câu lệnh thật gửi đi bằng tiếng Anh — các mô hình tạo ảnh hiểu tiếng Anh
+                tốt hơn hẳn, viết tiếng Việt cho ra ảnh tệ hơn rõ rệt. Đây là bản dịch
+                để bạn đọc, không phải thứ được gửi đi.
+              </p>
+            </div>
+          )}
+
+          {aiMessage && <p className="hint mt-3">{aiMessage}</p>}
+
+          {aiUrls.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-3">
+              {aiUrls.map((u) => (
+                <button
+                  key={u}
+                  type="button"
+                  className="w-32 text-left"
+                  onClick={() => { setHeroPreview(u); setHeroUrlDirect(u); setAiGenerated(true); }}
+                >
+                  <div className="frame">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={u} alt="Ảnh do AI tạo" />
+                  </div>
+                  <span className="muted-2 text-xs">Bấm để dùng ảnh này</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         <label className="mt-5 flex cursor-pointer items-start gap-3">
           <input
@@ -579,8 +803,32 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                   />
                 </div>
 
+                {/* Ba duong lay anh cho mot mon, xep theo do de dung:
+                    1. Tu dien khi lay duoc tu link
+                    2. Tu tai anh len — dung khi ban tu chup hoac tu lam anh
+                    3. Dan dia chi anh — duong cuoi, cho anh da co san o noi khac
+
+                    Duong 2 la thu truoc day thieu: nguoi dung khong co cach nao
+                    dua anh cua CHINH HO vao tung mon, chi dan duoc dia chi. */}
                 <div className="sm:col-span-2">
-                  <label className="label">Ảnh sản phẩm (địa chỉ ảnh)</label>
+                  <label className="label">Ảnh sản phẩm</label>
+
+                  <div className="mb-2 flex flex-wrap items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      className="text-sm"
+                      disabled={itemUploading === it.key}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void uploadItemImage(it, f);
+                      }}
+                    />
+                    {itemUploading === it.key && (
+                      <span className="muted-2 text-xs">Đang tải ảnh lên…</span>
+                    )}
+                  </div>
+
                   <input
                     value={it.imageUrl}
                     onChange={(e) => patch(it.key, { imageUrl: e.target.value })}
@@ -601,6 +849,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             </div>
           ))}
         </div>
+
+        {itemUploadError && <p className="hint-error">{itemUploadError}</p>}
 
         <div className="mt-6 flex flex-wrap items-center gap-4">
           <button type="button" className="btn btn-sm" onClick={() => setItems((xs) => [...xs, newItem()])}>

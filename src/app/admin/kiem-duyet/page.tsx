@@ -1,31 +1,70 @@
 'use client';
 
+/**
+ * Hang doi kiem duyet — xem nhu nguoi dung thay, va sua ngay tai cho.
+ *
+ * BO CUC HAI COT
+ *   Trai  — dung lai bai DUNG NHU trang cong khai: anh lon, tieu de, danh sach
+ *           mon kem anh va gia. Doi ngay khi go o cot phai.
+ *   Phai  — o sua tung truong, o nhap ly do, va cac nut duyet.
+ *
+ *   VI SAO PHAI DUNG LAI PHAN NHIN
+ *     Ban cu chi hien anh nho 220px va mot bang du lieu. Nhung loi hay gap nhat
+ *     khi duyet lai la loi NHIN: anh mo, anh bi cat mat dau, tieu de dai qua bi
+ *     vo dong, mau trong anh khong khop mo ta. Nhung loi do khong nhin ra duoc
+ *     tu mot bang chu.
+ *
+ * SUA TAI CHO CHAM VAO BA BANG KHAC NHAU
+ *   outfits          — tieu de, mo ta, anh, phong cach, dip
+ *   products         — ten va gia tung mon
+ *   affiliate_links  — dia chi link
+ *
+ *   Chung duoc luu trong MOT lan bam, nhung goi rieng tung bang. Neu mot bang
+ *   loi thi bao ro bang nao, khong im lang bo qua.
+ *
+ * CANH BAO PHAI HIEN CHO NGUOI DUYET
+ *   Sua `products` anh huong MOI bai dang dung san pham do, khong chi bai nay.
+ *   Doi link affiliate cua bai DA DANG thi trigger tu dua bai ve cho duyet.
+ *   Ca hai deu duoc ghi ngay canh o nhap, khong giau trong tai lieu.
+ *
+ * Ba nut duyet deu goi CUNG mot ham SQL review_outfit(), khong tu UPDATE bang
+ * outfits. Ham do lam ba viec trong MOT giao dich — doi trang thai, ghi
+ * post_reviews, ghi admin_audit_log — va bat buoc co ly do khi yeu cau sua.
+ */
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase/client';
 import { EmptyState, Spinner } from '@/components/site';
 import { StatusTag } from '@/components/outfit';
-import { useAsyncData, useTaxonomy } from '@/lib/hooks';
+import { useAsyncData, useTaxonomy, useAuth } from '@/lib/hooks';
+import { uploadImage } from '@/lib/storage';
 import { formatRelative, formatVnd } from '@/lib/format';
 import type { OutfitWithItems, ReviewAction } from '@/lib/supabase/types';
 
-/**
- * Hang doi kiem duyet.
- *
- * Ba nut duyet deu goi CUNG mot ham SQL review_outfit(), khong tu UPDATE bang
- * outfits. Ly do: ham do lam ba viec trong MOT giao dich — doi trang thai, ghi
- * post_reviews, ghi admin_audit_log. Neu tu UPDATE thi rat de doi trang thai
- * xong ma quen ghi ly do, va nhat ky se co lo hong.
- *
- * Ham cung bat buoc phai co ly do khi chon "yeu cau sua" — kiem tra do nam
- * trong SQL, khong phai o form nay.
- */
+/** Cac truong cua bai co the sua ngay tai trang duyet. */
+interface OutfitEdit {
+  title?: string;
+  description?: string;
+  hero_image_url?: string;
+  style_slug?: string;
+  occasion_slug?: string;
+}
+
 export default function ModerationPage() {
   const tax = useTaxonomy();
+  const { session } = useAuth();
 
   const [reasons, setReasons] = useState<Record<string, string>>({});
+  const [outfitEdits, setOutfitEdits] = useState<Record<string, OutfitEdit>>({});
+  const [productEdits, setProductEdits] = useState<
+    Record<string, { name?: string; price_vnd?: number | null }>
+  >({});
+  const [linkEdits, setLinkEdits] = useState<Record<string, string>>({});
+
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
 
   const { data, loading, error: loadError, reload } = useAsyncData<OutfitWithItems[]>(
@@ -52,6 +91,73 @@ export default function ModerationPage() {
 
   const rows = data ?? [];
   const error = actionError ?? loadError;
+
+  /** Gia tri hien tai cua mot truong: uu tien ban dang sua. */
+  const field = <K extends keyof OutfitEdit>(
+    o: OutfitWithItems,
+    k: K,
+  ): string => (outfitEdits[o.id]?.[k] ?? (o[k as keyof OutfitWithItems] as string) ?? '');
+
+  const setField = (id: string, k: keyof OutfitEdit, v: string) => {
+    setOutfitEdits((e) => ({ ...e, [id]: { ...e[id], [k]: v } }));
+    setSavedId(null);
+  };
+
+  const hasEdits = (o: OutfitWithItems) => {
+    if (outfitEdits[o.id] && Object.keys(outfitEdits[o.id]).length > 0) return true;
+    return (o.outfit_items ?? []).some(
+      (it) =>
+        (it.products && productEdits[it.products.id]) ||
+        (it.affiliate_links && linkEdits[it.affiliate_links.id] !== undefined),
+    );
+  };
+
+  /** Luu moi thay doi cua mot bai. Goi rieng tung bang de bao loi dung cho. */
+  const saveEdits = async (o: OutfitWithItems) => {
+    const sb = getSupabase()!;
+    setBusyId(o.id);
+    setActionError(null);
+
+    const patch = outfitEdits[o.id];
+    if (patch && Object.keys(patch).length > 0) {
+      const { error: e } = await sb.from('outfits').update(patch).eq('id', o.id);
+      if (e) { setBusyId(null); setActionError(`Bài: ${e.message}`); return; }
+    }
+
+    for (const it of o.outfit_items ?? []) {
+      const pid = it.products?.id;
+      if (pid && productEdits[pid]) {
+        const { error: e } = await sb.from('products').update(productEdits[pid]).eq('id', pid);
+        if (e) { setBusyId(null); setActionError(`Sản phẩm: ${e.message}`); return; }
+      }
+
+      const lid = it.affiliate_links?.id;
+      if (lid && linkEdits[lid] !== undefined) {
+        const { error: e } = await sb
+          .from('affiliate_links')
+          .update({ url: linkEdits[lid] })
+          .eq('id', lid);
+        if (e) { setBusyId(null); setActionError(`Link: ${e.message}`); return; }
+      }
+    }
+
+    setOutfitEdits((e) => { const n = { ...e }; delete n[o.id]; return n; });
+    setBusyId(null);
+    setSavedId(o.id);
+    reload();
+  };
+
+  const onHeroFile = async (o: OutfitWithItems, file: File) => {
+    if (!session) return;
+    setBusyId(o.id);
+    setActionError(null);
+
+    const r = await uploadImage('outfit-images', session.user.id, file);
+    setBusyId(null);
+
+    if (!r.ok || !r.url) { setActionError(r.message); return; }
+    setField(o.id, 'hero_image_url', r.url);
+  };
 
   const review = async (id: string, action: ReviewAction) => {
     const sb = getSupabase()!;
@@ -120,7 +226,7 @@ export default function ModerationPage() {
             aria-pressed={filter === 'pending'}
             onClick={() => setFilter('pending')}
           >
-            Chỉ chờ duyệt
+            Chờ duyệt
           </button>
           <button
             type="button"
@@ -140,141 +246,288 @@ export default function ModerationPage() {
           Hàng đợi trống. Bài mới sẽ hiện ở đây khi có người gửi duyệt.
         </EmptyState>
       ) : (
-        <div className="flex flex-col gap-8">
-          {rows.map((o) => (
-            <article key={o.id} className="border p-5" style={{ borderColor: 'var(--line)' }}>
-              <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
-                <div>
-                  <div className="frame">
-                    {o.hero_image_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={o.hero_image_url} alt="" />
-                    ) : (
-                      <div className="frame frame-empty absolute inset-0">Chưa có ảnh</div>
+        <div className="flex flex-col gap-12">
+          {rows.map((o) => {
+            const busy = busyId === o.id;
+            const items = o.outfit_items ?? [];
+
+            return (
+              <article key={o.id} className="border" style={{ borderColor: 'var(--line)' }}>
+                <div className="flex flex-wrap items-center gap-2 border-b p-4"
+                     style={{ borderColor: 'var(--line)' }}>
+                  <StatusTag status={o.status} />
+                  {o.is_seed && <span className="tag tag-quiet">Dữ liệu mẫu</span>}
+                  {o.ai_generated && <span className="tag tag-warn">Ảnh tạo bởi AI</span>}
+                  <span className="muted-2 text-xs">
+                    {o.submitted_at ? `gửi ${formatRelative(o.submitted_at)}` : 'chưa gửi'}
+                  </span>
+                  <Link
+                    href={`/outfit/${o.slug}`}
+                    target="_blank"
+                    className="btn btn-quiet btn-sm ml-auto"
+                  >
+                    Xem như người dùng ↗
+                  </Link>
+                </div>
+
+                <div className="grid gap-8 p-5 lg:grid-cols-[1fr_1fr] lg:gap-10">
+                  {/* ---------------------------------------------------------- */}
+                  {/* TRAI — dung lai dung nhu nguoi dung thay                    */}
+                  {/* ---------------------------------------------------------- */}
+                  <div>
+                    <p className="eyebrow mb-3">Người dùng sẽ thấy</p>
+
+                    <div className="frame mb-5" style={{ aspectRatio: '4 / 5' }}>
+                      {field(o, 'hero_image_url') ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={field(o, 'hero_image_url')} alt="" />
+                      ) : (
+                        <div className="frame frame-empty absolute inset-0">Chưa có ảnh</div>
+                      )}
+                    </div>
+
+                    <h2 className="display-sm mb-2">{field(o, 'title') || '(chưa có tiêu đề)'}</h2>
+                    <p className="muted-2 mb-4 text-xs">
+                      {tax.styleLabel(field(o, 'style_slug'))} ·{' '}
+                      {tax.occasionLabel(field(o, 'occasion_slug'))} ·{' '}
+                      {formatVnd(o.total_price_vnd)} · {items.length} món
+                    </p>
+
+                    {field(o, 'description') && (
+                      <p className="muted mb-5 text-sm leading-relaxed">
+                        {field(o, 'description')}
+                      </p>
                     )}
-                  </div>
-                  {o.ai_generated && (
-                    <p className="tag tag-warn mt-2">Ảnh tạo bởi AI</p>
-                  )}
-                </div>
 
-                <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <StatusTag status={o.status} />
-                    {o.is_seed && <span className="tag tag-quiet">Dữ liệu mẫu</span>}
-                    <span className="muted-2 text-xs">
-                      {o.submitted_at ? `gửi ${formatRelative(o.submitted_at)}` : 'chưa gửi'}
-                    </span>
-                  </div>
-
-                  <h2 className="display-xs mb-1">{o.title}</h2>
-                  <p className="muted-2 mb-3 text-xs">
-                    {tax.styleLabel(o.style_slug)} · {tax.occasionLabel(o.occasion_slug)} ·{' '}
-                    {formatVnd(o.total_price_vnd)} · {o.outfit_items?.length ?? 0} món
-                  </p>
-
-                  {o.description && <p className="muted mb-4 text-sm">{o.description}</p>}
-
-                  {/* Danh sach san pham va link — day la thu can kiem tra ky nhat:
-                      ten, gia, va ten mien cua link.                            */}
-                  <div className="scroll-x mb-4">
-                    <table className="data">
-                      <thead>
-                        <tr>
-                          <th>Vai trò</th>
-                          <th>Sản phẩm</th>
-                          <th>Giá</th>
-                          <th>Link</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(o.outfit_items ?? []).map((it) => (
-                          <tr key={it.id}>
-                            <td className="muted-2 text-xs">{it.role}</td>
-                            <td>{it.products?.name ?? '—'}</td>
-                            <td className="whitespace-nowrap">{formatVnd(it.products?.price_vnd ?? null)}</td>
-                            <td className="text-xs">
-                              {it.affiliate_links ? (
-                                <>
-                                  <span className="tag tag-quiet">
-                                    {it.affiliate_links.resolved_host ??
-                                      it.affiliate_links.platform}
-                                  </span>{' '}
-                                  <a
-                                    href={it.affiliate_links.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer nofollow"
-                                    className="underline"
-                                  >
-                                    mở
-                                  </a>
-                                  {it.affiliate_links.resolved_host === null && (
-                                    <span className="muted-2 block">chưa resolve</span>
-                                  )}
-                                </>
-                              ) : (
-                                <span className="hint-error">thiếu link</span>
+                    <div className="flex flex-col gap-3">
+                      {items.map((it) => (
+                        <div key={it.id} className="flex items-center gap-3">
+                          <div
+                            className="frame shrink-0"
+                            style={{ width: '3.5rem', aspectRatio: '1 / 1' }}
+                          >
+                            {it.products?.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={it.products.image_url} alt="" />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm">
+                              {productEdits[it.products?.id ?? '']?.name ??
+                                it.products?.name ??
+                                '—'}
+                            </p>
+                            <p className="muted-2 text-xs">
+                              {it.role} ·{' '}
+                              {formatVnd(
+                                productEdits[it.products?.id ?? '']?.price_vnd ??
+                                  it.products?.price_vnd ??
+                                  null,
                               )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                            </p>
+                          </div>
+                          {!it.affiliate_links && (
+                            <span className="hint-error text-xs">thiếu link</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
-                  <label className="label" htmlFor={`reason-${o.id}`}>
-                    Lý do (bắt buộc khi yêu cầu sửa hoặc ẩn)
-                  </label>
-                  <textarea
-                    id={`reason-${o.id}`}
-                    value={reasons[o.id] ?? ''}
-                    onChange={(e) => setReasons((r) => ({ ...r, [o.id]: e.target.value }))}
-                    className="field mb-4"
-                    rows={2}
-                    placeholder="Ví dụ: ảnh mờ, cần ảnh rõ hơn. Hoặc: link sản phẩm thứ 2 đã hết hàng."
-                  />
+                  {/* ---------------------------------------------------------- */}
+                  {/* PHAI — sua tai cho                                          */}
+                  {/* ---------------------------------------------------------- */}
+                  <div>
+                    <p className="eyebrow mb-3">Sửa trực tiếp</p>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-solid"
-                      disabled={busyId === o.id}
-                      onClick={() => review(o.id, 'approve')}
-                    >
-                      Duyệt và đăng
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm"
-                      disabled={busyId === o.id}
-                      onClick={() => review(o.id, 'request_changes')}
-                    >
-                      Yêu cầu sửa
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      disabled={busyId === o.id}
-                      onClick={() => review(o.id, 'reject')}
-                    >
-                      Từ chối
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-danger"
-                      disabled={busyId === o.id}
-                      onClick={() => hide(o.id)}
-                    >
-                      Ẩn vì vi phạm
-                    </button>
-                    <Link href={`/outfit/${o.slug}`} className="btn btn-quiet btn-sm">
-                      Xem như người dùng
-                    </Link>
+                    <label className="label" htmlFor={`t-${o.id}`}>Tiêu đề</label>
+                    <input
+                      id={`t-${o.id}`}
+                      className="field mb-3"
+                      value={field(o, 'title')}
+                      onChange={(e) => setField(o.id, 'title', e.target.value)}
+                    />
+
+                    <label className="label" htmlFor={`d-${o.id}`}>Mô tả</label>
+                    <textarea
+                      id={`d-${o.id}`}
+                      className="field mb-3"
+                      rows={3}
+                      value={field(o, 'description')}
+                      onChange={(e) => setField(o.id, 'description', e.target.value)}
+                    />
+
+                    <div className="mb-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label" htmlFor={`s-${o.id}`}>Phong cách</label>
+                        <select
+                          id={`s-${o.id}`}
+                          className="field"
+                          value={field(o, 'style_slug')}
+                          onChange={(e) => setField(o.id, 'style_slug', e.target.value)}
+                        >
+                          {tax.styles.map((s) => (
+                            <option key={s.slug} value={s.slug}>{s.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="label" htmlFor={`oc-${o.id}`}>Dịp</label>
+                        <select
+                          id={`oc-${o.id}`}
+                          className="field"
+                          value={field(o, 'occasion_slug')}
+                          onChange={(e) => setField(o.id, 'occasion_slug', e.target.value)}
+                        >
+                          {tax.occasions.map((x) => (
+                            <option key={x.slug} value={x.slug}>{x.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <label className="label" htmlFor={`img-${o.id}`}>Đổi ảnh đại diện</label>
+                    <input
+                      id={`img-${o.id}`}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      className="mb-4 text-sm"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) void onHeroFile(o, f);
+                      }}
+                    />
+
+                    {/* --- Tung mon --- */}
+                    <p className="eyebrow mb-2 mt-5">Từng món</p>
+                    <p className="hint mb-3">
+                      Sửa tên hoặc giá ở đây đổi luôn trong <strong>mọi bài</strong> dùng
+                      sản phẩm đó. Đổi link của bài đã đăng sẽ tự đưa bài về chờ duyệt.
+                    </p>
+
+                    <div className="flex flex-col gap-4">
+                      {items.map((it) => {
+                        const p = it.products;
+                        const l = it.affiliate_links;
+                        if (!p) return null;
+
+                        return (
+                          <div key={it.id} className="border p-3" style={{ borderColor: 'var(--line)' }}>
+                            <p className="eyebrow mb-2">{it.role}</p>
+                            <input
+                              className="field mb-2"
+                              value={productEdits[p.id]?.name ?? p.name}
+                              onChange={(e) =>
+                                setProductEdits((s) => ({
+                                  ...s,
+                                  [p.id]: { ...s[p.id], name: e.target.value },
+                                }))
+                              }
+                            />
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                className="field"
+                                type="number"
+                                step={1000}
+                                placeholder="Giá (đ)"
+                                value={
+                                  productEdits[p.id]?.price_vnd ?? p.price_vnd ?? ''
+                                }
+                                onChange={(e) =>
+                                  setProductEdits((s) => ({
+                                    ...s,
+                                    [p.id]: {
+                                      ...s[p.id],
+                                      price_vnd: e.target.value === '' ? null : Number(e.target.value),
+                                    },
+                                  }))
+                                }
+                              />
+                              <input
+                                className="field"
+                                placeholder="Link Shopee / TikTok"
+                                value={l ? (linkEdits[l.id] ?? l.url) : ''}
+                                disabled={!l}
+                                onChange={(e) =>
+                                  l && setLinkEdits((s) => ({ ...s, [l.id]: e.target.value }))
+                                }
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-3">
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={!hasEdits(o) || busy}
+                        onClick={() => void saveEdits(o)}
+                      >
+                        {busy ? 'Đang lưu…' : 'Lưu chỉnh sửa'}
+                      </button>
+                      {savedId === o.id && (
+                        <span className="text-xs" style={{ color: 'var(--color-ok)' }}>
+                          Đã lưu
+                        </span>
+                      )}
+                    </div>
+
+                    {/* --- Quyet dinh duyet --- */}
+                    <div className="mt-8 border-t pt-5" style={{ borderColor: 'var(--line)' }}>
+                      <label className="label" htmlFor={`reason-${o.id}`}>
+                        Lý do (bắt buộc khi yêu cầu sửa hoặc ẩn)
+                      </label>
+                      <textarea
+                        id={`reason-${o.id}`}
+                        value={reasons[o.id] ?? ''}
+                        onChange={(e) => setReasons((r) => ({ ...r, [o.id]: e.target.value }))}
+                        className="field mb-3"
+                        rows={2}
+                        placeholder="Ví dụ: ảnh mờ, cần ảnh rõ hơn. Hoặc: link sản phẩm thứ 2 đã hết hàng."
+                      />
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-solid"
+                          disabled={busy}
+                          onClick={() => review(o.id, 'approve')}
+                        >
+                          Duyệt và đăng
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          disabled={busy}
+                          onClick={() => review(o.id, 'request_changes')}
+                        >
+                          Yêu cầu sửa
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          disabled={busy}
+                          onClick={() => review(o.id, 'reject')}
+                        >
+                          Từ chối
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-danger"
+                          disabled={busy}
+                          onClick={() => hide(o.id)}
+                        >
+                          Ẩn vì vi phạm
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </div>

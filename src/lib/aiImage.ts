@@ -81,6 +81,78 @@ export function buildImagePrompt(input: PromptInput): string {
   ].join(' ');
 }
 
+/**
+ * Dien giai bang tieng Viet cau lenh dang gui cho AI.
+ *
+ * VI SAO CAU LENH ANH VAN LA TIENG ANH
+ *   Cac mo hinh tao anh duoc huan luyen gan nhu hoan toan tren chu thich tieng
+ *   Anh. Viet cau lenh bang tieng Viet cho ra anh te hon ro ret — sai bo cuc,
+ *   sai chat lieu, va cac dieu kien loai tru (khong chu, khong logo) hay bi bo
+ *   qua. Day la ly do ky thuat, khong phai lua chon tham my.
+ *
+ *   Nhung nguoi bam nut thi can hieu minh dang yeu cau gi. Ham nay dich lai
+ *   cau lenh do sang tieng Viet de doc, khong gui di dau ca.
+ */
+export function explainPromptVi(input: PromptInput): string[] {
+  const scene = SCENES.find((s) => s.id === input.sceneId) ?? SCENES[0];
+  const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
+
+  const garments = input.items
+    .map((it) => `${it.roleLabel.toLowerCase()}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`)
+    .join('; ');
+
+  return [
+    'Ảnh thời trang nam, kiểu ảnh tạp chí.',
+    `Người mẫu: một nam Đông Nam Á khoảng 25 tuổi, ${model.label.toLowerCase()}, đứng, biểu cảm tự nhiên.`,
+    `Trang phục: ${garments || '(chưa nhập món nào)'}.`,
+    `Tông màu tổng thể: ${input.colorLabels.join(', ') || '(chưa chọn màu)'}.`,
+    `Phong cách: ${input.styleLabel}. Dịp: ${input.occasionLabel}.`,
+    `Bối cảnh: ${scene.label}.`,
+    'Bố cục: toàn thân, khung dọc 3:4, nhiều khoảng trống, người lệch tâm.',
+    'Không có chữ, logo hay nhãn hiệu nào.',
+    'Không giống bất kỳ người thật nào.',
+    'Phải ra chất ảnh chụp, không phải tranh vẽ hay ảnh dựng 3D.',
+    'Không ghép nhiều khung, không nhiều người.',
+  ];
+}
+
+/**
+ * Cau lenh yeu cau AI viet MO TA SET DO bang tieng Viet.
+ *
+ * Khac cau lenh tao anh: cai nay viet bang tieng Viet, vi day la mo hinh ngon
+ * ngu chu khong phai mo hinh anh, va ket qua phai ra tieng Viet tu nhien cho
+ * nguoi Viet doc.
+ *
+ * Rang buoc quan trong nhat nam o hai dong cuoi: KHONG duoc bia them mon,
+ * bia gia hay bia thuong hieu. Mot mo ta nghe hay nhung noi sai san pham la
+ * thu gay hai that cho nguoi mua.
+ */
+export function buildDescriptionPrompt(input: PromptInput): string {
+  const garments = input.items
+    .map((it) => `${it.roleLabel.toLowerCase()}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`)
+    .join('; ');
+
+  return [
+    'Viết mô tả cho một set đồ nam trên website gợi ý phối đồ tại Việt Nam.',
+    '',
+    `Tên set: ${input.outfitTitle || '(chưa đặt)'}`,
+    `Phong cách: ${input.styleLabel}`,
+    `Dịp mặc: ${input.occasionLabel}`,
+    `Màu chủ đạo: ${input.colorLabels.join(', ') || '(chưa chọn)'}`,
+    `Các món: ${garments || '(chưa nhập)'}`,
+    '',
+    'Yêu cầu:',
+    '- Viết bằng tiếng Việt, 2 đến 3 câu, tổng dưới 60 từ.',
+    '- Giọng bình thường, như một người bạn rành ăn mặc đang gợi ý. Không hoa mỹ, không dùng từ như "đẳng cấp", "sang chảnh", "must-have".',
+    '- Nói được vì sao các món này hợp nhau, và mặc dịp nào thì đúng.',
+    '- Không dùng dấu chấm than. Không dùng biểu tượng cảm xúc.',
+    '- CHỈ nói về những món đã liệt kê ở trên. Không thêm món nào khác.',
+    '- Không nhắc tới giá, không nhắc tên thương hiệu, không hứa hẹn chất lượng.',
+    '',
+    'Chỉ trả về đoạn mô tả, không thêm lời dẫn.',
+  ].join('\n');
+}
+
 export interface GenerateResult {
   ok: boolean;
   urls: string[];
@@ -146,5 +218,49 @@ export async function requestAiImage(args: {
       ok: false, urls: [], jobId: null,
       message: `Lỗi khi gọi ai-generate: ${(e as Error).message}`,
     };
+  }
+}
+
+/**
+ * Goi AI viet mo ta set do bang tieng Viet.
+ *
+ * Dung chung Edge Function `ai-generate` voi `mode: 'text'`. Ly do dung chung
+ * thay vi viet function moi: khoa API da duoc ma hoa va giai ma o do roi, tach
+ * ra function thu hai nghia la nhan doi doan ma cham vao khoa — cang it noi
+ * cham vao khoa cang tot.
+ */
+export async function requestAiDescription(args: {
+  provider: AiProviderId;
+  prompt: string;
+  model?: string;
+}): Promise<{ ok: boolean; text: string; message: string }> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, text: '', message: 'Chưa cấu hình Supabase.' };
+
+  try {
+    const { data, error } = await sb.functions.invoke('ai-generate', {
+      body: {
+        mode: 'text',
+        provider: args.provider,
+        prompt: args.prompt,
+        ...(args.model ? { model: args.model } : {}),
+      },
+    });
+
+    if (error) {
+      return {
+        ok: false, text: '',
+        message:
+          `Không gọi được ai-generate: ${error.message}. ` +
+          'Nếu chưa triển khai function này, xem supabase/functions/README.md.',
+      };
+    }
+
+    const r = data as { ok: boolean; text?: string; error?: string };
+    return r?.ok && r.text
+      ? { ok: true, text: r.text.trim(), message: 'Đã tạo mô tả. Đọc lại rồi sửa cho đúng ý bạn.' }
+      : { ok: false, text: '', message: r?.error ?? 'Tạo mô tả thất bại, không rõ lý do.' };
+  } catch (e) {
+    return { ok: false, text: '', message: `Lỗi khi gọi ai-generate: ${(e as Error).message}` };
   }
 }

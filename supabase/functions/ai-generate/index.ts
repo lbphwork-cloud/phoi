@@ -249,6 +249,59 @@ async function generateWithOpenAI(
   return images;
 }
 
+/**
+ * Mo hinh viet chu. Khac han mo hinh tao anh.
+ *
+ * Duong sinh chu dung chung function nay thay vi tach function moi. Ly do:
+ * khoa API da duoc ma hoa va giai ma o day roi; tach ra nghia la nhan doi doan
+ * ma cham vao khoa, ma cang it noi cham vao khoa cang tot.
+ */
+const DEFAULT_TEXT_MODEL: Record<string, string> = {
+  gemini: 'gemini-2.5-flash',
+  openai: 'gpt-4o-mini',
+};
+
+/**
+ * Goi mo hinh ngon ngu de viet mot doan chu. Tra ve chu thuan.
+ *
+ * KHONG ghi vao ai_jobs nhu duong tao anh: mot doan mo ta khong ton chi phi
+ * luu tru, khong can duyet, va nguoi dung se sua lai truoc khi luu. Ghi job
+ * cho no chi lam bang ai_jobs day nhung dong khong ai doc.
+ */
+async function generateText(
+  provider: string,
+  apiKey: string,
+  prompt: string,
+  model: string,
+): Promise<string> {
+  if (provider === 'gemini') {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+      },
+    );
+    if (!res.ok) throw new Error(`Gemini trả về ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    const j = await res.json();
+    const text = j?.candidates?.[0]?.content?.parts?.map((x: { text?: string }) => x.text ?? '').join('') ?? '';
+    if (!text.trim()) throw new Error('Gemini không trả về chữ nào.');
+    return text;
+  }
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
+  });
+  if (!res.ok) throw new Error(`OpenAI trả về ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const j = await res.json();
+  const text = j?.choices?.[0]?.message?.content ?? '';
+  if (!text.trim()) throw new Error('OpenAI không trả về chữ nào.');
+  return text;
+}
+
 const DEFAULT_MODEL: Record<string, string> = {
   gemini: 'gemini-2.5-flash-image',
   openai: 'gpt-image-1',
@@ -298,6 +351,8 @@ Deno.serve(async (req) => {
     prompt?: string;
     outfitId?: string | null;
     model?: string;
+    /** 'image' (mac dinh) hoac 'text' de viet mo ta bang tieng Viet. */
+    mode?: string;
   };
   try {
     body = await req.json();
@@ -308,7 +363,10 @@ Deno.serve(async (req) => {
   const provider = String(body.provider ?? 'gemini');
   const prompt = String(body.prompt ?? '').trim();
   const outfitId = body.outfitId ?? null;
-  const model = String(body.model ?? DEFAULT_MODEL[provider] ?? '');
+  const mode = body.mode === 'text' ? 'text' : 'image';
+  const model = String(
+    body.model ?? (mode === 'text' ? DEFAULT_TEXT_MODEL[provider] : DEFAULT_MODEL[provider]) ?? '',
+  );
 
   if (!['gemini', 'openai'].includes(provider)) {
     return json(
@@ -398,6 +456,16 @@ Deno.serve(async (req) => {
           'thay đổi sau khi lưu key. Xoá key cũ trong trang AI rồi nhập lại.',
         500,
       );
+    }
+
+    // --- Duong viet chu: tra ve ngay, khong dung toi storage --------------
+    if (mode === 'text') {
+      const text = await generateText(provider, apiKey, prompt, model);
+      await admin
+        .from('ai_jobs')
+        .update({ status: 'done', finished_at: new Date().toISOString() })
+        .eq('id', job.id);
+      return json({ ok: true, text, jobId: job.id });
     }
 
     // --- Goi nha cung cap -------------------------------------------------
