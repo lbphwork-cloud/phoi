@@ -8,7 +8,7 @@
  *   2. Goc nguoi mau doi theo tung lan tao, ma hai ban lai chon tu hai bang
  *      khac nhau — lech thu tu mot dong la sai het.
  */
-import { buildImagePrompt, explainPromptVi, MODEL_ORIGINS } from '../src/lib/aiImage';
+import { buildImagePrompt, explainPromptVi, monChuaCoAnh, MODEL_ORIGINS } from '../src/lib/aiImage';
 
 let pass = 0, fail = 0;
 const check = (label: string, ok: boolean, detail = '') => {
@@ -92,6 +92,45 @@ console.log('\n=== 4. Ban tieng Viet phai khop ban tieng Anh ===');
   check('ban tieng Viet liet ke tung mon', /\* áo: theo hình đính kèm/.test(vi));
   check('ban tieng Viet khong lan tieng Anh',
     !/(sneakers|trousers|t-shirt|neutral tone)/i.test(vi), vi.slice(0, 0));
+}
+
+/*
+  SET NUA CO ANH NUA KHONG — truong hop tung bi noi doi.
+
+  Co chung `hasReferences` cua ca set lam mot set co hai mon co anh, hai mon
+  khong van bi ghi ca bon la "theo anh dinh kem". Hai mon khong co anh thanh ra
+  khong duoc ta gi, mo hinh tu bia, va nguoi doc cau lenh khong he biet.
+*/
+console.log('\n=== 5. Set nua co anh nua khong ===');
+{
+  const tron = {
+    ...base,
+    hasReferences: undefined,
+    items: [
+      { roleLabel: 'Áo', name: 'Áo polo trắng', colorLabel: 'Trắng', hasImage: true },
+      { roleLabel: 'Quần', name: 'Quần chinos đen', colorLabel: 'Đen', hasImage: false },
+    ],
+  };
+  const en = buildImagePrompt(tron);
+  const vi = explainPromptVi(tron).join('\n');
+
+  check('mon co anh: ghi theo anh dinh kem', /\* áo: exactly as shown in the attached image/.test(en));
+  check('mon khong anh: ta bang chu', /\* quần: Quần chinos đen \(Đen\)/.test(en));
+  check('canh bao khong duoc chep anh sang mon khong co anh',
+    /must NOT be copied from\s+the attached images/.test(en));
+  check('ban tieng Viet noi ro ty le', /Chỉ 1\/2 món có ảnh đính kèm/.test(vi));
+  check('ban tieng Viet danh dau mon phai ta chay', /tả bằng chữ, chưa có ảnh/.test(vi));
+
+  check('mon chua co anh liet ke dung', monChuaCoAnh(tron).join(',') === 'quần');
+  check('tat ca co anh thi danh sach rong',
+    monChuaCoAnh({ ...base, hasReferences: true }).length === 0);
+  check('khong mon nao co anh thi liet ke het',
+    monChuaCoAnh({ ...base, hasReferences: false }).length === base.items.length);
+
+  // Co chung van phai lam viec nhu cu voi cac cho goi kieu cu.
+  const cu = buildImagePrompt({ ...base, hasReferences: true });
+  check('mon khong noi ro thi theo co chung cua set',
+    (cu.match(/attached image$/gm) ?? []).length === 2);
 }
 
 console.log(`\n>>> ${pass} PASS, ${fail} FAIL`);

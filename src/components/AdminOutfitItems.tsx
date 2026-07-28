@@ -25,16 +25,17 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useAsyncData, useAuth, useTaxonomy } from '@/lib/hooks';
 import { uploadImage } from '@/lib/storage';
 import { checkAffiliateUrl } from '@/lib/affiliate';
-import { fetchProductFromUrl } from '@/lib/fetchProduct';
+import { fetchProductFromUrl, guessCategory, roleFromCategory, guessColorSlug } from '@/lib/fetchProduct';
+import { guessColorSlugs } from '@/lib/guessColor';
 import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
 import { UploadButton } from '@/components/UploadButton';
-import { ITEM_ROLE_LABEL } from '@/lib/supabase/types';
+import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import {
-  datTenTheoQuyTac, vietMoTaTheoQuyTac, thieuGiDeDatTen, thieuGiDeVietMoTa,
+  datTenTheoQuyTac, vietMoTaTheoQuyTac, thieuGiDeDatTen, thieuGiDeVietMoTa, bangMau,
 } from '@/lib/outfitNaming';
-import { buildImagePrompt, explainPromptVi } from '@/lib/aiImage';
-import type { ItemRole } from '@/lib/supabase/types';
+import { buildImagePrompt, explainPromptVi, monChuaCoAnh, SCENES, MODEL_TYPES } from '@/lib/aiImage';
+import type { ItemRole, ProductCategory } from '@/lib/supabase/types';
 import type { OutfitWithItems } from '@/lib/supabase/types';
 
 /** Ban nhap cua mot mon. Chi chua truong nguoi dung da dong vao. */
@@ -43,6 +44,20 @@ interface ItemDraft {
   price?: string;
   imageUrl?: string;
   affiliateUrl?: string;
+  /*
+    BON TRUONG NAY TRUOC DAY KHONG SUA DUOC O DAY, va tung cai deu co hau qua:
+
+      category  — mon them tu trang quan tri bi ghi cung la "phu kien".
+      role      — vai tro di thang vao cau lenh tao anh. Sai vai tro thi cau
+                  lenh ghi "* phu kien: theo anh dinh kem" cho ca ao lan quan,
+                  va anh sinh ra khong con biet dau la ao dau la quan.
+      colorSlug — mau THAT trong set. Bo loc mau va phep tinh hop menh doc no.
+      availableColorSlugs — cac mau chinh link do con ban, chi de nguoi mua biet.
+  */
+  category?: ProductCategory;
+  role?: ItemRole;
+  colorSlug?: string;
+  availableColorSlugs?: string[];
 }
 
 export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
@@ -106,12 +121,29 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   const [promptLan, setPromptLan] = useState(0);
   const [hienPrompt, setHienPrompt] = useState(false);
   const [daChep, setDaChep] = useState(false);
+  /** Boi canh va dang nguoi mau. Truoc day khoa cung nen trang + dang can doi. */
+  const [sceneId, setSceneId] = useState<string>('trang');
+  const [modelTypeId, setModelTypeId] = useState<string>('can-doi');
+  /*
+    CAU LENH DA SUA TAY.
+
+    null = chua dong vao, cau lenh bam theo du lieu va tu doi khi du lieu doi.
+    Co gia tri = nguoi dung da tu sua, va tu luc do KHONG duoc tu ghi de nua.
+
+    Mot o chu tu nhay lai ve ban may sinh khi nguoi ta vua go xong hai cau la
+    mat trang cua ho, khong phai mot tinh nang.
+  */
+  const [promptSua, setPromptSua] = useState<string | null>(null);
 
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [addNote, setAddNote] = useState<string | null>(null);
   const [moi, setMoi] = useState({
-    url: '', name: '', price: '', imageUrl: '', role: 'accessory' as ItemRole,
+    url: '', name: '', price: '', imageUrl: '',
+    category: 'ao' as ProductCategory,
+    role: 'top' as ItemRole,
+    colorSlug: '',
+    availableColorSlugs: [] as string[],
   });
 
   // Anh dai dien cua ca set. Giu rieng khoi `draft` vi no thuoc bang outfits,
@@ -239,6 +271,48 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   };
 
   /**
+   * Doi cho mot mon voi mon lien ke.
+   *
+   * VI SAO THU TU QUAN TRONG
+   *   No khong chi la thu tu hien tren man hinh. Cac dong trong cau lenh tao
+   *   anh va cau mo ta tu dong deu di theo thu tu nay — nen mot set do liet ke
+   *   giay truoc ao se sinh ra ca cau lenh lan mo ta bat dau bang doi giay.
+   *
+   * BA LAN GHI, KHONG PHAI HAI. Bang co rang buoc unique (outfit_id, position),
+   * nen ghi A sang vi tri cua B se dung ngay vao dong B dang giu. Phai dua A ra
+   * mot vi tri trong (-1) truoc, tra B ve cho A, roi moi dat A vao cho B.
+   *
+   * Vi tri am chi ton tai trong khoang giua ba lenh ghi nay. Neu lenh thu hai
+   * hong thi con lai mot mon o vi tri -1 — no van hien dung dau danh sach va
+   * bam doi cho lan nua la ve lai binh thuong, khong mat du lieu.
+   */
+  const moveItem = async (index: number, huong: -1 | 1) => {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const a = items[index];
+    const b = items[index + huong];
+    if (!a || !b) return;
+
+    setBusyId(a.id);
+    setSaveError(null);
+
+    const buoc = [
+      sb.from('outfit_items').update({ position: -1 }).eq('id', a.id),
+      sb.from('outfit_items').update({ position: a.position }).eq('id', b.id),
+      sb.from('outfit_items').update({ position: b.position }).eq('id', a.id),
+    ];
+
+    for (const b1 of buoc) {
+      const { error: e } = await b1;
+      if (e) { setBusyId(null); setSaveError(`Đổi thứ tự: ${e.message}`); return; }
+    }
+
+    setBusyId(null);
+    reload();
+  };
+
+  /**
    * Lay thong tin tu LINK DANG NAM TRONG O, ngay trong trang quan tri.
    *
    * DOC LINK TRONG O CHU KHONG PHAI LINK DA LUU. Neu nguoi duyet vua dan mot
@@ -281,6 +355,46 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     if (d.name) moi.name = d.name;
     if (d.price_vnd) moi.price = String(d.price_vnd);
     if (d.image_url) moi.imageUrl = d.image_url;
+
+    /*
+      DOAN LOAI VA MAU TU TEN, nhung CHI DIEN VAO O DANG TRONG.
+
+      Doan sai la chuyen binh thuong — ten hang tren san nhoi day tu khoa. Neu
+      ghi de len thu nguoi duyet da chon tay thi mot lan bam "Lay thong tin" de
+      cap nhat gia se lang le lam hong ca loai lan mau da sua dung.
+
+      Mau CHU DAO cua ca set thi khong dong vao o day: no la quyet dinh o cap
+      set, va co nut rieng ngay tren.
+    */
+    const cs = draft[item.id]?.colorSlug ?? item.products?.color_slug ?? '';
+    if (!cs && d.name) {
+      const doan = guessColorSlug(d.name);
+      if (doan) moi.colorSlug = doan;
+    }
+
+    // Chi doan LOAI khi mon dang mang gia tri mac dinh "phu kien" — do la thu
+    // ma nut "Them mon vao set" tung ghi cung cho moi mon.
+    const cat = draft[item.id]?.category ?? item.products?.category;
+    if (cat === 'phu_kien' && d.name) {
+      const catDoan = guessCategory(d.name) as ProductCategory;
+      if (catDoan !== 'phu_kien') {
+        moi.category = catDoan;
+        moi.role = roleFromCategory(catDoan) as ItemRole;
+      }
+    }
+
+    // Mau con ban tren san: doc tu nhan bien the (chi co qua Local Helper) va
+    // tu chinh ten san pham. `max` de 17 vi day la "link nay ban nhung mau
+    // nao" — mot cai ao ban nam mau la binh thuong.
+    const dsMau = draft[item.id]?.availableColorSlugs ?? item.products?.available_color_slugs ?? [];
+    if (dsMau.length === 0) {
+      const slugs = tax.colors.map((c) => c.slug);
+      const gom = [...new Set([
+        ...(d.variant_labels ?? []).flatMap((nhan) => guessColorSlugs(nhan, slugs)),
+        ...guessColorSlugs(d.name ?? '', slugs, 17),
+      ])];
+      if (gom.length) moi.availableColorSlugs = gom;
+    }
 
     if (Object.keys(moi).length === 0) {
       setFetchNote((x) => ({ ...x, [item.id]: 'Đọc được link nhưng không có dữ liệu mới.' }));
@@ -347,11 +461,25 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     if (!out.ok || !out.data) { setAddNote(out.message); return; }
 
     const d = out.data;
+    const slugs = tax.colors.map((c) => c.slug);
+    // Doan loai tu ten roi suy ra vai tro. Chi ap dung khi cac o con TRONG —
+    // doan sai la binh thuong, va ghi de len lua chon da sua tay thi te hon.
+    const catDoan = d.name ? (guessCategory(d.name) as ProductCategory) : null;
+
     setMoi((x) => ({
       ...x,
       name: x.name || d.name || '',
       price: x.price || (d.price_vnd ? String(d.price_vnd) : ''),
       imageUrl: x.imageUrl || d.image_url || '',
+      category: x.name || !catDoan ? x.category : catDoan,
+      role: x.name || !catDoan ? x.role : (roleFromCategory(catDoan) as ItemRole),
+      colorSlug: x.colorSlug || guessColorSlug(d.name ?? '') || '',
+      availableColorSlugs: x.availableColorSlugs.length
+        ? x.availableColorSlugs
+        : [...new Set([
+            ...(d.variant_labels ?? []).flatMap((nhan) => guessColorSlugs(nhan, slugs)),
+            ...guessColorSlugs(d.name ?? '', slugs, 17),
+          ])],
     }));
     setAddNote('Đã điền vào các ô bên dưới. Xem lại rồi bấm "Thêm vào set".');
   };
@@ -387,7 +515,12 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
       .from('products')
       .insert({
         name: moi.name.trim(),
-        category: 'phu_kien',
+        // Truoc day ghi cung 'phu_kien' cho MOI mon them tu day. Hau qua khong
+        // nam o cai nhan: vai tro di thang vao cau lenh tao anh, nen mot bo do
+        // day du van bi ta thanh bon mon phu kien.
+        category: moi.category,
+        color_slug: moi.colorSlug || null,
+        available_color_slugs: moi.availableColorSlugs,
         price_vnd: Number(moi.price.replace(/\D/g, '')) || null,
         price_checked_at: moi.price ? new Date().toISOString() : null,
         image_url: moi.imageUrl.trim() || null,
@@ -428,7 +561,10 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
     setAdding(false);
     setAddNote(null);
-    setMoi({ url: '', name: '', price: '', imageUrl: '', role: 'accessory' });
+    setMoi({
+      url: '', name: '', price: '', imageUrl: '',
+      category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
+    });
     reload();
   };
 
@@ -450,14 +586,31 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     setBusyId(item.id);
     setSaveError(null);
 
-    if (item.products && (d.name !== undefined || d.price !== undefined || d.imageUrl !== undefined)) {
+    if (item.products) {
       const patch: Record<string, unknown> = {};
       if (d.name !== undefined) patch.name = d.name.trim();
       if (d.imageUrl !== undefined) patch.image_url = d.imageUrl.trim();
       if (d.price !== undefined) patch.price_vnd = Number(d.price.replace(/\D/g, '')) || 0;
+      if (d.category !== undefined) patch.category = d.category;
+      // Chuoi rong -> null, khong phai chuoi rong: cot co rang buoc doi chieu
+      // voi bang mau, va '' khong phai mot mau hop le.
+      if (d.colorSlug !== undefined) patch.color_slug = d.colorSlug || null;
+      if (d.availableColorSlugs !== undefined) patch.available_color_slugs = d.availableColorSlugs;
 
-      const { error: e } = await sb.from('products').update(patch).eq('id', item.products.id);
-      if (e) { setBusyId(null); setSaveError(`Sản phẩm: ${e.message}`); return; }
+      if (Object.keys(patch).length > 0) {
+        const { error: e } = await sb.from('products').update(patch).eq('id', item.products.id);
+        if (e) { setBusyId(null); setSaveError(`Sản phẩm: ${e.message}`); return; }
+      }
+    }
+
+    // Vai tro nam o bang outfit_items chu khong phai products: cung mot cai ao
+    // co the la "áo" trong set nay va "áo khoác" trong set khac.
+    if (d.role !== undefined) {
+      const { error: e } = await sb
+        .from('outfit_items')
+        .update({ role: d.role })
+        .eq('id', item.id);
+      if (e) { setBusyId(null); setSaveError(`Vai trò: ${e.message}`); return; }
     }
 
     if (item.affiliate_links && d.affiliateUrl !== undefined) {
@@ -497,12 +650,28 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     styleLabel: oStyle ? tax.styleLabel(oStyle) : '',
     occasionLabel: oOcc ? tax.occasionLabel(oOcc) : '',
     colorLabels: oColors.map((c) => tax.colorLabel(c)),
-    items: items.map((it) => ({
-      roleLabel: ITEM_ROLE_LABEL[it.role],
-      name: draft[it.id]?.name ?? it.products?.name ?? '',
-      colorLabel: it.products?.color_slug ? tax.colorLabel(it.products.color_slug) : undefined,
-    })),
+    items: items.map((it) => {
+      // BAN NHAP TRUOC, DU LIEU DA LUU SAU — cho ca ba truong, khong chi ten.
+      // Truoc day vai tro va mau chi doc tu du lieu da luu, nen dien mau cho
+      // bon mon xong bam "Dat ten tu dong" van ra dung cai ten cu khong mau.
+      const cs = draft[it.id]?.colorSlug ?? it.products?.color_slug ?? '';
+      return {
+        roleLabel: ITEM_ROLE_LABEL[draft[it.id]?.role ?? it.role],
+        name: draft[it.id]?.name ?? it.products?.name ?? '',
+        colorLabel: cs ? tax.colorLabel(cs) : undefined,
+        // Tinh theo TUNG MON: set nua co anh nua khong thi cau lenh phai noi
+        // dung mon nao co anh, mon nao dang phai ta bang chu.
+        hasImage: Boolean(draft[it.id]?.imageUrl ?? it.products?.image_url),
+      };
+    }),
   };
+
+  /** Mau gom tu cac mon — dung cho nut "Lấy màu từ các món" o khoi mau chu dao. */
+  const mauTuCacMon = [...new Set(
+    items
+      .map((it) => draft[it.id]?.colorSlug ?? it.products?.color_slug ?? '')
+      .filter(Boolean),
+  )];
 
   const tenGoiY = datTenTheoQuyTac(nguyenLieu);
   const moTaGoiY = vietMoTaTheoQuyTac(nguyenLieu);
@@ -511,13 +680,17 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
   const promptInput = {
     ...nguyenLieu,
-    sceneId: 'trang',
-    modelTypeId: 'can-doi',
-    // Anh cua tung mon SE duoc gui kem khi goi AI, nen cau lenh phai duoc dung
-    // theo huong do — neu khong no se ta quan ao bang chu va bo qua anh.
-    hasReferences: items.some((it) => it.products?.image_url),
+    // Mau chu dao chua chon thi dung mau gom tu cac mon — cau lenh khong nen
+    // im lang bo mat thong tin ma nguoi dung vua dien vao tung mon.
+    colorLabels: bangMau(nguyenLieu),
+    sceneId,
+    modelTypeId,
     variation: promptLan,
   };
+
+  /** Cau lenh dang hien: ban tu sua neu co, khong thi ban sinh tu du lieu. */
+  const cauLenh = promptSua ?? buildImagePrompt(promptInput);
+  const thieuAnh = monChuaCoAnh(promptInput);
 
   const patchOutfit = (p: typeof outfitDraft) => {
     setOutfitSaved(false);
@@ -618,7 +791,33 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
         </div>
 
         <div>
-          <label className="label">Màu chủ đạo</label>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <label className="label mb-0">Màu chủ đạo</label>
+            {/*
+              GOM MAU TU CAC MON.
+
+              Mau cua ca set dung ra la tap hop mau cua nhung mon lam nen no.
+              Truoc day phai doc mau tung mon roi tich tay trong 17 cai chip —
+              va do la thao tac de bo qua nhat, nen mot nua danh muc tung nam
+              im voi mang mau rong (migration 0028 phai di vet lai).
+
+              Van ghi vao BAN NHAP chu khong luu ngay: van con phai bam Luu, va
+              van bo bot duoc mau nao khong muon.
+            */}
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              disabled={mauTuCacMon.length === 0}
+              onClick={() => patchOutfit({ colorSlugs: mauTuCacMon })}
+              title={
+                mauTuCacMon.length
+                  ? `Đặt thành: ${mauTuCacMon.map((c) => tax.colorLabel(c)).join(', ')}`
+                  : 'Chưa món nào chọn màu.'
+              }
+            >
+              Lấy màu từ các món
+            </button>
+          </div>
           <div className="flex flex-wrap gap-2">
             {tax.colors.map((c) => (
               <button
@@ -644,68 +843,6 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
           </p>
         </div>
 
-        {/*
-          CAU LENH TAO ANH.
-
-          Khong goi AI o day — chi DUNG cau lenh roi cho chep. Ai co key thi
-          dung o trang tao bai; ai khong co van mang cau lenh nay sang bat ky
-          cong cu tao anh nao. Do la ca ly do no ton tai: phan lon nguoi dung se
-          khong bao gio co API key.
-        */}
-        <div className="border-t pt-3" style={{ borderColor: 'var(--line)' }}>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="btn btn-sm btn-quiet"
-              onClick={() => { setHienPrompt((v) => !v); setDaChep(false); }}
-            >
-              {hienPrompt ? 'Ẩn câu lệnh tạo ảnh' : 'Tạo câu lệnh tạo ảnh'}
-            </button>
-            {hienPrompt && (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-sm btn-quiet"
-                  onClick={() => { setPromptLan((n) => n + 1); setDaChep(false); }}
-                >
-                  Đổi cách diễn đạt
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  onClick={() => {
-                    void navigator.clipboard.writeText(buildImagePrompt(promptInput));
-                    setDaChep(true);
-                  }}
-                >
-                  {daChep ? 'Đã chép' : 'Chép câu lệnh'}
-                </button>
-              </>
-            )}
-          </div>
-
-          {hienPrompt && (
-            <div className="mt-3">
-              <p className="eyebrow mb-2">Đang yêu cầu AI những gì</p>
-              <ul className="muted flex flex-col gap-1 text-sm">
-                {explainPromptVi(promptInput).map((d, i) => <li key={i}>{d}</li>)}
-              </ul>
-              {!promptInput.hasReferences && (
-                <p className="hint-error mt-2">
-                  Chưa món nào có ảnh, nên câu lệnh chỉ tả bằng chữ — ảnh sinh ra sẽ
-                  không giống sản phẩm thật. Thêm ảnh cho từng món ở dưới trước.
-                </p>
-              )}
-              <details className="mt-3">
-                <summary className="eyebrow cursor-pointer">Xem câu lệnh gốc (tiếng Anh)</summary>
-                <pre className="muted-2 mt-2 whitespace-pre-wrap text-xs">
-                  {buildImagePrompt(promptInput)}
-                </pre>
-              </details>
-            </div>
-          )}
-        </div>
-
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -725,6 +862,136 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
             <span className="text-xs" style={{ color: 'var(--color-ok)' }}>Đã lưu</span>
           )}
         </div>
+      </div>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Cau lenh tao anh                                                    */}
+      {/*                                                                     */}
+      {/* HOP RIENG, khong con nhet cuoi khoi thong tin set. O do no nam duoi */}
+      {/* mot hang 17 chip mau va khong co tieu de, nen gan nhu khong ai thay */}
+      {/* — chu website bao la "chua co" trong khi no da chay duoc.           */}
+      {/*                                                                     */}
+      {/* KHONG GOI AI o day: chi DUNG cau lenh roi cho chep, mien phi va      */}
+      {/* khong can key. Phan lon nguoi dung se khong bao gio co API key.      */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="flex flex-col gap-3 border p-4" style={{ borderColor: 'var(--line)' }}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="eyebrow">Câu lệnh tạo ảnh</p>
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => { setHienPrompt((v) => !v); setDaChep(false); }}
+          >
+            {hienPrompt ? 'Ẩn câu lệnh' : 'Tạo câu lệnh'}
+          </button>
+        </div>
+
+        {!hienPrompt && (
+          <p className="muted-2 text-sm">
+            Dựng câu lệnh từ chính các trường ở trên — phong cách, dịp, màu, và từng
+            món trong set. Chạy bằng quy tắc, không gọi AI nên không cần API key.
+          </p>
+        )}
+
+        {hienPrompt && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="label">Bối cảnh</label>
+                <select
+                  className="field"
+                  value={sceneId}
+                  onChange={(e) => setSceneId(e.target.value)}
+                >
+                  {SCENES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="label">Dáng người mẫu</label>
+                <select
+                  className="field"
+                  value={modelTypeId}
+                  onChange={(e) => setModelTypeId(e.target.value)}
+                >
+                  {MODEL_TYPES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <p className="eyebrow mb-2">Đang yêu cầu AI những gì</p>
+              <ul className="muted flex flex-col gap-1 text-sm">
+                {explainPromptVi(promptInput).map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+              {thieuAnh.length > 0 && (
+                <p className="hint-error mt-2">
+                  {thieuAnh.length === items.length
+                    ? 'Chưa món nào có ảnh, nên câu lệnh chỉ tả bằng chữ — ảnh sinh ra sẽ không giống sản phẩm thật.'
+                    : `Chưa có ảnh: ${thieuAnh.join(', ')}. Những món này chỉ được tả bằng chữ.`}
+                  {' '}Thêm ảnh cho từng món ở dưới rồi bấm lại.
+                </p>
+              )}
+            </div>
+
+            {/*
+              SUA TAY DUOC. O nay tung la <pre> chi doc, nen muon them mot cau
+              la phai chep ra ngoai roi sua o cho khac — va sua o cho khac thi
+              lan sau quay lai khong con.
+
+              Sua roi thi cau lenh KHONG tu dung lai nua, ke ca khi doi phong
+              cach hay doi mau: tu ghi de len chu nguoi ta vua go la mat trang.
+              Muon quay ve ban may sinh thi co nut "Dung lai theo du lieu".
+            */}
+            <div>
+              <label className="label">Câu lệnh (tiếng Anh, sửa được)</label>
+              <textarea
+                className="field font-mono text-xs"
+                rows={14}
+                value={cauLenh}
+                onChange={(e) => { setPromptSua(e.target.value); setDaChep(false); }}
+              />
+              <p className="hint">
+                Viết bằng tiếng Anh vì các mô hình tạo ảnh hiểu tiếng Anh tốt hơn hẳn —
+                lý do kỹ thuật, không phải thẩm mỹ. Phần tiếng Việt ở trên là bản dịch
+                để đọc.
+                {promptSua !== null && ' Bạn đã sửa tay nên câu lệnh không tự dựng lại nữa.'}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => {
+                  // navigator.clipboard bi tu choi khi khong chay tren HTTPS.
+                  // O chu ben tren van boi den chep tay duoc nen day khong phai
+                  // ngo cut — nhung phai bao that thay vi bao "Da chep".
+                  void navigator.clipboard?.writeText(cauLenh)
+                    .then(() => setDaChep(true))
+                    .catch(() => setSaveError('Trình duyệt không cho chép tự động. Bôi đen ô câu lệnh rồi chép tay.'));
+                }}
+              >
+                {daChep ? 'Đã chép' : 'Chép câu lệnh'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-quiet"
+                onClick={() => { setPromptLan((n) => n + 1); setPromptSua(null); setDaChep(false); }}
+              >
+                Đổi cách diễn đạt
+              </button>
+              {promptSua !== null && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => { setPromptSua(null); setDaChep(false); }}
+                >
+                  Dựng lại theo dữ liệu
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* ------------------------------------------------------------------ */}
@@ -800,13 +1067,17 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
         <p className="muted-2 text-sm">Set này chưa có sản phẩm nào.</p>
       )}
 
-      {items.map((it) => {
+      {items.map((it, index) => {
         const p = it.products;
         const d = draft[it.id] ?? {};
         const name = d.name ?? p?.name ?? '';
         const price = d.price ?? String(p?.price_vnd ?? '');
         const imageUrl = d.imageUrl ?? p?.image_url ?? '';
         const affiliateUrl = d.affiliateUrl ?? it.affiliate_links?.url ?? '';
+        const category = d.category ?? p?.category ?? 'phu_kien';
+        const role = d.role ?? it.role;
+        const colorSlug = d.colorSlug ?? p?.color_slug ?? '';
+        const banMau = d.availableColorSlugs ?? p?.available_color_slugs ?? [];
         const dirty = Object.keys(d).length > 0;
         const busy = busyId === it.id;
 
@@ -849,6 +1120,98 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                 />
                 <p className="hint">
                   {formatVnd(Number(price) || 0)}. Tổng giá của set được tính lại tự động.
+                </p>
+              </div>
+
+              {/*
+                LOAI VA VAI TRO.
+
+                Doi Loai thi Vai tro tu doi theo — hai thu nay gan nhu luon di
+                cung nhau, va bat chon hai lan cho cung mot y nghia la cach chac
+                chan de mot trong hai bi bo quen.
+
+                Van cho sua rieng Vai tro: mot cai ao khoac van la "Ao" ve loai,
+                nhung trong set do nay no dong vai tro ao ngoai.
+              */}
+              <div>
+                <label className="label">Loại</label>
+                <select
+                  className="field"
+                  value={category}
+                  onChange={(e) => {
+                    const cat = e.target.value as ProductCategory;
+                    set(it.id, { category: cat, role: roleFromCategory(cat) as ItemRole });
+                  }}
+                >
+                  {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Vai trò trong set</label>
+                <select
+                  className="field"
+                  value={role}
+                  onChange={(e) => set(it.id, { role: e.target.value as ItemRole })}
+                >
+                  {Object.entries(ITEM_ROLE_LABEL).map(([k, v]) => (
+                    <option key={k} value={k}>{v}</option>
+                  ))}
+                </select>
+                <p className="hint">
+                  Vai trò này đi thẳng vào câu lệnh tạo ảnh và câu mô tả tự động.
+                </p>
+              </div>
+
+              {/*
+                HAI KHAI NIEM MAU KHAC NHAU — giong het trang tao bai, va phai
+                giong het: gop lam mot thi hoac bo loc "mau trang" tra ve nhung
+                set khong he co mau trang, hoac nguoi mua khong biet mon do con
+                mau nao khac.
+              */}
+              <div>
+                <label className="label">Màu dùng trong set</label>
+                <select
+                  className="field"
+                  value={colorSlug}
+                  onChange={(e) => set(it.id, { colorSlug: e.target.value })}
+                >
+                  <option value="">— Không rõ —</option>
+                  {tax.colors.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
+                </select>
+                <p className="hint">
+                  Màu thật sự có trong bộ đồ này. Nút &ldquo;Lấy màu từ các món&rdquo; ở
+                  khối trên gom đúng các màu này thành màu chủ đạo của set.
+                </p>
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="label">Các màu còn bán trên sàn</label>
+                <div className="flex flex-wrap gap-2">
+                  {tax.colors.map((c) => (
+                    <button
+                      key={c.slug}
+                      type="button"
+                      className="chip"
+                      aria-pressed={banMau.includes(c.slug)}
+                      onClick={() =>
+                        set(it.id, {
+                          availableColorSlugs: banMau.includes(c.slug)
+                            ? banMau.filter((x) => x !== c.slug)
+                            : [...banMau, c.slug],
+                        })
+                      }
+                    >
+                      <span className="swatch" style={{ background: c.hex }} />
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="hint">
+                  Chỉ để người xem biết link đó còn lựa chọn nào. Không ảnh hưởng tới bộ
+                  lọc hay gợi ý theo mệnh.
                 </p>
               </div>
 
@@ -924,6 +1287,33 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                   <span className="text-xs" style={{ color: 'var(--color-ok)' }}>Đã lưu</span>
                 )}
 
+                {/*
+                  DOI THU TU. Luu NGAY chu khong qua ban nhap: day la mot thao
+                  tac tren quan he giua hai dong, khong phai mot o chu — giu no
+                  cho o ban nhap nghia la phai theo doi trang thai cua ca hai
+                  mon cung luc va bam Luu o dung mot trong hai.
+                */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-quiet"
+                    disabled={busy || index === 0}
+                    title="Đưa lên trên"
+                    onClick={() => void moveItem(index, -1)}
+                  >
+                    Lên
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-quiet"
+                    disabled={busy || index === items.length - 1}
+                    title="Đưa xuống dưới"
+                    onClick={() => void moveItem(index, 1)}
+                  >
+                    Xuống
+                  </button>
+                </div>
+
                 {/* Nut go dat CUOI HANG va tach ra bang ml-auto: no la thao tac
                     khong hoan lai duoc, nen no khong duoc nam canh nut Luu de
                     bam nham. */}
@@ -992,6 +1382,22 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
             </div>
 
             <div>
+              <label className="label">Loại</label>
+              <select
+                className="field"
+                value={moi.category}
+                onChange={(e) => {
+                  const cat = e.target.value as ProductCategory;
+                  setMoi((x) => ({ ...x, category: cat, role: roleFromCategory(cat) as ItemRole }));
+                }}
+              >
+                {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
               <label className="label">Vai trò trong set</label>
               <select
                 className="field"
@@ -1002,6 +1408,43 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                   <option key={k} value={k}>{v}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="label">Màu dùng trong set</label>
+              <select
+                className="field"
+                value={moi.colorSlug}
+                onChange={(e) => setMoi((x) => ({ ...x, colorSlug: e.target.value }))}
+              >
+                <option value="">— Không rõ —</option>
+                {tax.colors.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
+              </select>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="label">Các màu còn bán trên sàn</label>
+              <div className="flex flex-wrap gap-2">
+                {tax.colors.map((c) => (
+                  <button
+                    key={c.slug}
+                    type="button"
+                    className="chip"
+                    aria-pressed={moi.availableColorSlugs.includes(c.slug)}
+                    onClick={() =>
+                      setMoi((x) => ({
+                        ...x,
+                        availableColorSlugs: x.availableColorSlugs.includes(c.slug)
+                          ? x.availableColorSlugs.filter((y) => y !== c.slug)
+                          : [...x.availableColorSlugs, c.slug],
+                      }))
+                    }
+                  >
+                    <span className="swatch" style={{ background: c.hex }} />
+                    {c.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
@@ -1061,7 +1504,10 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
               onClick={() => {
                 setAdding(false);
                 setAddNote(null);
-                setMoi({ url: '', name: '', price: '', imageUrl: '', role: 'accessory' });
+                setMoi({
+      url: '', name: '', price: '', imageUrl: '',
+      category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
+    });
               }}
             >
               Huỷ

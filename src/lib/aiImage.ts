@@ -78,10 +78,26 @@ export interface PromptInput {
   /** Ten mau tieng Viet, vi du ['Trắng', 'Đen'] */
   colorLabels: string[];
   /** Mo ta tung mon: 'Áo: áo thun trơn trắng' */
-  items: Array<{ roleLabel: string; name: string; colorLabel?: string }>;
+  items: Array<{
+    roleLabel: string;
+    name: string;
+    colorLabel?: string;
+    /**
+     * RIENG MON NAY co anh de dinh kem khong.
+     *
+     * Truoc day chi co mot co chung cho ca set (`hasReferences`), va no sai
+     * ngay khi set khong dong deu: hai mon co anh, hai mon khong, thi cau lenh
+     * van ghi ca bon la "theo anh dinh kem". Hai mon khong co anh thanh ra
+     * khong duoc ta gi ca — mo hinh tu bia, va nguoi doc cau lenh khong he
+     * biet minh vua yeu cau mot thu khong ton tai.
+     *
+     * Khong dat thi lay theo co chung, de cho goi cu khong doi hanh vi.
+     */
+    hasImage?: boolean;
+  }>;
   sceneId: string;
   modelTypeId: string;
-  /** Co gui anh tung mon lam mau tham chieu khong. Doi cach viet cau lenh. */
+  /** Co chung cho ca set. Chi con dung khi tung mon khong noi ro. */
   hasReferences?: boolean;
   /**
    * So lan bam "tao lai". Moi lan doi nhe cau lenh — gui y het thi mo hinh hay
@@ -139,6 +155,16 @@ const VARIATIONS = [
   ' Softer directional light from one side.',
 ];
 
+/** Mon nay co anh de dinh kem khong. Mon khong noi ro thi theo co chung cua set. */
+function coAnh(it: PromptInput['items'][number], input: PromptInput): boolean {
+  return it.hasImage ?? input.hasReferences ?? false;
+}
+
+/** Ten cac mon dang PHAI ta bang chu vi chua co anh. Dung de canh bao nguoi dung. */
+export function monChuaCoAnh(input: PromptInput): string[] {
+  return input.items.filter((it) => !coAnh(it, input)).map((it) => it.roleLabel.toLowerCase());
+}
+
 /**
  * Dung cau lenh. Viet bang tieng Anh vi cac mo hinh tao anh hieu tieng Anh tot
  * hon nhieu — day la ly do ky thuat, khong phai lua chon tham my.
@@ -148,6 +174,7 @@ export function buildImagePrompt(input: PromptInput): string {
   const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
   const goc = MODEL_ORIGINS[(input.variation ?? 0) % MODEL_ORIGINS.length];
   const variation = VARIATIONS[(input.variation ?? 0) % VARIATIONS.length];
+  const soCoAnh = input.items.filter((it) => coAnh(it, input)).length;
 
   /*
     LIET KE TUNG MON MOT DONG, KHONG GOP THANH MOT CAU.
@@ -166,7 +193,7 @@ export function buildImagePrompt(input: PromptInput): string {
   */
   const dongMon = input.items.map((it) => {
     const ten = it.roleLabel.toLowerCase();
-    if (input.hasReferences) {
+    if (coAnh(it, input)) {
       return `* ${ten}: exactly as shown in the attached image`;
     }
     return `* ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`;
@@ -191,12 +218,22 @@ export function buildImagePrompt(input: PromptInput): string {
       Khong co anh mau thi noi thang la dang ta bang chu, de nguoi dung hieu vi
       sao ket qua khong giong, thay vi tuong mo hinh kem.
     */
-    input.hasReferences
-      ? 'CRITICAL: the attached images are the actual garments to depict. Reproduce '
+    /*
+      BA TRUONG HOP, khong phai hai. Truoc day chi co "co anh" va "khong co
+      anh", nen mot set nua co nua khong roi vao nhanh "co anh" va cau lenh noi
+      doi ve nhung mon con lai.
+    */
+    soCoAnh === 0
+      ? 'No reference images were supplied, so the garments are described in words only.'
+      : 'CRITICAL: the attached images are the actual garments to depict. Reproduce '
         + 'their exact colour, cut, proportion, fabric texture and any visible pattern '
         + 'or detail, garment by garment. Do not substitute, restyle or "improve" any '
         + 'garment. Fidelity to the attached images outranks every other instruction.'
-      : 'No reference images were supplied, so the garments are described in words only.',
+        + (soCoAnh < input.items.length
+          ? ' Only the garments marked "as shown in the attached image" have a reference; '
+            + 'the remaining garments are described in words and must NOT be copied from '
+            + 'the attached images.'
+          : ''),
 
     `Subject: one ${goc} man, mid-twenties, ${model.en}, natural expression, standing.`,
 
@@ -244,13 +281,14 @@ export function explainPromptVi(input: PromptInput): string[] {
   const scene = SCENES.find((s) => s.id === input.sceneId) ?? SCENES[0];
   const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
   const goc = MODEL_ORIGIN_VI[(input.variation ?? 0) % MODEL_ORIGIN_VI.length];
+  const soCoAnh = input.items.filter((it) => coAnh(it, input)).length;
 
   const dongMon = input.items.length
     ? input.items.map((it) => {
         const ten = it.roleLabel.toLowerCase();
-        return input.hasReferences
+        return coAnh(it, input)
           ? `   * ${ten}: theo hình đính kèm`
-          : `   * ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`;
+          : `   * ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''} — tả bằng chữ, chưa có ảnh`;
       })
     : ['   * (chưa nhập món nào)'];
 
@@ -260,11 +298,17 @@ export function explainPromptVi(input: PromptInput): string[] {
 
   return [
     'Ảnh thời trang nam theo phong cách editorial.',
-    input.hasReferences
-      ? 'Ảnh của từng món được ĐÍNH KÈM cùng câu lệnh; AI được yêu cầu vẽ lại đúng '
-        + 'màu, phom, chất vải và hoạ tiết trong những ảnh đó.'
-      : 'Không có ảnh đính kèm, nên toàn bộ trang phục chỉ được mô tả bằng chữ — '
-        + 'kết quả sẽ không giống sản phẩm thật.',
+    // Phai khop tung nhanh voi buildImagePrompt o tren. Nguoi dung tin dong nay
+    // chu khong doc cau lenh tieng Anh, nen lech mot nhanh la noi doi voi ho.
+    soCoAnh === 0
+      ? 'Không có ảnh đính kèm, nên toàn bộ trang phục chỉ được mô tả bằng chữ — '
+        + 'kết quả sẽ không giống sản phẩm thật.'
+      : soCoAnh === input.items.length
+        ? 'Ảnh của từng món được ĐÍNH KÈM cùng câu lệnh; AI được yêu cầu vẽ lại đúng '
+          + 'màu, phom, chất vải và hoạ tiết trong những ảnh đó.'
+        : `Chỉ ${soCoAnh}/${input.items.length} món có ảnh đính kèm. Những món đó được `
+          + 'yêu cầu vẽ đúng theo ảnh; các món còn lại chỉ tả bằng chữ nên sẽ không '
+          + 'giống sản phẩm thật.',
     `Chủ thể: một nam giới ${goc}, khoảng 25 tuổi, ${model.label.toLowerCase()}, `
       + 'biểu cảm tự nhiên, đứng tạo dáng.',
     'Trang phục cần thể hiện:',

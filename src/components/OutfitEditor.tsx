@@ -203,6 +203,15 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   const [showPromptVi, setShowPromptVi] = useState(false);
   const [showRawPrompt, setShowRawPrompt] = useState(false);
   const [copied, setCopied] = useState(false);
+  /**
+   * Cau lenh da sua tay. null = chua dong vao, van bam theo du lieu.
+   *
+   * O nay tung la o chi doc. Muon them mot cau — vi du ta ky hon mot hoa tiet —
+   * thi phai chep ra ngoai roi sua o cho khac, va lan sau quay lai khong con.
+   * Sua roi thi khong tu dung lai nua: tu ghi de len chu nguoi ta vua go la mat
+   * trang, khong phai cap nhat.
+   */
+  const [promptSua, setPromptSua] = useState<string | null>(null);
 
   // Key AI cua chinh nguoi dang dang nhap. Quyet dinh nut tao anh co bam duoc
   // hay khong — xem aiReady ben duoi.
@@ -422,6 +431,15 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     setAiBusy(true);
     setAiMessage(null);
 
+    /*
+      KHONG dung ban sua tay o o "Khong co API key" cho duong nay.
+
+      Hai cau lenh do khac nhau co y: ban de CHEP RA NGOAI ta quan ao bang chu
+      (nguoi ta chua chac dinh kem anh o cong cu ben kia), con duong nay GUI KEM
+      anh tung mon nen cau lenh phai noi ro anh dinh kem chinh la quan ao can
+      ve. Lay ban words-only roi van dinh anh vao la mo hinh khong duoc bao anh
+      do de lam gi — ket qua te hon han.
+    */
     const prompt = buildImagePrompt(promptInput());
 
     const r = await requestAiImage({
@@ -1418,11 +1436,11 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             {showRawPrompt && (
               <div className="mt-4">
                 <textarea
-                  readOnly
                   className="field"
                   rows={8}
-                  value={buildImagePrompt({ ...promptInput(), hasReferences: false })}
-                  onFocus={(e) => e.currentTarget.select()}
+                  value={promptSua ?? buildImagePrompt({ ...promptInput(), hasReferences: false })}
+                  onChange={(e) => { setPromptSua(e.target.value); setCopied(false); }}
+                  onFocus={(e) => promptSua === null && e.currentTarget.select()}
                 />
                 <div className="mt-2 flex flex-wrap items-center gap-3">
                   <button
@@ -1433,13 +1451,22 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                       // hoac nguoi dung chan quyen). O nhap ben tren van chon
                       // duoc bang tay, nen that bai o day khong phai ngo cut.
                       void navigator.clipboard
-                        ?.writeText(buildImagePrompt({ ...promptInput(), hasReferences: false }))
+                        ?.writeText(promptSua ?? buildImagePrompt({ ...promptInput(), hasReferences: false }))
                         .then(() => setCopied(true))
                         .catch(() => setCopied(false));
                     }}
                   >
                     Chép câu lệnh
                   </button>
+                  {promptSua !== null && (
+                    <button
+                      type="button"
+                      className="btn btn-sm btn-quiet"
+                      onClick={() => { setPromptSua(null); setCopied(false); }}
+                    >
+                      Dựng lại theo dữ liệu
+                    </button>
+                  )}
                   {copied && (
                     <span className="text-xs" style={{ color: 'var(--color-ok)' }}>
                       Đã chép. Dán vào công cụ của bạn.

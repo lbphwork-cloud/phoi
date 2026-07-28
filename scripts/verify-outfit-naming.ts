@@ -7,7 +7,7 @@
  */
 import {
   cotLoiTenHang, datTenTheoQuyTac, vietMoTaTheoQuyTac,
-  thieuGiDeDatTen, thieuGiDeVietMoTa,
+  thieuGiDeDatTen, thieuGiDeVietMoTa, bangMau,
 } from '../src/lib/outfitNaming';
 
 let pass = 0, fail = 0;
@@ -80,6 +80,37 @@ console.log('\n=== 3. Viet mo ta ===');
     vietMoTaTheoQuyTac({ ...input, items: input.items.slice(0, 1) }) === null);
   check('bao dung ly do',
     thieuGiDeVietMoTa({ ...input, items: input.items.slice(0, 1) }).length === 1);
+}
+
+/*
+  MAU CUA SET CHUA CHON THI GOM TU CAC MON.
+
+  Khong co buoc nay thi dien mau cho ca bon mon xong, bam "Dat ten tu dong" van
+  ra dung cai ten khong co mau nhu truoc — va khong noi vi sao.
+*/
+console.log('\n=== 4. Bang mau gom tu cac mon ===');
+{
+  const items = [
+    { roleLabel: 'Áo', name: 'Áo sơ mi', colorLabel: 'Trắng' },
+    { roleLabel: 'Quần', name: 'Quần tây', colorLabel: 'Đen' },
+    { roleLabel: 'Giày', name: 'Giày lười', colorLabel: 'Đen' },
+  ];
+  const nen = { styleLabel: 'Smart casual', occasionLabel: 'Đi làm', items };
+
+  check('mau cua set duoc uu tien tuyet doi',
+    bangMau({ ...nen, colorLabels: ['Be'] }).join(',') === 'Be');
+  check('chua chon thi gom tu cac mon',
+    bangMau({ ...nen, colorLabels: [] }).join(',') === 'Trắng,Đen');
+  check('khong lap mau trung', bangMau({ ...nen, colorLabels: [] }).length === 3 - 1);
+  check('khong mon nao co mau thi rong',
+    bangMau({ ...nen, colorLabels: [], items: items.map((i) => ({ ...i, colorLabel: undefined })) })
+      .length === 0);
+
+  const ten = datTenTheoQuyTac({ ...nen, colorLabels: [] });
+  check('ten lay mau tu cac mon', ten === 'Smart casual trắng đen — đi làm', ten ?? 'null');
+
+  const moTa = vietMoTaTheoQuyTac({ ...nen, colorLabels: [] })!;
+  check('mo ta cung lay bang mau do', moTa.includes('Bảng màu: trắng, đen.'), moTa);
 }
 
 console.log(`\n>>> ${pass} PASS, ${fail} FAIL`);

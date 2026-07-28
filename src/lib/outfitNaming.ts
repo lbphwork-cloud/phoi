@@ -81,6 +81,34 @@ export function cotLoiTenHang(raw: string): string {
 }
 
 /**
+ * Bang mau dung de dat ten va viet mo ta.
+ *
+ * LAY MAU CUA CA SET TRUOC; CHUA CHON THI GOM TU CAC MON.
+ *   Mau chu dao la thu nguoi dang chon co y, nen no luon thang. Nhung rat
+ *   nhieu bai chua chon — va luc do van co day du thong tin de doan: mau cua
+ *   tung mon deu da duoc dien.
+ *
+ *   Khong co buoc nay thi vua dien mau cho bon mon xong, bam "Dat ten tu dong"
+ *   van ra dung cai ten khong co mau nhu truoc, va khong noi vi sao.
+ *
+ * CHI DE SINH CHU, KHONG GHI VAO DATABASE. Doan tu cac mon la mot phong doan
+ * tot cho mot cai ten; no khong du chac de am tham quyet dinh set do nay co
+ * hop menh voi ai hay khong. Muon dua vao du lieu that thi bam nut "Lay mau tu
+ * cac mon" o khoi mau chu dao — mot hanh dong co y thuc, nhin thay duoc.
+ */
+export function bangMau(input: NamingInput): string[] {
+  if (input.colorLabels.length) return input.colorLabels;
+
+  const gom: string[] = [];
+  for (const it of input.items) {
+    const m = it.colorLabel?.trim();
+    // So sanh da bo dau: 'Trắng' va 'trắng' la mot mau, khong phai hai.
+    if (m && !gom.some((x) => thuong(x) === thuong(m))) gom.push(m);
+  }
+  return gom;
+}
+
+/**
  * Dat ten set do bang quy tac. Tra ve null khi khong du du lieu de dat mot cai
  * ten co nghia — luc do nguoi goi moi nen nghi den AI.
  *
@@ -96,7 +124,7 @@ export function datTenTheoQuyTac(input: NamingInput): string | null {
   if (!style) return null;
 
   // Toi da hai mau. Ba mau tro len thi cai ten dai hon phan noi dung cua no.
-  const mau = input.colorLabels.slice(0, 2).map((c) => c.toLowerCase());
+  const mau = bangMau(input).slice(0, 2).map((c) => c.toLowerCase());
   const dip = input.occasionLabel.trim().toLowerCase();
 
   const dau = mau.length ? `${style} ${mau.join(' ')}` : style;
@@ -134,7 +162,7 @@ export function vietMoTaTheoQuyTac(input: NamingInput): string | null {
     ? `Kiểu ${style}, hợp khi ${dip}.`
     : dip ? `Hợp khi ${dip}.` : style ? `Kiểu ${style}.` : '';
 
-  const mau = input.colorLabels.slice(0, 3).map((c) => c.toLowerCase());
+  const mau = bangMau(input).slice(0, 3).map((c) => c.toLowerCase());
   const cau3 = mau.length ? `Bảng màu: ${mau.join(', ')}.` : '';
 
   return [cau1, cau2, cau3].filter(Boolean).join(' ');

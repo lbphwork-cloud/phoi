@@ -104,7 +104,16 @@ export interface Product {
   id: string;
   name: string;
   category: ProductCategory;
+  /** Mau THAT SU dung trong set do. Mot mau. Bo loc va phep tinh hop menh doc cot nay. */
   color_slug: string | null;
+  /**
+   * Cac mau chinh link do dang ban. Nhieu mau, CHI de nguoi mua biet con lua
+   * chon nao — khong di vao bo loc, khong di vao phep tinh hop menh.
+   *
+   * Cot co tu migration 0025 nhung thieu o day, nen moi cho doc no deu phai ep
+   * kieu. Mot cot da ton tai ma kieu du lieu khong biet la mot cot se bi quen.
+   */
+  available_color_slugs: string[];
   price_vnd: number | null;
   price_checked_at: string | null;
   image_url: string | null;
