@@ -100,12 +100,14 @@ function Home() {
         hero.splitCta ? 'mt-8 justify-center' : 'mt-9'
       }`}
     >
+      {/* Bong chu cua khoi cha bi go o CSS cho cac nut co nen duc
+          (.btn-onmedia / .btn-solid) — xem chu thich trong globals.css. */}
       <Link
         href={c.t('home.hero.cta_href', '/kham-pha')}
         className={`btn ${hero.buttonClass}`}
       >
         <span style={c.s('home.hero.cta_label')}>
-          {c.t('home.hero.cta_label', 'Xem tất cả outfit')}
+          {c.t('home.hero.cta_label', 'Khám phá bộ sưu tập')}
         </span>
       </Link>
       {!ctxLoading && !personalised && (
@@ -222,7 +224,7 @@ function Home() {
           <div className={c.isMobile ? 'mb-5 text-center' : 'shell mb-12 md:mb-16'}>
             <p className="eyebrow" style={c.isMobile ? { color: 'var(--fg)' } : undefined}>
               <span style={c.s('home.styles.eyebrow')}>
-                {c.t('home.styles.eyebrow', 'Theo phong cách')}
+                {c.t('home.styles.eyebrow', 'Khám phá')}
               </span>
             </p>
           </div>
@@ -346,14 +348,18 @@ function StyleBlock({
               className="absolute inset-0"
               style={{
                 background:
-                  'linear-gradient(to top, rgba(0,0,0,0.58) 0%, rgba(0,0,0,0.22) 46%, rgba(0,0,0,0) 72%)',
+                  'linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.30) 48%, rgba(0,0,0,0) 74%)',
               }}
               aria-hidden="true"
             />
 
             <div
               className="hero-body flex w-full flex-col items-center px-6 pb-12 text-center"
-              style={{ color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.35), 0 2px 14px rgba(0,0,0,0.4)' }}
+              /* Lop phu ben tren da dam hon nen bong chu chi con MOT lop sat
+                 chan chu. Bong rong lam net manh cua phong chu day len va nhin
+                 ra ngay la chu duoc dap them mot lop — vung toi lam viec do
+                 tot hon ma khong dong vao hinh dang chu. */
+              style={{ color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}
             >
               <p className="display-sm mb-3">{style.label}</p>
               {style.desc && (
@@ -440,7 +446,7 @@ function StyleTile({
             className="absolute inset-0"
             style={{
               background:
-                'linear-gradient(to top, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.2) 48%, rgba(0,0,0,0) 74%)',
+                'linear-gradient(to top, rgba(0,0,0,0.76) 0%, rgba(0,0,0,0.28) 50%, rgba(0,0,0,0) 76%)',
             }}
             aria-hidden="true"
           />
@@ -449,7 +455,7 @@ function StyleTile({
             className="hero-body w-full px-3 pb-5 text-center"
             style={{
               color: '#fff',
-              textShadow: '0 1px 2px rgba(0,0,0,0.4), 0 2px 12px rgba(0,0,0,0.45)',
+              textShadow: '0 1px 2px rgba(0,0,0,0.5)',
             }}
           >
             <p className="display-xs">{style.label}</p>

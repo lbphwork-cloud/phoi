@@ -980,6 +980,27 @@ table.data th {
 }
 
 /* Nut sang tren nen anh toi. */
+/*
+  NUT NEN DUC NAM TREN ANH THI KHONG DUOC AN BONG CHU CUA KHOI CHA.
+
+  Khoi chu de len anh (`.hero-body`) dat text-shadow ba lop de chu trang khong
+  chim vao nhung vung sang cua buc anh. Bong do ke thua xuong MOI thu ben trong
+  — ke ca cai nut nay, ma nut nay lai co nen trang duc va chu mau toi. Ket qua
+  la chu den tren nen trang mang mot quang den mo quanh chan chu: nhin ra chu
+  bi nhoe, khong ra bong.
+
+  Chu website goi dung ten no la "stroke mo" va bao bo di. Bo o DAY chu khong
+  bo o tung cho goi: cung mot cai nut xuat hien o phan mo dau trang chu va
+  trong tung khoi phong cach ban dien thoai, va se con xuat hien o cho khac.
+
+  `.btn-ghost-onmedia` KHONG bo — chu cua no la chu trang nam truc tiep tren
+  anh, va bong chinh la thu duy nhat giu cho no doc duoc.
+*/
+.btn-onmedia,
+.btn-solid {
+  text-shadow: none;
+}
+
 .btn-onmedia {
   background: #fff;
   color: #14120f;

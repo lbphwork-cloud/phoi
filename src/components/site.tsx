@@ -20,7 +20,7 @@ const NAV = [
   { href: '/kham-pha', key: 'nav.discover', fallback: 'Discover' },
   { href: '/gio-hang', key: 'nav.cart', fallback: 'Cart' },
   { href: '/tao-bai', key: 'nav.create', fallback: 'Create' },
-  { href: '/bai-cua-toi', key: 'nav.my_posts', fallback: 'My posts' },
+  { href: '/bai-cua-toi', key: 'nav.my_posts', fallback: 'Your Post' },
   // Dat cuoi cung trong nhom: bon muc tren la viec nguoi ta den day de lam,
   // muc nay tra loi mot cau hoi. Cau hoi do chi duoc hoi mot lan trong doi
   // moi nguoi dung, con bon muc kia duoc bam moi luot.

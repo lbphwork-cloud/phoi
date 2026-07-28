@@ -33,9 +33,29 @@ function Guard({ children }: { children: React.ReactNode }) {
   const { session, isAdmin, loading } = useAuth();
   const pathname = usePathname();
 
-  if (loading) return <Spinner label="Đang kiểm tra quyền" />;
+  /*
+    KHONG CHAN MAN HINH DE CHO NUA.
 
-  if (!session) {
+    Truoc day dong dau tien la `if (loading) return <Spinner/>`, va no chay MOI
+    LAN bam vao mot trang quan tri — ke ca khi vua bam tu mot trang quan tri
+    khac sang. Ly do nam o useAuth: moi component giu mot ban trang thai rieng
+    nen lan nao dung lop chan nay cung bat dau lai tu con so khong. Cai do da
+    duoc chua trong src/lib/hooks.ts.
+
+    Cho nay chua not nua phan con lai: khi DA BIET la admin — ke ca chi biet
+    qua bo nho trinh duyet tu lan truoc — thi vao thang, khong cho. Chi khi
+    that su chua biet gi moi hien o cho, va hien BEN TRONG khung trang quan tri
+    chu khong thay ca man hinh: bo khung di roi dung lai lam ca trang nhay mot
+    cai, va nguoi dung mat luon hang the o tren.
+
+    An toan khong dua vao cho nay. Moi truy van cua trang quan tri deu bi
+    database kiem tra is_admin() lai — day chi la lop tien loi.
+  */
+  if (!isAdmin && loading) {
+    return <Chrome pathname={pathname}><Spinner label="Đang mở trang quản trị" /></Chrome>;
+  }
+
+  if (!isAdmin && !session) {
     return (
       <div className="shell-narrow py-20 text-center">
         <h1 className="display-sm mb-6">Cần đăng nhập</h1>
@@ -62,6 +82,17 @@ function Guard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  return <Chrome pathname={pathname}>{children}</Chrome>;
+}
+
+/**
+ * Khung co dinh cua trang quan tri: tieu de va hang the.
+ *
+ * Tach ra vi no duoc dung o HAI trang thai — luc dang cho biet quyen va luc da
+ * vao duoc. Khung phai la MOT va giong het nhau o ca hai, neu khong thi luc
+ * chuyen tu cho sang xong ca trang se nhay.
+ */
+function Chrome({ pathname, children }: { pathname: string; children: React.ReactNode }) {
   return (
     <div className="shell py-10">
       <div className="mb-8">

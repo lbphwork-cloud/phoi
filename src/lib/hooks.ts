@@ -9,7 +9,7 @@
  */
 
 import {
-  useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore,
+  useCallback, useEffect, useMemo, useRef, useSyncExternalStore,
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from './supabase/client';
@@ -179,72 +179,223 @@ export interface AuthState {
   profile: Profile | null;
   isAdmin: boolean;
   configured: boolean;
+  /**
+   * Quyen admin dang doc tu bo nho trinh duyet, chua duoc database xac nhan
+   * lai trong lan tai trang nay.
+   *
+   * Cong khai ra de giao dien noi that duoc khi can. KHONG duoc dung no de
+   * quyet dinh cho phep lam gi — quyet dinh do thuoc ve RLS.
+   */
+  optimistic: boolean;
 }
 
-export function useAuth(): AuthState & { signOut: () => Promise<void> } {
-  const [state, setState] = useState<AuthState>({
-    // Khoi tao loading = isSupabaseConfigured, khong phai true.
-    //
-    // Neu chua cau hinh database thi khong co gi de tai, nen loading phai la
-    // false NGAY TU DAU. Cach cu la dat true roi goi setState(false) trong
-    // effect — bo lint cua React 19 bao loi dung: setState dong bo trong effect
-    // gay mot vong render du thua, va o day hoan toan tranh duoc bang cach chon
-    // gia tri khoi tao cho dung.
-    loading: isSupabaseConfigured,
-    session: null,
-    profile: null,
-    isAdmin: false,
-    configured: isSupabaseConfigured,
-  });
+/*
+  =============================================================================
+  MOT KHO TRANG THAI DANG NHAP, DUNG CHUNG CHO CA WEBSITE
 
-  useEffect(() => {
-    const sb = getSupabase();
-    if (!sb) return;
+  LOI CU: MOI COMPONENT MOT BAN SAO.
+    useAuth() truoc day giu state bang useState ngay trong tung component. Ca
+    website co 18 cho goi no — thanh dieu hoi, trang tao bai, khoi sua outfit,
+    lop chan trang quan tri...
 
-    let alive = true;
+    Moi cho trong so do:
+      * bat dau o loading = true, nen hien mot o cho rieng cua no;
+      * tu goi getSession() roi tu truy van bang `profiles`.
 
-    const loadProfile = async (session: Session | null) => {
-      if (!session) {
-        if (alive) {
-          setState({
-            loading: false, session: null, profile: null,
-            isAdmin: false, configured: true,
-          });
-        }
-        return;
-      }
+    Chuyen mot trang la 18 truy van GIONG HET NHAU chay song song de lay ve
+    cung mot dong du lieu, moi cai mot vong cho mang. Va vi moi ban sao bat dau
+    lai tu dau, lop chan trang quan tri hien "Dang kiem tra quyen" moi lan bam
+    vao trang admin — du vua bam tu chinh trang admin sang.
 
-      const { data } = await sb
+  CACH CHUA: dat trang thai o CAP MODULE va cho cac component dang ky nghe.
+    Doc phien va tai ho so DUNG MOT LAN cho ca phien lam viec. Cho nao goi sau
+    thi doc ngay ket qua da co — khong vong mang, khong chop o cho.
+
+  NHO QUA LAN TAI TRANG (localStorage).
+    Ngay ca mot lan goi cung mat mot vong mang, va no roi dung vao luc nguoi
+    dung vua mo web. Nen ket qua duoc ghi lai; lan sau menu quan tri hien ngay
+    tu khung hinh dau tien.
+
+    DANH DOI, noi ro chu khong giau: neu quyen admin bi go o mot may khac thi
+    may nay con hien nham menu cho den lan tai trang ke tiep. Vo hai — moi truy
+    van cua trang admin deu bi database kiem tra is_admin() lai, nen thu duy
+    nhat ke do thay la mot man hinh trong.
+
+    KHONG BAO GIO GHI TOKEN VAO DAY. Chi ghi id nguoi dung va vai tro. Token do
+    thu vien Supabase tu quan ly o kho rieng cua no.
+  =============================================================================
+*/
+
+const AUTH_CACHE_KEY = 'phoi.auth';
+
+/**
+ * Trang thai luc may chu dung trang, va luc React noi lai (hydrate).
+ *
+ * PHAI LA MOT HANG SO CO DINH. useSyncExternalStore goi getServerSnapshot cho
+ * lan render dau khi noi lai; tra ve mot doi tuong moi moi lan goi se lam React
+ * lap vo han.
+ */
+const AUTH_SSR: AuthState = Object.freeze({
+  loading: isSupabaseConfigured,
+  session: null,
+  profile: null,
+  isAdmin: false,
+  configured: isSupabaseConfigured,
+  optimistic: false,
+});
+
+let authState: AuthState = AUTH_SSR;
+const authListeners = new Set<() => void>();
+/** Da bat dau doc phien chua. Chi mot lan cho ca phien, du bao nhieu component. */
+let authStarted = false;
+
+function setAuth(next: AuthState) {
+  authState = next;
+  for (const fn of authListeners) fn();
+}
+
+/** Doc quyen da nho tu lan truoc. Hong hay thieu thi coi nhu khong co. */
+function readAuthCache(): { uid: string; role: string } | null {
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as { uid?: unknown; role?: unknown };
+    if (typeof v.uid !== 'string' || typeof v.role !== 'string') return null;
+    return { uid: v.uid, role: v.role };
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthCache(uid: string, role: string) {
+  try {
+    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({ uid, role }));
+  } catch { /* rieng tu / het cho: khong co cache van chay dung, chi cham hon */ }
+}
+
+function clearAuthCache() {
+  try { localStorage.removeItem(AUTH_CACHE_KEY); } catch { /* nhu tren */ }
+}
+
+/**
+ * Bat dau theo doi dang nhap. Goi bao nhieu lan cung chi chay mot lan.
+ *
+ * Tra ve ham dung theo doi — nhung KHONG dung khi component cuoi cung roi di.
+ * Trang thai dang nhap la thu ca website dung; dung roi bat lai theo tung
+ * component la quay ve dung cai lo hong vua chua.
+ */
+function startAuth() {
+  if (authStarted) return;
+  authStarted = true;
+
+  const sb = getSupabase();
+  if (!sb) {
+    setAuth({ ...AUTH_SSR, loading: false, configured: false });
+    return;
+  }
+
+  // Hien quyen da nho NGAY, truoc khi hoi database. Van giu loading = true de
+  // cho nao can biet "da chac chua" thi biet duoc.
+  const cache = readAuthCache();
+  if (cache) {
+    setAuth({
+      ...authState,
+      loading: true,
+      isAdmin: cache.role === 'admin',
+      optimistic: true,
+    });
+  }
+
+  /** Tai khoan da tai xong ho so. Dung de khoi hoi lai bang `profiles`. */
+  let daTai: string | null = null;
+  /**
+   * Tai khoan DANG duoc hoi ngay luc nay.
+   *
+   * Chi kiem `daTai` thoi thi chua du: thu vien Supabase ban ca bon su kien
+   * gan nhu cung mot luc, nen ca bon deu chay qua cho kiem tra TRUOC khi truy
+   * van dau tien kip tra ve. Ket qua do duoc: van bon truy van giong het nhau.
+   * Bien nay duoc dat NGAY, truoc `await`, nen ba luot sau nhin thay va dung.
+   */
+  let dangTai: string | null = null;
+
+  const loadProfile = async (session: Session | null) => {
+    if (!session) {
+      daTai = null;
+      clearAuthCache();
+      setAuth({
+        loading: false, session: null, profile: null,
+        isAdmin: false, configured: true, optimistic: false,
+      });
+      return;
+    }
+
+    /*
+      CUNG MOT NGUOI THI KHONG HOI LAI BANG `profiles`.
+
+      Thu vien Supabase ban ra nhieu su kien cho mot lan dang nhap —
+      INITIAL_SESSION, SIGNED_IN, roi TOKEN_REFRESHED moi lan gia han token.
+      Moi su kien truoc day keo theo mot truy van, va do do duoc: bon truy van
+      giong het nhau trong mot lan mo trang quan tri.
+
+      Token doi thi VAN phai cap nhat `session` — cac cho khac lay token tu do
+      de goi Edge Function. Chi bo phan hoi lai vai tro, vi vai tro khong doi
+      theo token.
+    */
+    if (daTai === session.user.id && authState.profile) {
+      setAuth({ ...authState, session, loading: false, optimistic: false });
+      return;
+    }
+
+    // Dang co mot luot hoi cho chinh nguoi nay: de luot do lam not.
+    if (dangTai === session.user.id) return;
+    dangTai = session.user.id;
+
+    let data: unknown = null;
+    try {
+      ({ data } = await sb
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .maybeSingle();
+        .maybeSingle());
+    } finally {
+      // Tra lai du truy van hong, de lan sau con hoi lai duoc.
+      dangTai = null;
+    }
 
-      if (alive) {
-        const profile = (data as Profile | null) ?? null;
-        setState({
-          loading: false,
-          session,
-          profile,
-          isAdmin: profile?.role === 'admin',
-          configured: true,
-        });
-      }
-    };
+    const profile = (data as Profile | null) ?? null;
+    daTai = profile ? session.user.id : null;
 
-    sb.auth.getSession().then(({ data }) => loadProfile(data.session));
+    if (profile) writeAuthCache(session.user.id, profile.role);
+    else clearAuthCache();
 
-    const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
-      loadProfile(session);
+    setAuth({
+      loading: false,
+      session,
+      profile,
+      isAdmin: profile?.role === 'admin',
+      configured: true,
+      optimistic: false,
     });
+  };
 
-    return () => {
-      alive = false;
-      sub.subscription.unsubscribe();
-    };
-  }, []);
+  void sb.auth.getSession().then(({ data }) => loadProfile(data.session));
+  sb.auth.onAuthStateChange((_event, session) => { void loadProfile(session); });
+}
+
+function subscribeAuth(fn: () => void) {
+  startAuth();
+  authListeners.add(fn);
+  return () => { authListeners.delete(fn); };
+}
+
+const getAuthSnapshot = () => authState;
+const getAuthServerSnapshot = () => AUTH_SSR;
+
+export function useAuth(): AuthState & { signOut: () => Promise<void> } {
+  const state = useSyncExternalStore(subscribeAuth, getAuthSnapshot, getAuthServerSnapshot);
 
   const signOut = useCallback(async () => {
+    clearAuthCache();
     await getSupabase()?.auth.signOut();
   }, []);
 
@@ -345,31 +496,29 @@ export function useUserContext(): {
   reload: () => void;
 } {
   const { session, loading: authLoading } = useAuth();
-  const [loaded, setLoaded] = useState<LoadedUserData | null>(null);
-  const [nonce, setNonce] = useState(0);
-
   const uid = session?.user.id ?? null;
-  const key = `${uid ?? 'khach'}#${nonce}`;
 
-  const reload = useCallback(() => setNonce((n) => n + 1), []);
+  /*
+    DI QUA BO NHO DUNG CHUNG, khong con moi component mot ban sao.
 
-  useEffect(() => {
-    if (authLoading) return;
+    Truoc day hook nay giu state rieng va tu chay BA truy van moi lan duoc goi.
+    Nam cho goi no — trang chu, trang kham pha, trang chi tiet set do, trang ho
+    so — nen mo mot trang co the la ba, sau, chin truy van cho ve dung mot bo
+    du lieu. Do la cung mot lo hong vua duoc chua o useAuth, chi o mot hook
+    khac.
 
-    const sb = getSupabase();
-    // Khong setState o nhanh nay. Truong hop "chua dang nhap" duoc SUY RA ben
-    // duoi thay vi ghi vao state — nho vay khong co setState dong bo trong
-    // effect, va cung khong con nguy co state cu con sot lai sau khi dang xuat.
-    if (!sb || !uid) return;
-
-    let alive = true;
-
-    Promise.all([
-      sb.from('user_preferences').select('*').eq('user_id', uid).maybeSingle(),
-      sb.from('user_private').select('*').eq('user_id', uid).maybeSingle(),
-      sb.from('feedback_events').select('kind, target_value, outfit_id').eq('user_id', uid),
-    ]).then(([p, pv, fb]) => {
-      if (!alive) return;
+    Khoa co ca uid: doi tai khoan la doi khoa, nen du lieu cua nguoi truoc
+    khong bao gio con sot lai. Chua dang nhap thi khoa la null — useAsyncData
+    khong chay truy van nao ca.
+  */
+  const { data, loading: dataLoading, reload } = useAsyncData<Omit<LoadedUserData, 'key'>>(
+    `user-context-${uid ?? 'khach'}`,
+    async (sb) => {
+      const [p, pv, fb] = await Promise.all([
+        sb.from('user_preferences').select('*').eq('user_id', uid!).maybeSingle(),
+        sb.from('user_private').select('*').eq('user_id', uid!).maybeSingle(),
+        sb.from('feedback_events').select('kind, target_value, outfit_id').eq('user_id', uid!),
+      ]);
 
       const pref = (p.data as UserPreferences | null) ?? null;
       const priv = (pv.data as UserPrivate | null) ?? null;
@@ -379,32 +528,33 @@ export function useUserContext(): {
         }>) ?? [],
       );
 
-      setLoaded({
-        key,
-        prefs: pref,
-        privateData: priv,
-        ctx: {
-          preferredStyles: pref?.style_slugs ?? [],
-          preferredColors: pref?.color_slugs ?? [],
-          priceMinVnd: pref?.price_min_vnd ?? 0,
-          priceMaxVnd: pref?.price_max_vnd ?? Number.MAX_SAFE_INTEGER,
-          element: priv?.element ?? null,
-          elementEnabled: priv?.element_enabled ?? true,
-          ...derived,
+      return {
+        data: {
+          prefs: pref,
+          privateData: priv,
+          ctx: {
+            preferredStyles: pref?.style_slugs ?? [],
+            preferredColors: pref?.color_slugs ?? [],
+            priceMinVnd: pref?.price_min_vnd ?? 0,
+            priceMaxVnd: pref?.price_max_vnd ?? Number.MAX_SAFE_INTEGER,
+            element: priv?.element ?? null,
+            elementEnabled: priv?.element_enabled ?? true,
+            ...derived,
+          },
         },
-      });
-    });
+        error: p.error ?? pv.error ?? fb.error,
+      };
+    },
+    // Khach chua dang nhap thi khong co gi de hoi. `enabled = false` giu cho
+    // khoa 'khach' khong bao gio chay mot truy van nao.
+    uid !== null,
+  );
 
-    return () => { alive = false; };
-  }, [uid, authLoading, key]);
-
-  // Du lieu chi duoc dung khi no thuoc DUNG tai khoan dang dang nhap. Sau khi
-  // dang xuat hoac doi tai khoan, khoa khong khop nen tu dong quay ve rong.
-  const fresh = loaded?.key === key ? loaded : null;
+  const fresh = uid ? data : null;
 
   return {
     // Khach chua dang nhap: khong co gi de tai nen khong bao gio "dang tai".
-    loading: authLoading || (uid !== null && fresh === null),
+    loading: authLoading || (uid !== null && (dataLoading || fresh == null)),
     ctx: fresh?.ctx ?? emptyUserContext(),
     privateData: fresh?.privateData ?? null,
     prefs: fresh?.prefs ?? null,
