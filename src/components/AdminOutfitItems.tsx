@@ -22,7 +22,7 @@
 
 import { useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
-import { useAsyncData, useAuth } from '@/lib/hooks';
+import { useAsyncData, useAuth, useTaxonomy } from '@/lib/hooks';
 import { uploadImage } from '@/lib/storage';
 import { checkAffiliateUrl } from '@/lib/affiliate';
 import { fetchProductFromUrl } from '@/lib/fetchProduct';
@@ -43,6 +43,7 @@ interface ItemDraft {
 
 export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   const { session } = useAuth();
+  const tax = useTaxonomy();
 
   const { data, loading, error, reload } = useAsyncData<OutfitWithItems | null>(
     `admin-outfit-items-${outfitId}`,
@@ -75,6 +76,28 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     Giu trong mot khoi trang thai rieng chu khong nhet vao `draft`: `draft` la
     ban nhap cua cac mon DA CO, khoa theo id — mon chua ton tai thi chua co id.
   */
+  /*
+    THONG TIN CUA CA SET, sua ngay tai day.
+
+    Truoc day khoi nay chi sua duoc tung MON — ten, gia, anh, link. Nhung thu
+    quyet dinh set do hien o dau va cho ai thi lai nam o cap SET: phong cach,
+    dip, va nhat la MAU CHU DAO. Ba thu do la dau vao cua bo loc trang kham pha
+    va cua phep tinh hop menh.
+
+    Nghia la mot set bi gan sai mau thi no se hien sai cho voi moi nguoi dung,
+    va quan tri vien khong co duong nao sua ngoai viec bao nguoi dang tu sua.
+
+    GIU BAN NHAP RIENG khoi `draft` (ban nhap cua tung mon): hai thu nay thuoc
+    hai bang khac nhau va co hai nut Luu rieng. Gop lam mot thi mot loi mang o
+    bang nay se lam mat ca cong sua o bang kia.
+  */
+  const [outfitDraft, setOutfitDraft] = useState<{
+    title?: string; description?: string;
+    styleSlug?: string; occasionSlug?: string; colorSlugs?: string[];
+  }>({});
+  const [outfitBusy, setOutfitBusy] = useState(false);
+  const [outfitSaved, setOutfitSaved] = useState(false);
+
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [addNote, setAddNote] = useState<string | null>(null);
@@ -263,6 +286,43 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     }));
   };
 
+  /**
+   * Luu cac truong cua ca set do.
+   *
+   * CHI GUI NHUNG O DA DONG VAO. Gui het moi cot nghia la ghi de bang chinh
+   * gia tri dang co — vo hai ve du lieu, nhung no lam moi lan bam Luu deu tinh
+   * la mot lan sua trong nhat ky va lam trigger chay khong can thiet.
+   *
+   * Cac cot nay deu nam trong danh sach duoc cap quyen UPDATE o migration 0002.
+   * Nhung cot khong nam trong do (published_at, total_price_vnd, author_id...)
+   * chi trigger va ham SECURITY DEFINER duoc dat — dung nhu the.
+   */
+  const saveOutfit = async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+    if (Object.keys(outfitDraft).length === 0) return;
+
+    setOutfitBusy(true);
+    setSaveError(null);
+
+    const patch: Record<string, unknown> = {};
+    const d = outfitDraft;
+    if (d.title !== undefined) patch.title = d.title.trim();
+    if (d.description !== undefined) patch.description = d.description.trim() || null;
+    if (d.styleSlug !== undefined) patch.style_slug = d.styleSlug || null;
+    if (d.occasionSlug !== undefined) patch.occasion_slug = d.occasionSlug || null;
+    if (d.colorSlugs !== undefined) patch.color_slugs = d.colorSlugs;
+
+    const { error } = await sb.from('outfits').update(patch).eq('id', outfitId);
+
+    setOutfitBusy(false);
+    if (error) { setSaveError(`Thông tin set: ${error.message}`); return; }
+
+    setOutfitDraft({});
+    setOutfitSaved(true);
+    reload();
+  };
+
   /** Lay thong tin cho MON DANG THEM (chua co trong database). */
   const fetchForNew = async () => {
     if (!moi.url.trim()) { setAddNote('Chưa có link để lấy.'); return; }
@@ -405,9 +465,126 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     reload();
   };
 
+  const oTitle = outfitDraft.title ?? data.title;
+  const oDesc = outfitDraft.description ?? data.description ?? '';
+  const oStyle = outfitDraft.styleSlug ?? data.style_slug ?? '';
+  const oOcc = outfitDraft.occasionSlug ?? data.occasion_slug ?? '';
+  const oColors = outfitDraft.colorSlugs ?? data.color_slugs ?? [];
+  const outfitDirty = Object.keys(outfitDraft).length > 0;
+
+  const patchOutfit = (p: typeof outfitDraft) => {
+    setOutfitSaved(false);
+    setOutfitDraft((x) => ({ ...x, ...p }));
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {saveError && <div className="notice notice-danger">{saveError}</div>}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Thong tin cua ca set                                               */}
+      {/*                                                                     */}
+      {/* Dat TREN cung vi day la thu quyet dinh set do hien o dau va cho ai: */}
+      {/* phong cach, dip va mau chu dao la dau vao cua bo loc trang kham pha */}
+      {/* va cua phep tinh hop menh. Sua sai mot mau la set hien sai cho voi  */}
+      {/* moi nguoi dung, va truoc day khong co duong nao sua tu day.         */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="flex flex-col gap-3 border p-4" style={{ borderColor: 'var(--line)' }}>
+        <p className="eyebrow">Thông tin set đồ</p>
+
+        <div>
+          <label className="label">Tên set đồ</label>
+          <input
+            className="field"
+            value={oTitle}
+            maxLength={120}
+            onChange={(e) => patchOutfit({ title: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <label className="label">Mô tả</label>
+          <textarea
+            className="field"
+            rows={2}
+            maxLength={600}
+            value={oDesc}
+            onChange={(e) => patchOutfit({ description: e.target.value })}
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="label">Phong cách</label>
+            <select
+              className="field"
+              value={oStyle}
+              onChange={(e) => patchOutfit({ styleSlug: e.target.value })}
+            >
+              <option value="">— Chưa chọn —</option>
+              {tax.styles.map((x) => <option key={x.slug} value={x.slug}>{x.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Dịp sử dụng</label>
+            <select
+              className="field"
+              value={oOcc}
+              onChange={(e) => patchOutfit({ occasionSlug: e.target.value })}
+            >
+              <option value="">— Chưa chọn —</option>
+              {tax.occasions.map((x) => <option key={x.slug} value={x.slug}>{x.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="label">Màu chủ đạo</label>
+          <div className="flex flex-wrap gap-2">
+            {tax.colors.map((c) => (
+              <button
+                key={c.slug}
+                type="button"
+                className="chip"
+                aria-pressed={oColors.includes(c.slug)}
+                onClick={() =>
+                  patchOutfit({
+                    colorSlugs: oColors.includes(c.slug)
+                      ? oColors.filter((x) => x !== c.slug)
+                      : [...oColors, c.slug],
+                  })
+                }
+              >
+                <span className="swatch" style={{ background: c.hex }} />
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <p className="hint">
+            Bộ lọc ở trang khám phá và phép tính hợp mệnh dùng đúng các màu chọn ở đây.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={!outfitDirty || outfitBusy}
+            onClick={() => void saveOutfit()}
+          >
+            {outfitBusy ? 'Đang lưu…' : 'Lưu thông tin set'}
+          </button>
+          {outfitDirty && !outfitBusy && (
+            <button type="button" className="btn btn-sm btn-quiet"
+                    onClick={() => setOutfitDraft({})}>
+              Hoàn tác
+            </button>
+          )}
+          {outfitSaved && (
+            <span className="text-xs" style={{ color: 'var(--color-ok)' }}>Đã lưu</span>
+          )}
+        </div>
+      </div>
 
       {/* ------------------------------------------------------------------ */}
       {/* Anh dai dien cua ca set                                            */}

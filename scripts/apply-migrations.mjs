@@ -165,12 +165,36 @@ async function runChecks(db) {
                 join outfits o on o.id = oi.outfit_id
                where o.is_seed)::int as items
     `);
-    // 36 set = 9 phong cach x 4, sau migration 0024. Truoc do la 20 set chia
-    // khong deu (workwear khong co bai nao, toi-gian co sau).
+    /*
+      KHONG CHOT CUNG SO MON NUA.
+
+      Truoc day dong nay doi dung 144 mon. Roi chu website vao thu nut "Go khoi
+      set" — dung viec toi nho ho lam — va phep kiem bao FAIL. Nhat ky admin
+      ghi ro hai lan go do, tuc la tinh nang chay dung; chi co phep kiem la sai.
+
+      Day la lan thu hai trong du an nay mot phep kiem hong vi website duoc su
+      dung. Mot phep kiem nhu vay khong bao ve duoc gi — no chi tao ra tieng on
+      moi lan co nguoi cham vao du lieu.
+
+      Nen doi sang KIEM BAT BIEN thay vi kiem con so: so set do la co dinh (do
+      migration tao ra, khong ai them bot qua giao dien thuong), con so mon thi
+      chi can nam trong khoang hop ly va khong co set nao rong.
+    */
+    const [m] = await db.rows(`
+      select min(n)::int as it_nhat, max(n)::int as nhieu_nhat, count(*)::int as so_set
+        from (select oi.outfit_id, count(*) n
+                from outfit_items oi join outfits o on o.id = oi.outfit_id
+               where o.is_seed group by oi.outfit_id) t
+    `);
     report(
-      '0006+0024 — 45 san pham / 36 set do / 45 link / 144 mon (chi dem du lieu mau)',
-      r.products === 45 && r.outfits === 36 && r.links === 45 && r.items === 144,
-      `${r.products} / ${r.outfits} / ${r.links} / ${r.items}`,
+      '0006+0024 — 45 san pham / 36 set do / 45 link (chi dem du lieu mau)',
+      r.products === 45 && r.outfits === 36 && r.links === 45,
+      `${r.products} / ${r.outfits} / ${r.links}`,
+    );
+    report(
+      'moi set do mau deu con it nhat 1 mon',
+      m.so_set === r.outfits && m.it_nhat >= 1 && m.nhieu_nhat <= 8,
+      `${m.so_set}/${r.outfits} set co mon · moi set tu ${m.it_nhat} den ${m.nhieu_nhat} mon`,
     );
   }
 }

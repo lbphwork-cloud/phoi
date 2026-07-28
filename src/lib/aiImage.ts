@@ -111,6 +111,25 @@ function fillersFor(items: PromptInput['items']): string[] {
   return CORE_ROLES.filter((r) => !r.match.test(have)).map((r) => r.filler);
 }
 
+/**
+ * Ban tieng Viet cua goc nguoi mau, dung cho khung "Dang yeu cau AI nhung gi".
+ *
+ * Phai cung THU TU voi MODEL_ORIGINS, vi ca hai deu duoc chon bang cung mot so
+ * `variation`. Lech thu tu thi cau lenh that va cau giai thich se noi hai dieu
+ * khac nhau — va nguoi dung tin cau giai thich.
+ */
+const MODEL_ORIGIN_VI = [
+  'Đông Nam Á', 'Đông Á', 'Nam Á', 'châu Âu',
+  'Mỹ Latinh', 'Tây Phi', 'Trung Đông',
+] as const;
+
+/** Ban tieng Viet cua cac mon duoc bu them, de khung giai thich khong lan tieng Anh. */
+const FILLER_VI: Record<string, string> = {
+  'a plain crew-neck t-shirt in a neutral tone': 'một áo thun cổ tròn trơn, màu trung tính',
+  'plain straight-leg trousers in a neutral tone': 'một quần ống suông trơn, màu trung tính',
+  'simple low-profile sneakers in a neutral tone': 'một đôi giày đế thấp đơn giản, màu trung tính',
+};
+
 /** Cach dien dat khac nhau cho tung lan bam "tao lai". */
 const VARIATIONS = [
   '',
@@ -127,55 +146,86 @@ const VARIATIONS = [
 export function buildImagePrompt(input: PromptInput): string {
   const scene = SCENES.find((s) => s.id === input.sceneId) ?? SCENES[0];
   const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
-
-  const garments = input.items
-    .map((it) => `${it.roleLabel.toLowerCase()}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`)
-    .join('; ');
-
-  const fillers = fillersFor(input.items);
+  const goc = MODEL_ORIGINS[(input.variation ?? 0) % MODEL_ORIGINS.length];
   const variation = VARIATIONS[(input.variation ?? 0) % VARIATIONS.length];
+
+  /*
+    LIET KE TUNG MON MOT DONG, KHONG GOP THANH MOT CAU.
+
+    Ban truoc noi het bon mon trong mot cau ngan cach bang dau cham phay. Mo
+    hinh doc mot cau dai thi de bo sot mon cuoi, va cang de bo sot khi cau do
+    con phai mang ca ten hang lan ten mau.
+
+    Moi mon mot dong co dau sao la cach danh sach duoc doc nhu mot danh sach —
+    mo hinh xu ly tot hon han, va nguoi doc cau lenh cung kiem tra duoc bang
+    mat la du hay thieu mon.
+
+    KHI CO ANH DINH KEM thi tung mon ghi "as shown in the attached image" chu
+    khong ta bang chu. Mot cau chu khong bao gio ta noi mot hoa tiet hay mot
+    duong may; anh thi ta duoc, va ta chinh xac.
+  */
+  const dongMon = input.items.map((it) => {
+    const ten = it.roleLabel.toLowerCase();
+    if (input.hasReferences) {
+      return `* ${ten}: exactly as shown in the attached image`;
+    }
+    return `* ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`;
+  });
+
+  // Vai tro con thieu thi noi ro la "tu chon cho hop", kem rang buoc de phan
+  // bu do khong cuop mat su chu y khoi nhung mon that su co trong set.
+  const buThem = fillersFor(input.items).map(
+    (f) => `* complete the look with ${f} — keep it simple and unobtrusive`,
+  );
 
   return [
     'Editorial menswear fashion photograph.',
-    // Khi co anh mau, phai noi RO rang cac anh dau vao la quan ao can tai hien.
-    // Khong noi thi mo hinh hay coi chung la "anh tham khao phong cach" va ve
-    // ra mot bo do khac han.
+
     /*
       DOAN NAY LA THU QUYET DINH ANH RA CO GIONG DO THAT HAY KHONG.
 
-      Mot cau lenh bang chu khong bao gio ta noi mot hoa tiet, mot kieu co ao,
-      mot duong may. Anh mau thi ta duoc — nen khi CO anh mau, phai noi that ro
-      rang chung la QUAN AO CAN VE LAI, khong phai anh tham khao phong cach.
-      Khong noi ro thi mo hinh coi chung la "cam hung" va ve ra mot bo do khac
-      han, dep nhung khong phai bo do ban dang ban.
+      Khi CO anh mau, phai noi that ro rang chung la QUAN AO CAN VE LAI, khong
+      phai anh tham khao phong cach. Khong noi ro thi mo hinh coi chung la "cam
+      hung" va ve ra mot bo do khac han — dep, nhung khong phai bo do dang ban.
 
-      Khong co anh mau thi noi thang la dang ta bang chu — de nguoi dung biet vi
+      Khong co anh mau thi noi thang la dang ta bang chu, de nguoi dung hieu vi
       sao ket qua khong giong, thay vi tuong mo hinh kem.
     */
     input.hasReferences
       ? 'CRITICAL: the attached images are the actual garments to depict. Reproduce '
         + 'their exact colour, cut, proportion, fabric texture and any visible pattern '
-        + 'or detail. Match them garment by garment. Do not substitute, restyle or '
-        + '"improve" any garment. Fidelity to the attached images outranks every other '
-        + 'instruction in this prompt.'
+        + 'or detail, garment by garment. Do not substitute, restyle or "improve" any '
+        + 'garment. Fidelity to the attached images outranks every other instruction.'
       : 'No reference images were supplied, so the garments are described in words only.',
-    `Subject: one ${MODEL_ORIGINS[(input.variation ?? 0) % MODEL_ORIGINS.length]} man, `
-      + `mid-twenties, ${model.en}, natural expression, standing.`,
-    `Outfit to depict — ${garments}.`,
-    fillers.length
-      ? `Complete the look with ${fillers.join(', ')} — keep these secondary and unobtrusive.`
-      : '',
-    `Overall colour palette: ${input.colorLabels.join(', ')}.`,
-    `Style direction: ${input.styleLabel}. Suited for: ${input.occasionLabel}.`,
+
+    `Subject: one ${goc} man, mid-twenties, ${model.en}, natural expression, standing.`,
+
+    'Garments to depict:',
+    ...dongMon,
+    ...buThem,
+
+    `Style direction: ${input.styleLabel}.`,
+    input.occasionLabel ? `Suited for: ${input.occasionLabel}.` : '',
+    input.colorLabels.length ? `Overall colour palette: ${input.colorLabels.join(', ')}.` : '',
+
     `Setting: ${scene.en}.`,
-    'Composition: full body, vertical 3:4 frame, generous negative space, subject slightly off-centre.',
-    'Look: restrained and premium, muted colour grading, matte finish, no heavy saturation.',
-    // Cac dieu kien loai tru — ly do tung dong o chu thich dau file
-    'Must not include: any text, lettering, watermark, brand logo or trademark.',
-    'Must not resemble any real or identifiable person.',
-    'Must not look like an illustration, painting, 3D render or cartoon.',
-    'No collage, no split frames, no multiple people.',
-  ].filter(Boolean).join(' ') + variation;
+    'Composition: full body, vertical 3:4 frame, generous negative space, '
+      + 'subject slightly off-centre.',
+    'Look: minimal, premium and restrained. Muted colour, matte grading, '
+      + 'no oversaturation.',
+
+    // Cac dieu kien loai tru. Viet thanh danh sach chu khong gop mot cau: cau
+    // cang dai thi cac dieu kien cuoi cang de bi bo qua.
+    'Must NOT include:',
+    '* any text, lettering or characters',
+    '* watermarks',
+    '* brand logos or trademarks',
+    '* any real or identifiable person',
+    '* illustration, painting, cartoon or 3D render styles',
+    '* collage layouts',
+    '* split frames',
+    '* more than one person',
+  ].filter(Boolean).join('\n') + variation;
 }
 
 /**
@@ -193,24 +243,51 @@ export function buildImagePrompt(input: PromptInput): string {
 export function explainPromptVi(input: PromptInput): string[] {
   const scene = SCENES.find((s) => s.id === input.sceneId) ?? SCENES[0];
   const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
+  const goc = MODEL_ORIGIN_VI[(input.variation ?? 0) % MODEL_ORIGIN_VI.length];
 
-  const garments = input.items
-    .map((it) => `${it.roleLabel.toLowerCase()}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`)
-    .join('; ');
+  const dongMon = input.items.length
+    ? input.items.map((it) => {
+        const ten = it.roleLabel.toLowerCase();
+        return input.hasReferences
+          ? `   * ${ten}: theo hình đính kèm`
+          : `   * ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`;
+      })
+    : ['   * (chưa nhập món nào)'];
+
+  const buThem = fillersFor(input.items).map(
+    (f) => `   * hoàn thiện bằng ${FILLER_VI[f] ?? f} — thiết kế đơn giản, màu trung tính`,
+  );
 
   return [
-    'Ảnh thời trang nam, kiểu ảnh tạp chí.',
-    `Người mẫu: một nam Đông Nam Á khoảng 25 tuổi, ${model.label.toLowerCase()}, đứng, biểu cảm tự nhiên.`,
-    `Trang phục: ${garments || '(chưa nhập món nào)'}.`,
-    `Tông màu tổng thể: ${input.colorLabels.join(', ') || '(chưa chọn màu)'}.`,
-    `Phong cách: ${input.styleLabel}. Dịp: ${input.occasionLabel}.`,
+    'Ảnh thời trang nam theo phong cách editorial.',
+    input.hasReferences
+      ? 'Ảnh của từng món được ĐÍNH KÈM cùng câu lệnh; AI được yêu cầu vẽ lại đúng '
+        + 'màu, phom, chất vải và hoạ tiết trong những ảnh đó.'
+      : 'Không có ảnh đính kèm, nên toàn bộ trang phục chỉ được mô tả bằng chữ — '
+        + 'kết quả sẽ không giống sản phẩm thật.',
+    `Chủ thể: một nam giới ${goc}, khoảng 25 tuổi, ${model.label.toLowerCase()}, `
+      + 'biểu cảm tự nhiên, đứng tạo dáng.',
+    'Trang phục cần thể hiện:',
+    ...dongMon,
+    ...buThem,
+    `Phong cách: ${input.styleLabel || '(chưa chọn)'}.`
+      + (input.occasionLabel ? ` Dịp: ${input.occasionLabel}.` : ''),
+    input.colorLabels.length ? `Tông màu tổng thể: ${input.colorLabels.join(', ')}.` : '',
     `Bối cảnh: ${scene.label}.`,
-    'Bố cục: toàn thân, khung dọc 3:4, nhiều khoảng trống, người lệch tâm.',
-    'Không có chữ, logo hay nhãn hiệu nào.',
-    'Không giống bất kỳ người thật nào.',
-    'Phải ra chất ảnh chụp, không phải tranh vẽ hay ảnh dựng 3D.',
-    'Không ghép nhiều khung, không nhiều người.',
-  ];
+    'Bố cục: chụp toàn thân, khung hình dọc tỷ lệ 3:4, nhiều khoảng trống, '
+      + 'chủ thể đứng hơi lệch khỏi trung tâm.',
+    'Phong cách hình ảnh: tinh giản, cao cấp và tiết chế. Màu nhẹ, xử lý màu lì, '
+      + 'không bão hoà quá mức.',
+    'Không được xuất hiện:',
+    '   * chữ viết hoặc ký tự',
+    '   * watermark',
+    '   * logo thương hiệu hoặc nhãn hiệu',
+    '   * người thật hoặc khuôn mặt có thể nhận diện',
+    '   * phong cách minh hoạ, tranh vẽ, hoạt hình hoặc ảnh dựng 3D',
+    '   * bố cục collage',
+    '   * khung hình chia đôi',
+    '   * nhiều người trong cùng một ảnh',
+  ].filter(Boolean);
 }
 
 /**

@@ -220,6 +220,29 @@ async function main() {
   report('slugify_vi bo dau tieng Viet', slugTest[0].s === 'ao-so-mi-trang-dep-lam-day',
          `-> "${slugTest[0].s}"`);
 
+  /*
+    MOI SET DO PHAI CO MAU CHU DAO.
+
+    Khong phai chuyen tham my. Cot color_slugs la dau vao cua HAI tinh nang
+    chinh: bo loc theo mau, va phep tinh hop menh. Mang rong nghia la set do vo
+    hinh voi ca hai — no khong bao gio hien khi ai loc theo mau, va khong bao
+    gio duoc tinh la hop menh voi bat ky ai. Khong co thong bao loi nao het.
+
+    Migration 0024 cua toi tao 18 set voi mang rong; 0028 bu lai tu mau cua
+    chinh cac mon trong set. Phep kiem nay de dieu do khong tai dien.
+  */
+  const khongMau = await q(
+    `select slug from outfits where is_seed and coalesce(array_length(color_slugs, 1), 0) = 0`);
+  report('moi set do deu co mau chu dao', khongMau.length === 0,
+         khongMau.length ? `${khongMau.length} set thieu: ${khongMau.slice(0, 3).map(x => x.slug).join(', ')}`
+                         : 'tat ca deu co');
+
+  const quaNhieuMau = await q(
+    `select slug, array_length(color_slugs, 1) n from outfits
+      where is_seed and array_length(color_slugs, 1) > 3`);
+  report('khong set nao qua 3 mau chu dao', quaNhieuMau.length === 0,
+         quaNhieuMau.length ? JSON.stringify(quaNhieuMau) : 'toi da 3');
+
   console.log('\n=== 4. Kiem tra trigger nghiep vu ===');
 
   // Tao 1 admin va 1 user thuong
