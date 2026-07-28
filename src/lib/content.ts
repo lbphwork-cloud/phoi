@@ -19,8 +19,8 @@
  *   bo nho. Tai rieng tung khoa se thanh vai chuc luot goi mang cho mot trang.
  */
 
-import { useMemo } from 'react';
-import { useAsyncData, useIsMobile } from './hooks';
+import { useEffect, useMemo } from 'react';
+import { primeAsyncData, useAsyncData, useIsMobile } from './hooks';
 import { fieldStyleCss, parseFieldStyle } from './typography';
 
 export interface ContentRow {
@@ -96,11 +96,51 @@ export interface Content {
   isMobile: boolean;
 }
 
+/*
+  =============================================================================
+  GIU NOI DUNG WEBSITE TRONG BO NHO TRINH DUYET
+
+  VAN DE: MOI LAN TAI TRANG, LOGO NHAY MOT CAI.
+    Ten website, logo, cac doan chu co dinh deu nam trong bang site_content va
+    phai di mot vong mang moi ve. Trong vong do giao dien van phai ve mot cai
+    gi day, nen no ve ban du phong — chu "PHỐI". Anh logo den sau, thay cho
+    chu. Nguoi dung nhin thay dung cai nhay do moi lan tai lai trang.
+
+  CACH CHUA: luu ban da tai ve, lan sau nap ngay tu bo nho truoc khi hoi mang.
+    Khung hinh dau tien da dung roi; vong mang phia sau chi de cap nhat.
+
+  KHONG PHAI BI MAT GI: day la chu va duong dan anh hien cong khai tren trang.
+
+  VAN HOI LAI MAY CHU MOI LAN — xem primeAsyncData trong hooks.ts. Doi logo
+  trong trang quan tri xong thi lan tai ke tiep phai thay logo moi.
+  =============================================================================
+*/
+const KHOA_BO_NHO = 'phoi.content.v1';
+
+function napTuBoNho() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(KHOA_BO_NHO);
+    if (!raw) return;
+    const rows = JSON.parse(raw) as ContentRow[];
+    if (Array.isArray(rows) && rows.length > 0) primeAsyncData('site-content', rows);
+  } catch { /* hong thi bo qua, chi mat mot khung hinh */ }
+}
+
+function luuVaoBoNho(rows: ContentRow[]) {
+  try {
+    localStorage.setItem(KHOA_BO_NHO, JSON.stringify(rows));
+  } catch { /* het cho hoac che do rieng tu: khong sao */ }
+}
+
 export function useContent(): Content {
   // Khung dien thoai dung o ".mobile" khi o do co noi dung. Doc o day, mot lan
   // cho ca trang, thay vi de tung component tu hoi — hai component hoi hai luc
   // co the ra hai cau tra loi khac nhau ngay giua mot lan xoay may.
   const isMobile = useIsMobile();
+
+  // Nap ban da luu tu lan truoc TRUOC khi hoi may chu.
+  napTuBoNho();
 
   const { data, loading, reload } = useAsyncData<ContentRow[]>('site-content', (sb) =>
     sb
@@ -111,6 +151,11 @@ export function useContent(): Content {
   );
 
   const rows = useMemo(() => data ?? [], [data]);
+
+  // Luu lai cho lan tai trang sau. Chi luu khi that su co du lieu.
+  useEffect(() => {
+    if (rows.length > 0) luuVaoBoNho(rows);
+  }, [rows]);
 
   const map = useMemo(() => {
     const m = new Map<string, string>();

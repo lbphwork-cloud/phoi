@@ -1,0 +1,64 @@
+# =============================================================================
+# CAC HEADER BAO MAT — Cloudflare Pages doc file nay va gan vao moi phan hoi.
+#
+# NOI THANG MOT DIEU TRUOC, de khong ai ky vong sai:
+#
+#   KHONG THE GIAU KHOA `sb_publishable_...` VA DIA CHI SUPABASE.
+#   Trinh duyet phai co hai thu do de goi database. Bat cu thu gi trinh duyet
+#   gui di thi nguoi ngoi truoc trinh duyet deu doc duoc — mo tab Network la
+#   thay. Ma hoa hay xao tron chung chi lam cham nguoi to mo vai phut, khong
+#   giau duoc ai. Day la thiet ke cua Supabase, khong phai so sot cua website.
+#
+#   KHOA DO KHONG CHO QUYEN GI. Moi cau truy van deu bi Row Level Security cua
+#   Postgres kiem tra lai: nguoi la chi doc duoc bai da dang, khong doc duoc
+#   ho so nguoi khac, khong doc duoc ngay sinh, khong doc duoc API key da ma
+#   hoa. Ranh gioi bao mat that nam o do — va no duoc kiem chung bang 81 phep
+#   kiem chay tren Postgres that trong `npm run verify`.
+#
+#   NHUNG THU THAT SU BI MAT — mat khau database, service role key, token
+#   Cloudflare, token Supabase, khoa ma hoa API key — deu KHONG co trong ma
+#   nguon va KHONG co trong ban dung. Da kiem: khong tim thay chuoi nao.
+#
+# Cac header duoi day chua nhung lo hong THAT SU chua duoc bit.
+# =============================================================================
+
+/*
+  # Chan nhung website khac nhung trang nay vao khung an de lua nguoi dung bam
+  # nham (clickjacking). Hai dong cung mot y: mot cho trinh duyet cu, mot cho
+  # trinh duyet moi.
+  X-Frame-Options: DENY
+
+  # Chan trinh duyet tu doan lai kieu tep. Khong co dong nay thi mot tep anh do
+  # nguoi dung tai len co the bi doc thanh HTML va chay ma trong do.
+  X-Content-Type-Options: nosniff
+
+  # Khong gui duong dan trang hien tai sang website khac. Duong dan cua trang
+  # nay co the chua tham so tim kiem cua nguoi dung.
+  Referrer-Policy: strict-origin-when-cross-origin
+
+  # Tu choi cac quyen website nay khong bao gio dung. Co dong nay thi du ma la
+  # co chen duoc vao trang cung khong xin duoc camera hay vi tri.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+  # Bat buoc dung HTTPS trong mot nam. Cloudflare da chuyen huong san, nhung
+  # header nay chan ca lan truy cap DAU TIEN — luc chua kip chuyen huong.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+  # ---------------------------------------------------------------------------
+  # CONTENT SECURITY POLICY
+  #
+  # Y nghia thuc te: du co ke chen duoc mot doan ma la vao trang (qua mot o
+  # nhap, qua mot thu vien bi nhiem), trinh duyet van tu choi GUI DU LIEU DI
+  # dau ngoai cac dia chi liet ke o `connect-src`. Do la thu chan duoc viec
+  # danh cap phien dang nhap.
+  #
+  # `script-src` phai co 'unsafe-inline': Next.js xuat tinh nhung du lieu khoi
+  # tao vao mot the <script> ngay trong trang, va ban xuat tinh khong co may
+  # chu de sinh nonce cho tung lan tai. Ghi ro o day de khong ai tuong day la
+  # so sot — bo di la trang trang.
+  #
+  # `img-src https:` rong co y: anh san pham nam tren CDN cua Shopee va TikTok,
+  # va cac ten mien do doi lien tuc. Anh khong chay duoc ma nen do rong khong
+  # phai lo hong.
+  # ---------------------------------------------------------------------------
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; frame-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests

@@ -211,6 +211,26 @@ export function SiteHeader() {
             style={{ height: `${logoHeight}px` }}
           />
         </>
+      ) : c.loading ? (
+        /*
+          CHUA BIET CO LOGO HAY KHONG THI KHONG VE GI CA.
+
+          Truoc day cho nay ve chu "PHỐI" ngay tu khung hinh dau, roi khi du
+          lieu ve moi thay bang anh logo. Nguoi dung thay chu nhay thanh anh moi
+          lan tai trang — chu website goi dung ten no la "rat kho chiu".
+
+          Chu "PHỐI" van la ban du phong THAT, dung khi database khong co logo.
+          Chi trong VAI TRAM MILI GIAY dau, luc chua biet cau tra loi, thi giu
+          mot o trong dung kich thuoc — khong nhay, khong xe dich bo cuc.
+
+          Lan tai thu hai tro di gan nhu khong bao gio chay vao nhanh nay:
+          noi dung website da nam trong bo nho trinh duyet (xem lib/content.ts).
+        */
+        <span
+          aria-hidden="true"
+          className="block"
+          style={{ height: `${logoHeight}px`, width: '96px' }}
+        />
       ) : (
         <span className="display-xs" style={{ letterSpacing: '0.28em' }}>
           PHỐI

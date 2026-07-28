@@ -646,6 +646,30 @@ function runQuery(
   INFLIGHT.set(key, p);
 }
 
+/**
+ * Nap san mot ket qua vao bo nho dung chung, truoc khi co ai hoi.
+ *
+ * DUNG DE XOA CANH "NHAY MOT CAI" LUC TAI TRANG.
+ *   Mot so du lieu gan nhu khong bao gio doi — ten website, logo, cac doan chu
+ *   co dinh. Nhung chung van phai di mot vong mang moi ve, va trong vong do
+ *   giao dien buoc phai ve mot cai gi do: chu thay cho logo, o trong thay cho
+ *   tieu de. Nguoi dung nhin thay dung cai nhay do moi lan tai trang.
+ *
+ *   Nap ban da luu tu lan truoc vao day thi khung hinh dau tien da dung roi,
+ *   va vong mang phia sau chi de cap nhat neu co gi doi.
+ *
+ * KHONG danh dau la "da tai xong" theo nghia chan truy van: `runQuery` van chay
+ * binh thuong khi component hoi, va ket qua that se ghi de len ban nap san.
+ */
+/** Cac khoa dang giu ban nap san — van phai hoi lai may chu mot lan. */
+const PRIMED = new Set<string>();
+
+export function primeAsyncData(key: string, data: unknown) {
+  if (CACHE.has(key)) return;
+  CACHE.set(key, { data, error: null });
+  PRIMED.add(key);
+}
+
 /** Xoa mot khoa khoi bo nho dung chung. Dung khi du lieu vua bi sua o noi khac. */
 export function invalidateAsyncData(key: string) {
   CACHE.delete(key);
@@ -679,7 +703,15 @@ export function useAsyncData<T>(
 
   useEffect(() => {
     if (!enabled) return;
-    if (CACHE.has(key)) return;
+    /*
+      Ban NAP SAN thi van phai hoi lai mot lan.
+
+      Khong co ngoai le nay thi du lieu nap tu bo nho trinh duyet se dong bang
+      vinh vien: doi logo trong trang quan tri xong, nguoi dung tai lai trang
+      va van thay logo cu — khong co gi bao cho ho biet vi sao.
+    */
+    if (CACHE.has(key) && !PRIMED.has(key)) return;
+    PRIMED.delete(key);
     runQuery(key, queryRef.current as never);
   }, [key, enabled]);
 
