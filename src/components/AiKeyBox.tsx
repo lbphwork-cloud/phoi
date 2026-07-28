@@ -64,6 +64,7 @@ export function AiKeyBox({
   provider,
   purpose,
   active,
+  sharedWithText = false,
   loading,
   onChanged,
 }: {
@@ -71,6 +72,14 @@ export function AiKeyBox({
   purpose: AiKeyPurpose;
   /** Key dang luu cho dung cap (nha cung cap, muc dich) nay. */
   active: AiCredentialPublic | null;
+  /**
+   * Key dang hien khong phai key rieng cho viec nay ma la key dung chung.
+   *
+   * Phai noi ra chu khong duoc im lang: nguoi dung nhin thay mot key va tuong
+   * ho da dat key rieng cho viec nay. Den luc key do het han muc cho anh ma
+   * van viet chu duoc thi ho se khong hieu chuyen gi dang xay ra.
+   */
+  sharedWithText?: boolean;
   loading: boolean;
   onChanged: () => void;
 }) {
@@ -117,6 +126,9 @@ export function AiKeyBox({
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <p className="text-sm">
                 Đang dùng: <code>{active.key_hint}</code>
+                {sharedWithText && (
+                  <span className="muted"> — dùng chung với phần viết chữ</span>
+                )}
               </p>
               <button type="button" className="btn btn-sm btn-quiet"
                       disabled={busy} onClick={() => void test()}>
@@ -126,10 +138,15 @@ export function AiKeyBox({
                       onClick={() => setShowInput((v) => !v)}>
                 {showInput ? 'Thôi' : 'Đổi key'}
               </button>
-              <button type="button" className="btn btn-sm btn-quiet btn-danger"
-                      disabled={busy} onClick={() => void remove()}>
-                Xoá
-              </button>
+              {/* KHONG cho xoa khi dang dung chung: bam vao day se xoa mat
+                  chinh key cua phan viet chu, va nguoi dung khong he y dinh
+                  do. Muon xoa thi xoa o dung cho cua no. */}
+              {!sharedWithText && (
+                <button type="button" className="btn btn-sm btn-quiet btn-danger"
+                        disabled={busy} onClick={() => void remove()}>
+                  Xoá
+                </button>
+              )}
             </div>
           ) : (
             <p className="mb-3 text-sm">

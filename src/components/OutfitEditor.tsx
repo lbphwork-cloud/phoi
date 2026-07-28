@@ -197,9 +197,26 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   // hay khong — xem aiReady ben duoi.
   const creds = useAiCredentials();
   const credsLoading = creds.loading;
-  // Hai key rieng cho hai viec — xem chu thich trong AiKeyBox.
+  /*
+    HAI KEY RIENG CHO HAI VIEC — nhung CO DUONG LUI ve dung chung mot key.
+
+    VI SAO CAN DUONG LUI
+      Kha nang giu hai key rieng doi hai ham may chu ban moi. Truoc khi chung
+      duoc trien khai — hoac o bat ky ban cai dat nao chua cap nhat — moi tai
+      khoan chi co mot key duy nhat, va key do dang lam ca hai viec.
+
+      Neu o "key dung anh" cu bao "chua co key" trong khi tai khoan RO RANG co
+      mot key dang chay, thi giao dien dang noi sai. Nen khi khong co key rieng
+      cho anh, lay key viet chu va NOI RO la dang dung chung.
+
+    Day khong phai mot cai va tam: "chua dat key rieng cho anh thi dung key
+    chung" la hanh vi dung ve lau dai. Ai muon tach thi dan key khac vao, va
+    tu do hai o roi nhau.
+  */
   const textCred = creds.activeFor(aiProvider, 'text');
-  const imageCred = creds.activeFor(aiProvider, 'image');
+  const imageCredRieng = creds.activeFor(aiProvider, 'image');
+  const imageCred = imageCredRieng ?? textCred;
+  const imageKeyDungChung = !imageCredRieng && Boolean(textCred);
   const lastAiError = useLastAiError(aiProvider);
 
   // Doc du lieu tu tien ich Chrome NGAY TRONG ham khoi tao state.
@@ -1140,6 +1157,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             provider={aiProvider}
             purpose="image"
             active={imageCred}
+            sharedWithText={imageKeyDungChung}
             loading={credsLoading}
             onChanged={creds.reload}
           />
