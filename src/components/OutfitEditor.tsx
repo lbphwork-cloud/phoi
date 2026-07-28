@@ -191,6 +191,18 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   const [styleSlug, setStyleSlug] = useState('');
   const [occasionSlug, setOccasionSlug] = useState('');
   const [colorSlugs, setColorSlugs] = useState<string[]>([]);
+  /**
+   * Nguoi dung da tu tay dong vao o mau chua.
+   *
+   * Chua dong thi mau chu dao bam theo mau ao va quan (xem `toneTuMon`). Dong
+   * roi thi lua chon cua ho duoc giu nguyen, ke ca khi sau do ho doi mon —
+   * dung nguyen tac chu website dat tu dau: cai gi tu dong sinh ra thi phai
+   * sua tay duoc, va sua roi thi khong bi ghi de.
+   *
+   * Cot cung ten trong database lam dung viec do o phia may chu, cho cac
+   * trigger cua migration 0039.
+   */
+  const [toneThuCong, setToneThuCong] = useState(false);
   const [aiGenerated, setAiGenerated] = useState(false);
 
   const [heroFile, setHeroFile] = useState<File | null>(null);
@@ -402,6 +414,46 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
    *   mot rao can lon hon han viec dan mot doan chu vao ChatGPT. Duong nay cho
    *   ho dung dung cong cu ho da co san.
    */
+  /**
+   * Mau chu dao suy tu chinh cac mon: chi AO va QUAN.
+   *
+   * Giay, tui, dong ho khong tinh — doi mot doi giay khong doi tong mau cua bo
+   * do, va tinh ca chung thi mot set ao trang quan den di giay do se bi coi la
+   * "co mau do" trong bo loc va trong phan doi chieu menh.
+   *
+   * Ao khoac chi tinh khi khong co ao trong: co ca hai thi ao trong moi la mau
+   * nen. Dung hoan toan voi ham tinh_tone_outfit() trong migration 0039 — hai
+   * cho phai cho ra cung mot ket qua, neu khong thi mau hien luc soan se khac
+   * mau luu trong database.
+   */
+  const toneTuMon = (() => {
+    const coAoTrong = items.some((i) => i.role === 'top' && i.colorSlug);
+    const uu: Record<string, number> = { top: 1, outerwear: 2, bottom: 3 };
+    const lay = items
+      .filter((i) => {
+        if (!i.colorSlug) return false;
+        if (i.role === 'top' || i.role === 'bottom') return true;
+        return i.role === 'outerwear' && !coAoTrong;
+      })
+      .sort((a, b) => (uu[a.role] ?? 9) - (uu[b.role] ?? 9))
+      .map((i) => i.colorSlug);
+    return [...new Set(lay)];
+  })();
+
+  /*
+    Dong bo o mau theo cac mon, TRU KHI nguoi dung da tu chon.
+
+    Khong dung useEffect: so sanh roi setState ngay trong than component la
+    cach React khuyen dung cho state suy ra tu state khac. useEffect o day se
+    them mot lan ve thua moi lan doi mon.
+  */
+  const khoaTone = toneTuMon.join(',');
+  const [khoaToneCu, setKhoaToneCu] = useState(khoaTone);
+  if (!toneThuCong && khoaToneCu !== khoaTone) {
+    setKhoaToneCu(khoaTone);
+    if (toneTuMon.length > 0) setColorSlugs(toneTuMon);
+  }
+
   const promptReady = (() => {
     const full = items.filter((i) => i.name.trim() && i.colorSlug && i.priceVnd.trim());
     const missing: string[] = [];
@@ -723,6 +775,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           style_slug: styleSlug,
           occasion_slug: occasionSlug,
           color_slugs: colorSlugs,
+          // Bao cho trigger 0039 biet co duoc tinh lai mau theo mon hay khong.
+          tone_thu_cong: toneThuCong,
           author_id: uid,
           ai_generated: aiGenerated,
           // Luon tao o 'draft'. Chuyen sang 'pending' o buoc rieng ben duoi de
@@ -1268,11 +1322,29 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
         <ColorPicker
           colors={tax.colors}
           selected={colorSlugs}
-          onChange={setColorSlugs}
+          onChange={(xs) => { setToneThuCong(true); setColorSlugs(xs); }}
           multiple
           max={3}
         />
-        <p className="hint">Bộ lọc và gợi ý theo mệnh dùng đúng các màu bạn chọn ở đây.</p>
+        <p className="hint">
+          {toneThuCong
+            ? 'Bạn đã tự chọn màu, các màu này sẽ không tự đổi theo món nữa.'
+            : 'Tự lấy theo màu áo và quần. Giày và phụ kiện không tính vào màu chủ đạo.'}
+          {' '}Bộ lọc và gợi ý theo mệnh dùng đúng các màu ở đây.
+        </p>
+        {toneThuCong && toneTuMon.length > 0 && khoaTone !== colorSlugs.join(',') && (
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm mt-2"
+            onClick={() => {
+              setToneThuCong(false);
+              setColorSlugs(toneTuMon);
+              setKhoaToneCu(khoaTone);
+            }}
+          >
+            Lấy lại theo màu áo quần ({toneTuMon.map((s) => tax.colorLabel(s)).join(', ')})
+          </button>
+        )}
       </Block>
 
       {/* ------------------------------------------------------------------ */}

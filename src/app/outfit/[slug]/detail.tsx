@@ -10,6 +10,7 @@ import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { SaveButton } from '@/components/SaveButton';
 import { formatVnd, formatRelative } from '@/lib/format';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
+import { HOP_MENH_TOI_THIEU } from '@/lib/scoring';
 
 export default function OutfitDetail({ slug }: { slug: string }) {
   if (!isSupabaseConfigured) return <SetupNotice />;
@@ -125,6 +126,26 @@ function Detail({ slug }: { slug: string }) {
                   <p className="text-sm">
                     Có {menhMatch.length} màu được cho là hợp mệnh của bạn:{' '}
                     {menhMatch.map((c) => tax.colorLabel(c)).join(', ')}.
+                  </p>
+                )}
+                {/*
+                  NOI RO KET LUAN, khong bat nguoi doc tu suy.
+
+                  Trang nay dem tung mau, con trang kham pha chi goi mot set la
+                  hop menh khi DU HAI mau. Khong viet ket luan ra thi mot set co
+                  dung mot mau hop se hien "co 1 mau hop menh" o day nhung khong
+                  co nhan nao o trang kia — doc nhu website tu mau thuan.
+                */}
+                {menhMatch.length === 1 && (
+                  <p className="muted mt-1 text-sm">
+                    Mới một màu hợp nên set này chưa được tính là hợp mệnh — cần cả
+                    màu áo và màu quần đều hợp.
+                  </p>
+                )}
+                {menhMatch.length >= HOP_MENH_TOI_THIEU && (
+                  <p className="mt-1 text-sm">
+                    Cả áo và quần đều hợp mệnh, nên set này được ưu tiên khi bạn bật
+                    nút ưu tiên ở trang khám phá.
                   </p>
                 )}
                 {menhAvoid.length > 0 && (

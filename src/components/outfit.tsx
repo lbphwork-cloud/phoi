@@ -253,8 +253,15 @@ export function OutfitCard({
               />
             );
           })}
+          {/*
+            Viet ro "ca ao va quan", khong chi mot chu "hop menh".
+
+            Nhan cu khong noi duoc dieu gi khac nhau giua mot set hop nua voi
+            mot set hop ca bo — ma gio hai truong hop do duoc doi xu khac han:
+            chi truong hop thu hai moi duoc goi la hop menh.
+          */}
           {hopMenh && hopMenh.length > 0 && (
-            <span className="muted-2 ml-1 text-xs">hợp mệnh</span>
+            <span className="muted-2 ml-1 text-xs">cả áo và quần hợp mệnh</span>
           )}
         </div>
       </Link>

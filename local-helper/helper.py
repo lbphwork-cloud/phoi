@@ -160,7 +160,7 @@ def is_shortener_host(host: str | None) -> bool:
 PROFILE_DIR = HERE / ".browser-profile"
 
 PAGE_TIMEOUT_MS = 30_000
-CAPTCHA_WAIT_SEC = 90
+CAPTCHA_WAIT_SEC = 180
 MAX_ATTEMPTS = 2
 
 
@@ -764,10 +764,47 @@ def read_product_page(page: Any, url: str, interactive: bool) -> PageData:
     # lam ten san pham. Day tung la mot bug that, phat hien khi chay thu link
     # that cua nguoi dung.
     if is_bot_check_url(page.url):
-        raise RuntimeError(
-            f"San chuyen huong sang trang chong bot ({page.url.split('?')[0]}). "
-            "Trinh duyet tu dong bi phat hien. Dung tien ich Chrome hoac nhap tay."
-        )
+        # Co cua so dang mo thi nguoi that GIAI DUOC trang nay — day dung la
+        # truong hop trang chan bot sinh ra de xu ly. Ban truoc bao loi ngay tai
+        # day, nen duong "co cua so" khong bao gio duoc dung den: Shopee day
+        # sang /verify/captcha va helper bo cuoc trong khi cai thanh truot dang
+        # hien ngay truoc mat nguoi dung.
+        if not interactive:
+            raise RuntimeError(
+                f"San chuyen huong sang trang chong bot ({page.url.split('?')[0]}) "
+                "va dang chay --headless nen khong ai giai duoc. Bo --headless, "
+                "hoac dung tien ich Chrome."
+            )
+
+        log(f"San chuyen huong sang trang chong bot ({page.url.split('?')[0]}).", "warn")
+        log(f"Cua so dang mo — BAN giai giup, toi doi {CAPTCHA_WAIT_SEC} giay.", "warn")
+
+        deadline = time.monotonic() + CAPTCHA_WAIT_SEC
+        while time.monotonic() < deadline:
+            page.wait_for_timeout(3000)
+            if not is_bot_check_url(page.url):
+                log("Da qua duoc trang chan bot.", "ok")
+                break
+        else:
+            raise RuntimeError(
+                f"Khong ai giai trang chan bot trong {CAPTCHA_WAIT_SEC} giay. "
+                "Dung tien ich Chrome hoac nhap tay tren website."
+            )
+
+        # Giai xong thuong duoc tra ve trang chu, khong phai trang san pham —
+        # nen phai vao lai dung link roi doc lai tu dau.
+        page.goto(url, wait_until="domcontentloaded", timeout=PAGE_TIMEOUT_MS)
+        try:
+            page.wait_for_timeout(2500)
+        except PlaywrightError:
+            pass
+        og = page.evaluate(OG_SCRIPT)
+        title = og.get("__title", "")
+        body_text = og.get("__bodyText", "")
+        if is_bot_check_url(page.url):
+            raise RuntimeError(
+                "Van bi chan bot sau khi giai. Dung tien ich Chrome hoac nhap tay."
+            )
 
     # --- CAPTCHA ------------------------------------------------------------
     if looks_like_captcha(title, body_text):
@@ -897,6 +934,10 @@ class LazyBrowser:
     @property
     def started(self) -> bool:
         return self._ctx is not None
+
+    @property
+    def ctx(self) -> Any:
+        return self._ctx
 
     def page(self) -> Any:
         if self._page is None:
@@ -1160,6 +1201,53 @@ def run_test_url(url: str, headless: bool) -> int:
     return 0
 
 
+def cho_dang_nhap(b: "LazyBrowser", cho_toi_da: float = 900.0) -> bool:
+    """Cho den khi Shopee cap phien dang nhap, khong doi go phim.
+
+    VI SAO KHONG DUNG input()
+      Che do --login truoc day dung `input()` de biet luc nao nguoi dung xong.
+      Cach do chi chay duoc khi helper ngoi trong mot terminal co ban phim. Khi
+      helper duoc bat ho — chay nen — thi cua so trinh duyet van hien ra binh
+      thuong, nhung khong ai go duoc Enter vao dau ca, va tien trinh treo mai.
+
+      Cookie moi la thu biet chac: Shopee cap `SPC_ST` (session token) dung luc
+      dang nhap thanh cong. Doc no thi khong phai hoi ai het.
+
+    KHONG DOC MAT KHAU. Chi doc ten cookie va viec no co gia tri hay khong —
+    khong doc noi dung, khong doc gi tu o nhap lieu.
+    """
+    CAN = ("SPC_ST", "SPC_EC")   # hai cookie Shopee chi cap sau khi dang nhap
+    het_han = time.monotonic() + cho_toi_da
+    nhac = 0.0
+
+    print("  Dang cho ban dang nhap trong cua so vua mo…", flush=True)
+    while time.monotonic() < het_han:
+        try:
+            cookies = b.ctx.cookies()
+        except Exception:
+            # Nguoi dung dong cua so — khong phai loi, chi la ho thoi.
+            print("  Cua so da dong truoc khi dang nhap xong.", flush=True)
+            return False
+
+        co = {c["name"]: (c.get("value") or "") for c in cookies}
+        if any(co.get(n) for n in CAN):
+            # Cho them mot nhip: Shopee con ghi vai cookie nua ngay sau do, dong
+            # trinh duyet qua som thi phien luu lai bi thieu.
+            time.sleep(4)
+            print("  Da nhan ra phien dang nhap Shopee.", flush=True)
+            return True
+
+        if time.monotonic() > nhac:
+            con = int(het_han - time.monotonic())
+            print(f"  … chua thay phien dang nhap (con {con // 60} phut)", flush=True)
+            nhac = time.monotonic() + 60
+
+        time.sleep(2)
+
+    print("  Het gio cho. Chay lai lenh nay khi ban san sang.", flush=True)
+    return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="PHOI Local Helper — doc thong tin san pham tu link",
@@ -1199,7 +1287,10 @@ def main() -> None:
         print("  Mot cua so trinh duyet se mo ra. Trong do:")
         print("    1. Dang nhap Shopee (va TikTok neu ban dung link TikTok).")
         print("    2. Mo thu mot trang san pham bat ky de chac la vao duoc.")
-        print("    3. Quay lai day va bam Enter.")
+        if sys.stdin.isatty():
+            print("    3. Quay lai day va bam Enter.")
+        else:
+            print("    3. Khong phai lam gi them — helper tu nhan ra va tu dong cua so.")
         print()
         print("  Mat khau ban go vao la go tren trang cua chinh san, trong cua")
         print("  so cua chinh ban. Helper khong doc gi ngoai cookie trinh duyet")
@@ -1209,7 +1300,13 @@ def main() -> None:
             b = LazyBrowser(pw, headless=False)
             page = b.page()
             page.goto("https://shopee.vn/buyer/login", wait_until="domcontentloaded")
-            input("\n  Dang nhap xong thi bam Enter o day… ")
+
+            # Chay tay trong terminal thi bam Enter la xong. Chay nen (khong co
+            # ban phim noi vao day) thi tu do cookie ma biet — xem `cho_dang_nhap`.
+            if sys.stdin.isatty():
+                input("\n  Dang nhap xong thi bam Enter o day… ")
+            else:
+                cho_dang_nhap(b)
             b.close()
         print("  Da luu phien dang nhap. Chay lai --test-url de thu.")
         return

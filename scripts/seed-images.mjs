@@ -185,8 +185,19 @@ async function upload(bucket, path, buf, token) {
 }
 
 async function main() {
+  /*
+    --thieu: CHI lam nhung gi dang thieu anh.
+
+    Vi sao can: mac dinh script nay tao lai anh cho MOI du lieu mau. Sau khi
+    them mon moi, chay lai bang mac dinh se ghi de anh cua toan bo 60 mon va
+    72 set — trong do co nhung set dang lay anh tu mon dau tien (cach 0038 lam)
+    chu khong phai anh khoi mau. Chay lai se lam mat cach hien do ma khong ai
+    yeu cau.
+  */
+  const chiThieu = process.argv.includes('--thieu');
+
   const { token, userId } = await signIn();
-  console.log(`Dang nhap OK — ${userId}`);
+  console.log(`Dang nhap OK — ${userId}${chiThieu ? ' — chi lam phan dang thieu' : ''}`);
 
   const { client } = await connect(resolveConnectionString([]));
   const q = async (s, p) => (await client.query(s, p)).rows;
@@ -195,7 +206,9 @@ async function main() {
 
   // ---- Anh cho 20 set do -------------------------------------------------
   const outfits = await q(
-    'select id, slug, color_slugs from outfits where is_seed order by slug',
+    `select id, slug, color_slugs from outfits
+      where is_seed ${chiThieu ? "and coalesce(hero_image_url, '') = ''" : ''}
+      order by slug`,
   );
   console.log(`\nTao anh cho ${outfits.length} set do...`);
 
@@ -210,7 +223,9 @@ async function main() {
 
   // ---- Anh cho 45 san pham ----------------------------------------------
   const products = await q(
-    'select id, color_slug, category from products where is_seed order by id',
+    `select id, color_slug, category from products
+      where is_seed ${chiThieu ? "and coalesce(image_url, '') = ''" : ''}
+      order by id`,
   );
   console.log(`\nTao anh cho ${products.length} san pham...`);
 

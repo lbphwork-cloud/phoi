@@ -89,6 +89,58 @@ export interface ScorableOutfit {
 /** Ban do slug mau -> hanh, lay tu bang colors trong database. */
 export type ColorElementMap = Record<string, NguHanh | null>;
 
+/**
+ * PHAI DU HAI MAU HOP MOI COI LA HOP MENH.
+ *
+ * VI SAO KHONG PHAI MOT
+ *   Mau chu dao cua mot set do gio chi con la mau AO va mau QUAN (xem migration
+ *   0039). Neu chi mot trong hai hop menh thi nua bo do van thuoc hanh khac —
+ *   goi ca set la "hop menh" la noi qua ve dieu ma nguoi dung nhin thay.
+ *
+ *   Voi nguong mot mau, gan nhu moi set deu hop voi gan nhu moi menh: ao trang
+ *   quan den thi hop ca Kim (trang) lan Thuy (den) lan moi menh duoc hai mau do
+ *   tuong sinh. Mot nhan dung cho tat ca thi khong con la thong tin.
+ *
+ * Con so nay la mot LUAT, khong phai mot tham so de tinh chinh. Doi no la doi
+ * y nghia cua chu "hop menh" tren toan bo website.
+ */
+export const HOP_MENH_TOI_THIEU = 2;
+
+/** Dem so mau chu dao thuoc hanh ban menh hoac hanh tuong sinh. */
+export function demMauHopMenh(
+  colorSlugs: string[],
+  colorElements: ColorElementMap,
+  element: NguHanh,
+): number {
+  const g = colorGuidanceFor(element);
+  return colorSlugs.filter((slug) => {
+    const el = colorElements[slug];
+    return el === g.tuongSinh || el === g.banMenh;
+  }).length;
+}
+
+/** Cac mau chu dao dang hop menh — dung de to dam dung nhung o mau do. */
+export function mauHopMenh(
+  colorSlugs: string[],
+  colorElements: ColorElementMap,
+  element: NguHanh,
+): string[] {
+  const g = colorGuidanceFor(element);
+  return colorSlugs.filter((slug) => {
+    const el = colorElements[slug];
+    return el === g.tuongSinh || el === g.banMenh;
+  });
+}
+
+/** Mot set co duoc coi la hop menh hay khong. Dung chung o moi noi. */
+export function laHopMenh(
+  colorSlugs: string[],
+  colorElements: ColorElementMap,
+  element: NguHanh,
+): boolean {
+  return demMauHopMenh(colorSlugs, colorElements, element) >= HOP_MENH_TOI_THIEU;
+}
+
 export interface ScoreBreakdown {
   total: number;
   /** Tung phan diem, de giai thich cho nguoi dung va de go loi */
@@ -173,10 +225,25 @@ export function scoreOutfit(
       else if (el === g.hanChe) neg += W_ELEM_HAN_CHE;
     }
 
+    /*
+      DIEM CONG CHI DUOC TINH KHI DU HAI MAU HOP.
+
+      Mot mau hop mot mau khong thi nua bo do van thuoc hanh khac — khong du de
+      goi la hop menh, nen cung khong du de duoc cong diem. Xem HOP_MENH_TOI_THIEU.
+
+      Phan TRU diem thi khong theo nguong: mot mau nen han che van la mot mau
+      nen han che, du cac mau con lai co the nao. Hai chieu nay khong doi xung
+      vi ho khong hoi cung mot cau: cong diem hoi "ca bo do co hop khong",
+      tru diem hoi "co mau nao nen tranh khong".
+    */
+    if (demMauHopMenh(outfit.colorSlugs, colorElements, ctx.element) < HOP_MENH_TOI_THIEU) {
+      pos = 0;
+    }
+
     pos = clamp(pos, 0, ELEM_POSITIVE_CAP);
     neg = clamp(neg, ELEM_NEGATIVE_CAP, 0);
 
-    add('Màu hợp mệnh của bạn', pos);
+    add('Cả áo và quần đều hợp mệnh', pos);
     if (!isPhaCach) add('Có màu nên hạn chế theo mệnh', neg);
   }
 
@@ -219,12 +286,33 @@ export function rankOutfits<T extends ScorableOutfit>(
   ctx: UserContext,
   colorElements: ColorElementMap,
   now: number = 0,
+  /**
+   * Bat khi nguoi dung bam nut "Ưu tiên hợp mệnh".
+   *
+   * Day KHONG phai them diem — day la mot bac xep tren diem. Cong diem thi bai
+   * hop menh van co the bi mot bai dung phong cach yeu thich (+40) vuot len, va
+   * nguoi dung bam nut xong khong thay gi doi. Bam mot nut co ten "uu tien" thi
+   * phai thay ngay thu minh vua uu tien nam tren cung.
+   *
+   * Trong bac, thu tu van do diem quyet dinh — nen so thich ca nhan van dinh
+   * doat trat tu ben trong nhom hop menh, dung nhu bat bien o dau file.
+   */
+  uuTienMenh: boolean = false,
 ): Array<T & { score: ScoreBreakdown }> {
   const hidden = new Set(ctx.hiddenOutfitIds);
+  const menh = uuTienMenh && ctx.elementEnabled ? ctx.element : null;
+  const bac = (o: ScorableOutfit) =>
+    menh && laHopMenh(o.colorSlugs, colorElements, menh) ? 1 : 0;
+
   return outfits
     .filter((o) => !hidden.has(o.id))
     .map((o) => ({ ...o, score: scoreOutfit(o, ctx, colorElements, now) }))
     .sort((a, b) => {
+      if (menh) {
+        const ba = bac(a);
+        const bb = bac(b);
+        if (ba !== bb) return bb - ba;
+      }
       if (b.score.total !== a.score.total) return b.score.total - a.score.total;
       // Bang diem thi uu tien bai moi hon, roi den id de thu tu on dinh
       const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;

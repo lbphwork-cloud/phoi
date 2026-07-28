@@ -61,6 +61,8 @@ export function useOutfits(
   ctx: UserContext,
   colorElements: ColorElementMap,
   limit = 60,
+  /** Nguoi dung dang bat "Ưu tiên hợp mệnh" — day bai hop menh len dau. */
+  uuTienMenh = false,
 ) {
   const now = useStableNow();
   const key = JSON.stringify(filters) + '|' + limit;
@@ -104,6 +106,7 @@ export function useOutfits(
     ctx,
     colorElements,
     now,
+    uuTienMenh,
   );
 
   return {

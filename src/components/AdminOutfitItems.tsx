@@ -473,7 +473,13 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     if (d.description !== undefined) patch.description = d.description.trim() || null;
     if (d.styleSlug !== undefined) patch.style_slug = d.styleSlug || null;
     if (d.occasionSlug !== undefined) patch.occasion_slug = d.occasionSlug || null;
-    if (d.colorSlugs !== undefined) patch.color_slugs = d.colorSlugs;
+    if (d.colorSlugs !== undefined) {
+      patch.color_slugs = d.colorSlugs;
+      // Admin tu chon mau thi khoa lai, khong de trigger 0039 tinh lai theo
+      // mon nua. Khong co dong nay thi lan sua mon ke tiep se ghi de len lua
+      // chon vua roi va nhin nhu website tu doi mau.
+      patch.tone_thu_cong = true;
+    }
 
     const { error } = await sb.from('outfits').update(patch).eq('id', outfitId);
 

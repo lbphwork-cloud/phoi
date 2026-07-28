@@ -11,6 +11,7 @@ import { OutfitCard } from '@/components/outfit';
 import { ColorPicker } from '@/components/ColorPicker';
 import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
+import { laHopMenh, mauHopMenh } from '@/lib/scoring';
 import { formatVnd } from '@/lib/format';
 
 /**
@@ -62,7 +63,7 @@ function Discover() {
    */
   const searchParams = useSearchParams();
   const c = useContent();
-  const { ctx, privateData } = useUserContext();
+  const { ctx, privateData, reload: reloadCtx } = useUserContext();
 
   // Doc mot lan luc mo trang. Sau do bo loc thuoc ve nguoi dung: ho bo chon
   // phong cach thi khong co ly do gi de dia chi keo no quay lai.
@@ -72,8 +73,28 @@ function Discover() {
   });
   const [priceStep, setPriceStep] = useState(0);
   const [menhOnly, setMenhOnly] = useState(false);
+  /**
+   * Uu tien hop menh len dau — KHAC voi menhOnly.
+   *
+   * Hai viec khac nhau nen la hai nut khac nhau: "day len dau" giu nguyen ca
+   * danh sach va chi doi thu tu; "chi hien" cat bo phan con lai. Truoc day chi
+   * co mot nut lam viec thu hai, nen nguoi muon xem het nhung uu tien bai hop
+   * khong co cach nao lam duoc.
+   */
+  const [menhUuTien, setMenhUuTien] = useState(false);
 
-  const { outfits, loading, error, total, reload } = useOutfits(filters, ctx, tax.colorElements, 120);
+  /**
+   * Cac bai vua bi bam "khong thich" trong phien nay.
+   *
+   * Diem tru -100 chi co hieu luc sau khi ho so nguoi dung duoc tai lai — mat
+   * khoang mot giay. Trong khoang do the van nam nguyen cho cu, va nguoi dung
+   * tuong nut khong an. Danh sach nay day the xuong cuoi NGAY, roi lan tai lai
+   * chi xac nhan lai dieu da thay.
+   */
+  const [vuaBo, setVuaBo] = useState<string[]>([]);
+
+  const { outfits, loading, error, total, reload } =
+    useOutfits(filters, ctx, tax.colorElements, 120, menhUuTien);
 
   const element = privateData?.element ?? null;
   const menhEnabled = privateData?.element_enabled ?? true;
@@ -88,25 +109,25 @@ function Discover() {
    * bo cham diem — neu loc cung ngay tu dau thi nguoi menh Thuy chi con thay
    * do den va xanh, catalog ngheo di ngay lap tuc.
    */
-  const visible =
-    menhOnly && guidance
-      ? outfits.filter((o) =>
-          o.color_slugs.some((c) => {
-            const el = tax.colorElements[c];
-            return el === guidance.tuongSinh || el === guidance.banMenh;
-          }),
-        )
-      : outfits;
+  const hopMenhCuaBai = (o: { color_slugs: string[] }) =>
+    element ? laHopMenh(o.color_slugs, tax.colorElements, element) : false;
 
-  /** Bao nhieu bai co mau hop menh — dung cho con so ngay tren nut. */
-  const soHopMenh = guidance
-    ? outfits.filter((o) =>
-        o.color_slugs.some((cs) => {
-          const el = tax.colorElements[cs];
-          return el === guidance.tuongSinh || el === guidance.banMenh;
-        }),
-      ).length
-    : 0;
+  const locMenh = menhOnly && element ? outfits.filter(hopMenhCuaBai) : outfits;
+
+  /*
+    Bai vua bi bo xuong CUOI danh sach, khong bien mat.
+
+    Bo han thi bam nham la mat luon, khong tim lai duoc; day xuong cuoi thi van
+    con do. Do cung dung nghia cua nut nay — "khong thich cach phoi" chu khong
+    phai "an bai nay di".
+  */
+  const boSet = new Set(vuaBo);
+  const visible = boSet.size
+    ? [...locMenh.filter((o) => !boSet.has(o.id)), ...locMenh.filter((o) => boSet.has(o.id))]
+    : locMenh;
+
+  /** Bao nhieu bai DU HAI mau hop menh — dung cho con so ngay tren nut. */
+  const soHopMenh = element ? outfits.filter(hopMenhCuaBai).length : 0;
 
   /*
     TAI THEO TUNG DOT, khong bay het mot luc.
@@ -124,7 +145,7 @@ function Discover() {
   */
   const MOI_DOT = 24;
   const [soDot, setSoDot] = useState(1);
-  const khoaDanhSach = JSON.stringify(filters) + `|${menhOnly}|${visible.length}`;
+  const khoaDanhSach = JSON.stringify(filters) + `|${menhOnly}|${menhUuTien}|${visible.length}`;
   const [khoaCu, setKhoaCu] = useState(khoaDanhSach);
   if (khoaCu !== khoaDanhSach) {
     setKhoaCu(khoaDanhSach);
@@ -133,6 +154,27 @@ function Discover() {
 
   const dangHien = visible.slice(0, soDot * MOI_DOT);
   const conNua = visible.length - dangHien.length;
+
+  /**
+   * Nguoi dung vua bam "khong thich" mot bai.
+   *
+   * LOI CU O DAY, va no tinh vi: cho nay chi goi `reload()` cua danh sach
+   * outfit. Nhung danh sach outfit KHONG phai thu quyet dinh thu tu — diem tru
+   * -100 nam trong ngu canh nguoi dung (`ctx`), duoc dung tu bang phan hoi.
+   * Tai lai danh sach outfit thi tra ve dung nhung dong do, cham bang dung
+   * ngu canh cu, va ra dung thu tu cu. Diem tru viet dung tu dau nhung khong
+   * bao gio duoc doc toi.
+   *
+   * Ba viec, theo dung thu tu quan trong:
+   *   1. Day the xuong cuoi NGAY — nguoi dung thay nut co tac dung tuc thi.
+   *   2. Tai lai NGU CANH — day moi la thu lam diem tru co hieu luc that.
+   *   3. Tai lai danh sach — cho lan cham diem sau dung du lieu moi nhat.
+   */
+  const boBai = (id: string) => {
+    setVuaBo((v) => (v.includes(id) ? v : [...v, id]));
+    reloadCtx();
+    reload();
+  };
 
   const toggle = (k: keyof OutfitFilters, v: string) =>
     setFilters((f) => ({ ...f, [k]: f[k] === v ? null : v }));
@@ -146,6 +188,7 @@ function Discover() {
     setFilters({});
     setPriceStep(0);
     setMenhOnly(false);
+    setMenhUuTien(false);
   };
 
   const activeCount =
@@ -274,13 +317,32 @@ function Discover() {
             CHUA tat goi y theo menh. Khong quang cao tinh nang ho khong dung. */}
         {element && menhEnabled && guidance && (
           <Group label={`Mệnh ${NGU_HANH_LABEL[element]}`}>
+            {/*
+              HAI NUT, HAI VIEC KHAC NHAU.
+
+              "Ưu tiên lên đầu" doi thu tu ma giu nguyen so bai — dung cho nguoi
+              muon xem het catalog nhung thay bai hop truoc. "Chỉ hiện" cat bo
+              phan con lai. Truoc day chi co mot nut lam viec thu hai, va nguoi
+              muon viec thu nhat khong co cach nao.
+
+              Bat duoc ca hai cung luc: loc lay bai hop roi van xep chung theo
+              bac — vo hai, va khong can chan.
+            */}
+            <button
+              type="button"
+              className="chip"
+              aria-pressed={menhUuTien}
+              onClick={() => setMenhUuTien((v) => !v)}
+            >
+              Ưu tiên outfit hợp mệnh lên đầu
+            </button>
             <button
               type="button"
               className="chip"
               aria-pressed={menhOnly}
               onClick={() => setMenhOnly((v) => !v)}
             >
-              Chỉ hiện outfit có màu hợp mệnh
+              Chỉ hiện outfit hợp mệnh
             </button>
             {/*
               NOI SO BAI HOP MENH NGAY TAI NUT.
@@ -288,9 +350,13 @@ function Discover() {
               Truoc day bam nut xong chi thay danh sach doi — khong biet no bo
               bao nhieu bai, va neu danh sach ngan san thi khong biet nut co
               chay khong. Mot con so tra loi ca hai cau hoi truoc khi bam.
+
+              Cau "ca ao va quan" la phan quan trong: khong co no thi nguoi dung
+              thay 23/72 va tuong website dem thieu, trong khi that ra no dang
+              dem theo mot luat chat hon.
             */}
             <span className="muted-2 self-center text-xs">
-              {soHopMenh}/{outfits.length} bài có màu hợp mệnh ·
+              {soHopMenh}/{outfits.length} bài có cả áo và quần hợp mệnh ·
               {' '}Tương sinh: {NGU_HANH_LABEL[guidance.tuongSinh]} · Bản mệnh:{' '}
               {NGU_HANH_LABEL[guidance.banMenh]} · Hạn chế: {NGU_HANH_LABEL[guidance.hanChe]}
             </span>
@@ -342,17 +408,18 @@ function Discover() {
                 key={o.id}
                 outfit={o}
                 score={o.score}
+                /*
+                  CHI TO VIEN KHI CA BO DO HOP MENH.
+
+                  To vien tung o mau rieng le se noi "mau nay hop" cho mot set
+                  ma tong the khong hop — dung thu ma luat hai mau vua bo.
+                */
                 hopMenh={
-                  guidance
-                    ? o.color_slugs.filter((cs) => {
-                        const el = tax.colorElements[cs];
-                        return el === guidance.tuongSinh || el === guidance.banMenh;
-                      })
+                  element && hopMenhCuaBai(o)
+                    ? mauHopMenh(o.color_slugs, tax.colorElements, element)
                     : undefined
                 }
-                // Sau khi ghi phan hoi, tai lai danh sach de bo cham diem
-                // xep lai thu tu ngay — set vua bam se tut xuong cuoi.
-                onDislike={reload}
+                onDislike={() => boBai(o.id)}
               />
             ))}
           </div>

@@ -168,7 +168,13 @@ export interface Outfit {
   hero_image_url: string | null;
   style_slug: string | null;
   occasion_slug: string | null;
+  /**
+   * Mau chu dao. Tu migration 0039 day la mau cua AO va QUAN, khong tinh giay
+   * hay phu kien — trigger trong database tu tinh lai moi khi cac mon doi.
+   */
   color_slugs: string[];
+  /** true = nguoi dung tu chon mau, trigger khong tinh lai theo mon nua. */
+  tone_thu_cong: boolean;
   total_price_vnd: number | null;
   status: OutfitStatus;
   author_id: string | null;
