@@ -27,10 +27,18 @@ export function StatusTag({ status }: { status: OutfitStatus }) {
   return <span className={`tag ${cls[status]}`}>{STATUS_LABEL[status]}</span>;
 }
 
-/** Nhan du lieu mau, de khong lan voi du lieu that. */
-export function SeedTag() {
-  return <span className="tag tag-quiet">Dữ liệu mẫu</span>;
-}
+/*
+  NHAN "Du lieu mau" DA BO KHOI TOAN BO WEBSITE.
+
+  No tung hien tren the outfit, tren trang chi tiet, tren tung san pham va
+  trong hai trang quan tri. Chu website goi dung ten: nhin rat thieu chuyen
+  nghiep — mot nguoi la vao trang doc duoc dong do se hieu la website chua co
+  hang that.
+
+  Cot `is_seed` trong database GIU NGUYEN. No van dung cho cac phep kiem chung
+  va van dem duoc, chi la khong hien ra man hinh nua. Xoa cot di thi moi phep
+  kiem "dem dung du lieu mau" mat cho dua, ma chung dang bao ve nhung thu that.
+*/
 
 /** Nhan bat buoc cho anh do AI tao (de bai muc 7). */
 export function AiTag() {
@@ -344,7 +352,6 @@ export function ProductRow({
               {tax.colorLabel(product.color_slug)}
             </span>
           )}
-          {product.is_seed && <SeedTag />}
         </p>
 
         <p className="mt-2 font-medium">{formatVnd(product.price_vnd)}</p>

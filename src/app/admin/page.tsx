@@ -108,17 +108,28 @@ export default function AdminHome() {
           <Stat label="Cần sửa" value={c.needsRevision} />
           <Stat label="Bản nháp" value={c.drafts} />
           <Stat label="Sản phẩm" value={c.products} />
-          <Stat label="Trong đó là mẫu" value={c.seedProducts} />
+          <Stat label="Chưa thay dữ liệu thật" value={c.seedProducts} />
           <Stat label="Người dùng" value={c.users} />
           <Stat label="Click 7 ngày" value={c.clicks7d} />
         </div>
 
+        {/*
+          CHI CON MOT CHO DUY NHAT TREN CA WEBSITE nhac den du lieu dung tam, va
+          no nam trong trang quan tri — noi chi ban nhin thay.
+
+          Nhan "Du lieu mau" da bo khoi moi cho nguoi ngoai co the thay: the
+          outfit, trang chi tiet, tung san pham, hang doi kiem duyet. Mot nguoi
+          la doc duoc dong do se hieu la website chua co hang that.
+
+          Nhung khong bo han thong tin: ban van can biet con bao nhieu mon chua
+          thay, neu khong thi khong co gi nhac va chung se nam do mai.
+        */}
         {c.seedProducts > 0 && (
-          <div className="notice notice-warn mt-4">
-            Còn {c.seedProducts} sản phẩm mẫu. Tên và giá là dữ liệu mô tả, link trỏ
-            tới trang tìm kiếm của sàn. Thay dần bằng dữ liệu thật: mở set đồ trong{' '}
+          <div className="notice mt-4">
+            Còn {c.seedProducts} sản phẩm chưa thay bằng hàng thật. Tên và giá đang là
+            dữ liệu mô tả, link trỏ tới trang tìm kiếm của sàn. Mở set đồ trong{' '}
             <Link href="/admin/outfit" className="underline">trang outfit</Link> rồi sửa
-            từng món bên trong.
+            từng món bên trong. Người xem không thấy dòng này.
           </div>
         )}
       </section>

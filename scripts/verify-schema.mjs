@@ -243,6 +243,29 @@ async function main() {
   report('khong set nao qua 3 mau chu dao', quaNhieuMau.length === 0,
          quaNhieuMau.length ? JSON.stringify(quaNhieuMau) : 'toi da 3');
 
+  /*
+    KHONG BAI NAO DUOC TU GIOI THIEU LA DU LIEU MAU.
+
+    Migration 0024 cua toi dat "Dữ liệu mẫu. Nội dung và ảnh sẽ được thay..."
+    lam mo ta cho 18 set. Toi tuong do la ghi chu noi bo — nhung cot description
+    hien THANG tren trang chi tiet, cho moi nguoi la vao doc. Nua danh muc dang
+    tu noi minh la hang gia.
+
+    Phep kiem nay chan cai do quay lai, o bat ky cot chu nao nguoi ngoai doc duoc.
+  */
+  const tuThuNhan = await q(`
+    select slug from outfits
+     where description ilike '%dữ liệu mẫu%' or title ilike '%dữ liệu mẫu%'
+        or description ilike '%sẽ được thay bằng bài thật%'`);
+  report('khong bai nao tu nhan la du lieu mau', tuThuNhan.length === 0,
+         tuThuNhan.length ? `${tuThuNhan.length} bai: ${tuThuNhan.slice(0, 3).map(x => x.slug).join(', ')}`
+                          : 'khong co bai nao');
+
+  const moTaRong = await q(
+    `select slug from outfits where is_seed and coalesce(trim(description), '') = ''`);
+  report('moi set do mau deu co mo ta', moTaRong.length === 0,
+         moTaRong.length ? `${moTaRong.length} bai de trong` : 'tat ca deu co');
+
   console.log('\n=== 4. Kiem tra trigger nghiep vu ===');
 
   // Tao 1 admin va 1 user thuong

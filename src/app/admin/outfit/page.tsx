@@ -228,7 +228,6 @@ export default function AdminOutfitsPage() {
                       {o.title}
                     </span>
                     <span className="muted-2 block text-xs">
-                      {o.is_seed && 'dữ liệu mẫu · '}
                       {o.ai_generated && 'ảnh AI · '}
                       {o.view_count} lượt xem
                     </span>

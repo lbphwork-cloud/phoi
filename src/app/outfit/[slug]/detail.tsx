@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { isSupabaseConfigured } from '@/lib/supabase/client';
 import { useTaxonomy, useUserContext } from '@/lib/hooks';
 import { useOutfitDetail } from '@/lib/useOutfits';
-import { AiTag, FeedbackBar, ProductRow, SeedTag, StatusTag } from '@/components/outfit';
+import { AiTag, FeedbackBar, ProductRow, StatusTag } from '@/components/outfit';
 import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { SaveButton } from '@/components/SaveButton';
 import { formatVnd, formatRelative } from '@/lib/format';
@@ -78,7 +78,6 @@ function Detail({ slug }: { slug: string }) {
 
           <div className="lg:pt-4">
             <div className="mb-4 flex flex-wrap items-center gap-1.5">
-              {outfit.is_seed && <SeedTag />}
               {outfit.ai_generated && <AiTag />}
               {outfit.status !== 'published' && <StatusTag status={outfit.status} />}
             </div>

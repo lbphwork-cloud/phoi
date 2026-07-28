@@ -358,7 +358,6 @@ export default function ModerationPage() {
                 <div className="flex flex-wrap items-center gap-2 border-b p-4"
                      style={{ borderColor: 'var(--line)' }}>
                   <StatusTag status={o.status} />
-                  {o.is_seed && <span className="tag tag-quiet">Dữ liệu mẫu</span>}
                   {o.ai_generated && <span className="tag tag-warn">Ảnh tạo bởi AI</span>}
                   <span className="muted-2 text-xs">
                     {o.submitted_at ? `gửi ${formatRelative(o.submitted_at)}` : 'chưa gửi'}

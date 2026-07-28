@@ -30,6 +30,10 @@ import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
 import { UploadButton } from '@/components/UploadButton';
 import { ITEM_ROLE_LABEL } from '@/lib/supabase/types';
+import {
+  datTenTheoQuyTac, vietMoTaTheoQuyTac, thieuGiDeDatTen, thieuGiDeVietMoTa,
+} from '@/lib/outfitNaming';
+import { buildImagePrompt, explainPromptVi } from '@/lib/aiImage';
 import type { ItemRole } from '@/lib/supabase/types';
 import type { OutfitWithItems } from '@/lib/supabase/types';
 
@@ -97,6 +101,11 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   }>({});
   const [outfitBusy, setOutfitBusy] = useState(false);
   const [outfitSaved, setOutfitSaved] = useState(false);
+
+  /** Lan tao prompt thu may — bam "Đổi cách diễn đạt" thi tang len. */
+  const [promptLan, setPromptLan] = useState(0);
+  const [hienPrompt, setHienPrompt] = useState(false);
+  const [daChep, setDaChep] = useState(false);
 
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
@@ -472,6 +481,44 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   const oColors = outfitDraft.colorSlugs ?? data.color_slugs ?? [];
   const outfitDirty = Object.keys(outfitDraft).length > 0;
 
+  /*
+    DAU VAO CHUNG cho ba bo sinh tu dong: dat ten, viet mo ta, dung cau lenh anh.
+
+    Doc tu BAN NHAP dang go truoc, roi moi den du lieu da luu. Nho vay doi
+    phong cach o o ben tren la ba nut duoi tu cap nhat theo ngay — khong phai
+    bam Luu roi moi thay ket qua doi.
+
+    Dung CHUNG mot bo ham voi trang tao bai (src/lib/outfitNaming.ts). Viet lai
+    o day nghia la hai noi se dat ten theo hai kieu, va khong ai nhan ra cho
+    den khi so hai bai canh nhau.
+  */
+  const nguyenLieu = {
+    outfitTitle: oTitle,
+    styleLabel: oStyle ? tax.styleLabel(oStyle) : '',
+    occasionLabel: oOcc ? tax.occasionLabel(oOcc) : '',
+    colorLabels: oColors.map((c) => tax.colorLabel(c)),
+    items: items.map((it) => ({
+      roleLabel: ITEM_ROLE_LABEL[it.role],
+      name: draft[it.id]?.name ?? it.products?.name ?? '',
+      colorLabel: it.products?.color_slug ? tax.colorLabel(it.products.color_slug) : undefined,
+    })),
+  };
+
+  const tenGoiY = datTenTheoQuyTac(nguyenLieu);
+  const moTaGoiY = vietMoTaTheoQuyTac(nguyenLieu);
+  const thieuTen = thieuGiDeDatTen(nguyenLieu);
+  const thieuMoTa = thieuGiDeVietMoTa(nguyenLieu);
+
+  const promptInput = {
+    ...nguyenLieu,
+    sceneId: 'trang',
+    modelTypeId: 'can-doi',
+    // Anh cua tung mon SE duoc gui kem khi goi AI, nen cau lenh phai duoc dung
+    // theo huong do — neu khong no se ta quan ao bang chu va bo qua anh.
+    hasReferences: items.some((it) => it.products?.image_url),
+    variation: promptLan,
+  };
+
   const patchOutfit = (p: typeof outfitDraft) => {
     setOutfitSaved(false);
     setOutfitDraft((x) => ({ ...x, ...p }));
@@ -492,25 +539,57 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
       <div className="flex flex-col gap-3 border p-4" style={{ borderColor: 'var(--line)' }}>
         <p className="eyebrow">Thông tin set đồ</p>
 
+        {/*
+          BA NUT SINH TU DONG, dung CHUNG bo ham voi trang tao bai.
+
+          Deu chay bang QUY TAC, khong goi AI: khong can key, khong cho mang,
+          khong ton tien, va cung mot dau vao luon cho cung ket qua. Mot cai ten
+          set do chi can tra loi ba cau — phong cach gi, mau gi, mac dip nao —
+          va ca ba deu dang nam san trong cac o ngay tren.
+        */}
         <div>
-          <label className="label">Tên set đồ</label>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <label className="label mb-0">Tên set đồ</label>
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              disabled={!tenGoiY}
+              onClick={() => tenGoiY && patchOutfit({ title: tenGoiY })}
+              title={tenGoiY ? `Đặt thành: ${tenGoiY}` : thieuTen.join(' ')}
+            >
+              Đặt tên tự động
+            </button>
+          </div>
           <input
             className="field"
             value={oTitle}
             maxLength={120}
             onChange={(e) => patchOutfit({ title: e.target.value })}
           />
+          {thieuTen.length > 0 && <p className="hint">Chưa đặt tên tự động được: {thieuTen.join(' ')}</p>}
         </div>
 
         <div>
-          <label className="label">Mô tả</label>
+          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+            <label className="label mb-0">Mô tả</label>
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              disabled={!moTaGoiY}
+              onClick={() => moTaGoiY && patchOutfit({ description: moTaGoiY })}
+              title={moTaGoiY ? 'Viết ngay từ các món trong set' : thieuMoTa.join(' ')}
+            >
+              Viết tự động
+            </button>
+          </div>
           <textarea
             className="field"
-            rows={2}
+            rows={3}
             maxLength={600}
             value={oDesc}
             onChange={(e) => patchOutfit({ description: e.target.value })}
           />
+          {thieuMoTa.length > 0 && <p className="hint">Chưa viết tự động được: {thieuMoTa.join(' ')}</p>}
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -563,6 +642,68 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
           <p className="hint">
             Bộ lọc ở trang khám phá và phép tính hợp mệnh dùng đúng các màu chọn ở đây.
           </p>
+        </div>
+
+        {/*
+          CAU LENH TAO ANH.
+
+          Khong goi AI o day — chi DUNG cau lenh roi cho chep. Ai co key thi
+          dung o trang tao bai; ai khong co van mang cau lenh nay sang bat ky
+          cong cu tao anh nao. Do la ca ly do no ton tai: phan lon nguoi dung se
+          khong bao gio co API key.
+        */}
+        <div className="border-t pt-3" style={{ borderColor: 'var(--line)' }}>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              onClick={() => { setHienPrompt((v) => !v); setDaChep(false); }}
+            >
+              {hienPrompt ? 'Ẩn câu lệnh tạo ảnh' : 'Tạo câu lệnh tạo ảnh'}
+            </button>
+            {hienPrompt && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => { setPromptLan((n) => n + 1); setDaChep(false); }}
+                >
+                  Đổi cách diễn đạt
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    void navigator.clipboard.writeText(buildImagePrompt(promptInput));
+                    setDaChep(true);
+                  }}
+                >
+                  {daChep ? 'Đã chép' : 'Chép câu lệnh'}
+                </button>
+              </>
+            )}
+          </div>
+
+          {hienPrompt && (
+            <div className="mt-3">
+              <p className="eyebrow mb-2">Đang yêu cầu AI những gì</p>
+              <ul className="muted flex flex-col gap-1 text-sm">
+                {explainPromptVi(promptInput).map((d, i) => <li key={i}>{d}</li>)}
+              </ul>
+              {!promptInput.hasReferences && (
+                <p className="hint-error mt-2">
+                  Chưa món nào có ảnh, nên câu lệnh chỉ tả bằng chữ — ảnh sinh ra sẽ
+                  không giống sản phẩm thật. Thêm ảnh cho từng món ở dưới trước.
+                </p>
+              )}
+              <details className="mt-3">
+                <summary className="eyebrow cursor-pointer">Xem câu lệnh gốc (tiếng Anh)</summary>
+                <pre className="muted-2 mt-2 whitespace-pre-wrap text-xs">
+                  {buildImagePrompt(promptInput)}
+                </pre>
+              </details>
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
