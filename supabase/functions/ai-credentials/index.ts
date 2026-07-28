@@ -166,6 +166,12 @@ const PROBE_MODELS: Record<string, string[]> = {
   image: ['gemini-2.5-flash-image', 'gemini-3.1-flash-image'],
 };
 
+/** Cac mo hinh de thu key cua xAI (Grok). */
+const PROBE_MODELS_XAI: Record<string, string[]> = {
+  text: ['grok-4.5', 'grok-4.3'],
+  image: ['grok-imagine-image'],
+};
+
 async function probeKey(
   provider: string,
   key: string,
@@ -176,6 +182,52 @@ async function probeKey(
   }
 
   try {
+    /*
+      xAI: thu bang DUNG endpoint ma viec do se dung.
+
+      Viet chu di qua /v1/chat/completions, dung anh di qua /v1/images/edits.
+      Thu ca hai bang mot endpoint chung se cho ket qua vo nghia — key co the
+      goi duoc chu ma khong con tin dung de dung anh, va nguoc lai.
+    */
+    if (provider === 'xai') {
+      const ungVien = PROBE_MODELS_XAI[purpose] ?? PROBE_MODELS_XAI.text;
+      const model = ungVien[0];
+
+      const r = purpose === 'image'
+        ? await fetch('https://api.x.ai/v1/images/edits', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model, prompt: 'a plain white t-shirt on white background' }),
+          })
+        : await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model, max_tokens: 1, messages: [{ role: 'user', content: 'OK' }],
+            }),
+          });
+
+      const t = await r.text();
+
+      if (r.ok) {
+        return {
+          ok: true,
+          note: `Key dùng được để ${purpose === 'image' ? 'dựng ảnh' : 'viết chữ'} `
+            + `(vừa gọi thử ${model} và xAI trả lời bình thường).`
+            + (purpose === 'image' ? ' Mỗi ảnh khoảng 0,2 USD — có tính tiền.' : ''),
+        };
+      }
+      if (r.status === 401 || r.status === 403) {
+        return { ok: false, error: 'xAI từ chối key này — sai key, key đã bị xoá, hoặc '
+          + 'tài khoản chưa được cấp quyền dùng mô hình. Tạo key mới ở console.x.ai.' };
+      }
+      if (r.status === 429) {
+        return { ok: false, error: 'Key hợp lệ nhưng tài khoản xAI đã hết tín dụng '
+          + 'hoặc vượt hạn mức. Nạp thêm ở console.x.ai rồi thử lại.' };
+      }
+      return { ok: false, error: `xAI trả về ${r.status}: ${t.slice(0, 200)}` };
+    }
+
     if (provider === 'gemini') {
       const ungVien = PROBE_MODELS[purpose] ?? PROBE_MODELS.text;
       let r: Response | null = null;
@@ -332,7 +384,7 @@ Deno.serve(async (req) => {
   const purpose = body.purpose === 'image' ? 'image' : 'text';
   const rawKey = String(body.key ?? '');
 
-  if (!['gemini', 'openai', 'local_comfyui'].includes(provider)) {
+  if (!['gemini', 'openai', 'xai', 'local_comfyui'].includes(provider)) {
     return json({ ok: false, error: `Nhà cung cấp không hợp lệ: ${provider}` }, 400);
   }
 

@@ -40,6 +40,7 @@ import {
 import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
 import { UploadButton } from '@/components/UploadButton';
+import { ImagePicker, laAnhMauTrong } from '@/components/ImagePicker';
 import {
   SCENES, MODEL_TYPES, buildImagePrompt, requestAiImage,
   buildDescriptionPrompt, requestAiDescription, explainPromptVi,
@@ -48,14 +49,21 @@ import {
 import {
   useAiCredentials, useLastAiError,
 } from '@/lib/aiCredentials';
-import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
+import { AI_PROVIDER_LABEL, CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import type { ItemRole, Platform, ProductCategory } from '@/lib/supabase/types';
 
-/** Ten nha cung cap hien cho nguoi dung. */
+/*
+  Ten nha cung cap dung CHUNG mot bang voi ca website (AI_PROVIDER_LABEL trong
+  supabase/types.ts). Truoc day o day co mot ban rieng ghi "OpenAI", trong khi
+  cho khac ghi "ChatGPT" — cung mot thu, hai ten, va nguoi dung phai tu doan la
+  mot.
+*/
 const PROVIDER_LABEL: Record<AiProviderId, string> = {
-  gemini: 'Google Gemini',
-  openai: 'OpenAI',
+  gemini: AI_PROVIDER_LABEL.gemini,
+  openai: AI_PROVIDER_LABEL.openai,
+  xai: AI_PROVIDER_LABEL.xai,
 };
+
 
 /** Lay key o dau, va tra tien hay khong. */
 
@@ -67,6 +75,8 @@ interface DraftItem {
   role: ItemRole;
   /** Mau THUC SU dung trong set do nay. Mot mau. Di vao bo loc va hop menh. */
   colorSlug: string;
+  /** Cac anh doc duoc tu link, de nguoi dang chon mot. Rong = chua lay lan nao. */
+  imageChoices: string[];
   /** Cac mau ma chinh link do dang ban tren san. Nhieu mau. Chi de tham khao. */
   availableColorSlugs: string[];
   priceVnd: string;
@@ -158,6 +168,7 @@ let keySeq = 0;
 const newItem = (): DraftItem => ({
   key: `item-${++keySeq}`,
   name: '', category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
+  imageChoices: [],
   priceVnd: '', imageUrl: '', affiliateUrl: '', productUrl: '', platform: null,
   source: null, fetchNote: '', busy: false,
 });
@@ -185,7 +196,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
   // Tao anh bang AI. `heroUrlDirect` la anh AI da chon: no da nam tren
   // Storage roi nen khong phai tai len lai luc luu.
-  const [aiProvider, setAiProvider] = useState<AiProviderId>('gemini');
+  const [aiProvider, setAiProvider] = useState<AiProviderId>('xai');
   const [sceneId, setSceneId] = useState<string>(SCENES[0].id);
   const [modelTypeId, setModelTypeId] = useState<string>(MODEL_TYPES[1].id);
   const [aiBusy, setAiBusy] = useState(false);
@@ -325,6 +336,19 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     for (const i of named) {
       if (!i.imageUrl.trim()) {
         missing.push(`"${i.name.trim()}" chưa có ảnh — lấy từ link hoặc tự tải lên.`);
+      } else if (laAnhMauTrong(i.imageUrl)) {
+        /*
+          CHAN KHI ANH LA O VUONG XAM, khong chi canh bao.
+
+          Anh do script tao du lieu mau sinh ra la mot o mau tron 800x800. Gui
+          no lam anh mau thi AI khong co gi de dung lai — no se ve mot mon do
+          chung chung, va tam anh do TON TIEN THAT (khoang 0,2 USD voi Grok).
+          Do la mot khoan chi chac chan khong thu lai duoc gi.
+        */
+        missing.push(
+          `"${i.name.trim()}" đang dùng ảnh mẫu (ô vuông xám), không phải ảnh thật. `
+          + 'Lấy ảnh từ link hoặc tự tải lên trước — dựng ảnh từ ô màu là mất tiền vô ích.',
+        );
       }
     }
     if (!styleSlug) missing.push('Chưa chọn phong cách cho set.');
@@ -523,6 +547,14 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       name: it.name || d.name || '',
       priceVnd: it.priceVnd || (d.price_vnd ? String(d.price_vnd) : ''),
       imageUrl: it.imageUrl || d.image_url || '',
+      /*
+        GIU CA DANH SACH ANH, khong chi anh dau.
+
+        Anh dau la anh bia do nguoi ban chon — hay la anh ghep co chu quang cao
+        dan len. De nguoi dang chon giua vai anh thi ho chon duoc anh chup ro
+        mon do, va chinh anh do di lam mau cho AI.
+      */
+      imageChoices: d.image_urls?.length ? d.image_urls : (d.image_url ? [d.image_url] : []),
       // Chi dien mau khi nguoi dung CHUA chon: khong ghi de lua chon cua ho.
       colorSlug: it.colorSlug || guessColorSlug(d.name ?? '') || '',
       /*
@@ -1022,7 +1054,18 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                 </div>
               </div>
 
-              {it.imageUrl && (
+              {/* Cac anh lay duoc tu link — bam de chon anh dung cho mon nay. */}
+              {it.imageChoices.length > 0 && (
+                <div className="mt-4">
+                  <ImagePicker
+                    urls={it.imageChoices}
+                    selected={it.imageUrl}
+                    onPick={(u) => patch(it.key, { imageUrl: u })}
+                  />
+                </div>
+              )}
+
+              {it.imageUrl && it.imageChoices.length === 0 && (
                 <div className="mt-4 w-24">
                   <div className="frame frame-square">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1305,8 +1348,19 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                 value={aiProvider}
                 onChange={(e) => setAiProvider(e.target.value as AiProviderId)}
               >
-                <option value="gemini">Gemini (có gói miễn phí)</option>
-                <option value="openai">OpenAI (trả tiền mỗi ảnh)</option>
+                {/*
+                  GROK DUNG DAU VA LA MAC DINH — do bang phep thu tren key that,
+                  khong phai theo cam tinh:
+
+                    * Grok  — dung lai DUNG quan ao trong anh san pham. Co tinh
+                              tien, khoang 0,2 USD mot anh.
+                    * Gemini— han muc anh cua goi mien phi bang 0. Viet chu thi
+                              mien phi that, va rat tot.
+                    * ChatGPT — chua do tren du an nay.
+                */}
+                <option value="xai">Grok — dựng đúng ảnh sản phẩm (trả tiền)</option>
+                <option value="gemini">Gemini — miễn phí phần viết chữ</option>
+                <option value="openai">ChatGPT (OpenAI) — trả tiền</option>
               </select>
             </div>
             <div>

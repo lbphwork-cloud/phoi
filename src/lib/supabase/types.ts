@@ -27,7 +27,20 @@ export type FeedbackKind =
 
 export type JobStatus = 'pending' | 'claimed' | 'done' | 'failed' | 'cancelled';
 export type ReviewAction = 'approve' | 'reject' | 'request_changes';
-export type AiProvider = 'gemini' | 'openai' | 'local_comfyui';
+export type AiProvider = 'gemini' | 'openai' | 'xai' | 'local_comfyui';
+
+/**
+ * Ten hien ra cho nguoi dung.
+ *
+ * Goi dung ten ma nguoi ta biet: khong ai tim "OpenAI API key", ho tim key cua
+ * ChatGPT. `xai` cung vay — thu ho nghe la Grok.
+ */
+export const AI_PROVIDER_LABEL: Record<AiProvider, string> = {
+  gemini: 'Google Gemini',
+  openai: 'ChatGPT (OpenAI)',
+  xai: 'Grok (xAI)',
+  local_comfyui: 'ComfyUI trên máy bạn',
+};
 
 export const CATEGORY_LABEL: Record<ProductCategory, string> = {
   ao: 'Áo', quan: 'Quần', giay: 'Giày', tui: 'Túi',
@@ -209,6 +222,16 @@ export interface FetchJobResult {
   name?: string;
   price_vnd?: number | null;
   image_url?: string | null;
+  /**
+   * Cac anh doc duoc tu trang san pham, de nguoi dang chon mot.
+   *
+   * `image_url` luon la phan tu dau cua mang nay khi mang khong rong — giu ca
+   * hai de cac cho goi cu khong phai sua.
+   *
+   * CO THE IT HON BA, va co the rong. Mot link chi cong bo mot anh thi do la
+   * su that cua link do, khong phai thieu sot cua ham doc.
+   */
+  image_urls?: string[];
   platform?: Platform | null;
   resolved_url?: string | null;
   resolved_host?: string | null;

@@ -227,30 +227,12 @@ export async function fetchProductFromUrl(
   return { ...t2, tier: 3, message: t2.message };
 }
 
-/** Doan danh muc san pham tu ten, de dien san o chon cho nguoi dung. */
-export function guessCategory(name: string): string {
-  const n = name.toLowerCase();
-  const rules: Array<[RegExp, string]> = [
-    [/áo|ao |shirt|tee|polo|hoodie|sweat|jacket|khoác|cardigan|somi|sơ mi/, 'ao'],
-    [/quần|quan |pants|jean|chino|short|jogger|âu|tây/, 'quan'],
-    [/giày|giay|sneaker|shoe|sandal|loafer|derby|boot|slip/, 'giay'],
-    [/túi|tui |balo|backpack|bag|tote/, 'tui'],
-    [/đồng hồ|dong ho|watch/, 'dong_ho'],
-    [/kính|kinh |glasses|sunglass/, 'kinh'],
-    [/mũ|mu |cap|hat|bucket|nón/, 'mu'],
-  ];
-  for (const [re, cat] of rules) if (re.test(n)) return cat;
-  return 'phu_kien';
-}
-
-/** Doan vai tro trong set do tu danh muc. */
-export function roleFromCategory(cat: string): string {
-  const map: Record<string, string> = {
-    ao: 'top', quan: 'bottom', giay: 'shoes', tui: 'bag',
-    dong_ho: 'watch', kinh: 'glasses', mu: 'hat', phu_kien: 'accessory',
-  };
-  return map[cat] ?? 'accessory';
-}
+/*
+  Doan loai hang va vai tro da chuyen sang src/lib/guessCategory.ts — tach ra
+  de bo kiem chung chay duoc ma khong keo theo thu vien Supabase. Van xuat lai
+  o day cho cac cho dang goi.
+*/
+export { guessCategory, roleFromCategory } from './guessCategory';
 
 /** Doan nen tang tu link, de dien san. */
 export function platformFromUrl(url: string): Platform | null {

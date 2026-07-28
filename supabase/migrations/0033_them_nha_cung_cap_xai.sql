@@ -1,0 +1,32 @@
+-- =============================================================================
+-- Them nha cung cap `xai` (Grok) vao danh sach AI
+--
+-- VI SAO THEM: DO THANG TREN KEY THAT
+--   Gemini KHONG dung anh duoc bang goi mien phi — han muc anh bang 0, do tren
+--   hai key khac nhau. Grok thi dung duoc, va quan trong hon: no NHIN DUOC anh
+--   san pham that.
+--
+--   Phep thu: cung mot cau lenh, khong kem anh -> ra ao polo xanh va quan tay
+--   xam, bia hoan toan. Kem hai anh san pham that -> ra dung ao len xam gan co
+--   xe va quan be xep ly cua hai mon do. Do la ca ly do website nay can AI:
+--   ve mot bo do KHONG co that thi khong dung duoc vao viec gi.
+--
+-- CAI BAY DA TRANH DUOC, ghi lai de khong ai vap lai
+--   Endpoint /v1/images/generations cua xAI NHAN anh mau roi lang le vut di.
+--   Thu sau ten truong khac nhau (image, images, image_url, reference_images,
+--   input_image, image_urls) — tat ca deu tra ve 200 kem mot tam anh. Khong
+--   loi, khong canh bao. Noi vao do thi website deu dan sinh ra quan ao bia ma
+--   khong ai nhan ra.
+--
+--   Dung cho la /v1/images/edits voi `images: [{url}, ...]`.
+--   Chu thich day du nam trong supabase/functions/ai-generate/index.ts.
+--
+-- THEM GIA TRI VAO ENUM, KHONG DUNG BANG THAM CHIEU
+--   Enum `ai_provider` da co tu 0001 va duoc ba bang dung. Doi sang bang tham
+--   chieu la mot cuoc di chuyen du lieu chi de them mot dong — khong dang.
+--
+--   Postgres tu 12 cho phep ALTER TYPE ... ADD VALUE trong transaction, mien
+--   la khong DUNG gia tri moi trong cung transaction do. File nay chi them.
+-- =============================================================================
+
+alter type ai_provider add value if not exists 'xai';

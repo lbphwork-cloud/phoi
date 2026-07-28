@@ -30,11 +30,18 @@ import { guessColorSlugs } from '@/lib/guessColor';
 import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
 import { UploadButton } from '@/components/UploadButton';
+import { ImagePicker, laAnhMauTrong } from '@/components/ImagePicker';
 import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import {
   datTenTheoQuyTac, vietMoTaTheoQuyTac, thieuGiDeDatTen, thieuGiDeVietMoTa, bangMau,
 } from '@/lib/outfitNaming';
-import { buildImagePrompt, explainPromptVi, monChuaCoAnh, SCENES, MODEL_TYPES } from '@/lib/aiImage';
+import {
+  buildImagePrompt, explainPromptVi, monChuaCoAnh, requestAiImage,
+  SCENES, MODEL_TYPES, type AiProviderId,
+} from '@/lib/aiImage';
+import { useAiCredentials } from '@/lib/aiCredentials';
+import { AiKeyBox } from '@/components/AiKeyBox';
+import { AI_PROVIDER_LABEL } from '@/lib/supabase/types';
 import type { ItemRole, ProductCategory } from '@/lib/supabase/types';
 import type { OutfitWithItems } from '@/lib/supabase/types';
 
@@ -58,6 +65,8 @@ interface ItemDraft {
   role?: ItemRole;
   colorSlug?: string;
   availableColorSlugs?: string[];
+  /** Cac anh doc duoc tu link o lan bam "Lay thong tin" gan nhat. */
+  imageChoices?: string[];
 }
 
 export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
@@ -135,6 +144,20 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   */
   const [promptSua, setPromptSua] = useState<string | null>(null);
 
+  /*
+    DUNG ANH BANG AI NGAY TAI DAY.
+
+    Truoc day khoi nay chi DUNG cau lenh roi cho chep — muon tao anh that thi
+    phai sang trang tao bai, nhap lai toan bo mot set do da ton tai chi de bam
+    mot cai nut. Ma dung cho can anh nhat lai la day: bai da co du mon, du anh
+    san pham, dang cho duyet.
+  */
+  const [aiProvider, setAiProvider] = useState<AiProviderId>('xai');
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [aiUrls, setAiUrls] = useState<string[]>([]);
+  const creds = useAiCredentials();
+
   const [adding, setAdding] = useState(false);
   const [addBusy, setAddBusy] = useState(false);
   const [addNote, setAddNote] = useState<string | null>(null);
@@ -144,6 +167,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     role: 'top' as ItemRole,
     colorSlug: '',
     availableColorSlugs: [] as string[],
+    imageChoices: [] as string[],
   });
 
   // Anh dai dien cua ca set. Giu rieng khoi `draft` vi no thuoc bang outfits,
@@ -355,6 +379,9 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     if (d.name) moi.name = d.name;
     if (d.price_vnd) moi.price = String(d.price_vnd);
     if (d.image_url) moi.imageUrl = d.image_url;
+    // Giu ca danh sach de nguoi duyet chon anh khac neu anh dau khong ro mon do.
+    const dsAnh = d.image_urls?.length ? d.image_urls : (d.image_url ? [d.image_url] : []);
+    if (dsAnh.length) moi.imageChoices = dsAnh;
 
     /*
       DOAN LOAI VA MAU TU TEN, nhung CHI DIEN VAO O DANG TRONG.
@@ -471,6 +498,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
       name: x.name || d.name || '',
       price: x.price || (d.price_vnd ? String(d.price_vnd) : ''),
       imageUrl: x.imageUrl || d.image_url || '',
+      imageChoices: d.image_urls?.length ? d.image_urls : (d.image_url ? [d.image_url] : []),
       category: x.name || !catDoan ? x.category : catDoan,
       role: x.name || !catDoan ? x.role : (roleFromCategory(catDoan) as ItemRole),
       colorSlug: x.colorSlug || guessColorSlug(d.name ?? '') || '',
@@ -564,6 +592,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     setMoi({
       url: '', name: '', price: '', imageUrl: '',
       category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
+      imageChoices: [],
     });
     reload();
   };
@@ -691,6 +720,54 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   /** Cau lenh dang hien: ban tu sua neu co, khong thi ban sinh tu du lieu. */
   const cauLenh = promptSua ?? buildImagePrompt(promptInput);
   const thieuAnh = monChuaCoAnh(promptInput);
+
+  /** Anh cua tung mon, gui kem lam mau tham chieu cho AI. */
+  const anhThamChieu = items
+    .map((it) => draft[it.id]?.imageUrl ?? it.products?.image_url ?? '')
+    .filter((u) => u && !laAnhMauTrong(u));
+
+  /** Con thieu gi de bam duoc nut dung anh. Rong nghia la du. */
+  const thieuDeDungAnh: string[] = (() => {
+    const thieu: string[] = [];
+    if (!creds.loading && !creds.activeFor(aiProvider as never, 'image')
+        && !creds.activeFor(aiProvider as never, 'text')) {
+      thieu.push(`Chưa có API key ${AI_PROVIDER_LABEL[aiProvider]} — dán vào ô ngay dưới.`);
+    }
+    if (items.length === 0) thieu.push('Set chưa có món nào.');
+    for (const it of items) {
+      const u = draft[it.id]?.imageUrl ?? it.products?.image_url ?? '';
+      const ten = draft[it.id]?.name ?? it.products?.name ?? 'món này';
+      if (!u) thieu.push(`"${ten.slice(0, 30)}" chưa có ảnh.`);
+      else if (laAnhMauTrong(u)) {
+        thieu.push(`"${ten.slice(0, 30)}" đang dùng ảnh mẫu ô vuông xám — dựng từ nó là mất tiền vô ích.`);
+      }
+    }
+    return thieu;
+  })();
+
+  const dungAnh = async () => {
+    setAiBusy(true);
+    setAiMessage(null);
+
+    const r = await requestAiImage({
+      provider: aiProvider,
+      // Gui DUNG cau lenh dang hien tren man hinh, ke ca ban da sua tay. Gui
+      // mot cau lenh khac thu nguoi dung vua doc la dieu khong giai thich duoc.
+      prompt: cauLenh,
+      outfitId,
+      referenceUrls: anhThamChieu,
+    });
+
+    setAiBusy(false);
+    setAiMessage({ ok: r.ok, text: r.message });
+    if (r.ok && r.urls.length) setAiUrls(r.urls);
+  };
+
+  /** Dat mot anh AI vua dung lam anh dai dien cua set. Van phai bam Luu. */
+  const chonAnhAi = (u: string) => {
+    setHeroDraft(u);
+    setHeroSaved(false);
+  };
 
   const patchOutfit = (p: typeof outfitDraft) => {
     setOutfitSaved(false);
@@ -956,6 +1033,89 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                 để đọc.
                 {promptSua !== null && ' Bạn đã sửa tay nên câu lệnh không tự dựng lại nữa.'}
               </p>
+            </div>
+
+            {/* ------------------------------------------------------------ */}
+            {/* DUNG ANH BANG AI, ngay tai day                               */}
+            {/*                                                               */}
+            {/* Chi quan tri vien — may chu chan cung, va day la khoi chi     */}
+            {/* quan tri vien mo duoc. Nguoi dang bai van dung duoc nut viet  */}
+            {/* mo ta bang AI o trang tao bai voi key cua chinh ho.           */}
+            {/* ------------------------------------------------------------ */}
+            <div className="border-t pt-3" style={{ borderColor: 'var(--line)' }}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">Dịch vụ AI</label>
+                  <select
+                    className="field"
+                    value={aiProvider}
+                    onChange={(e) => setAiProvider(e.target.value as AiProviderId)}
+                  >
+                    <option value="xai">Grok — dựng đúng ảnh sản phẩm (trả tiền)</option>
+                    <option value="gemini">Gemini — hạn mức ảnh miễn phí bằng 0</option>
+                    <option value="openai">ChatGPT (OpenAI) — trả tiền</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-3">
+                <AiKeyBox
+                  provider={aiProvider as never}
+                  purpose="image"
+                  active={creds.activeFor(aiProvider as never, 'image')
+                    ?? creds.activeFor(aiProvider as never, 'text')}
+                  sharedWithText={!creds.activeFor(aiProvider as never, 'image')
+                    && Boolean(creds.activeFor(aiProvider as never, 'text'))}
+                  loading={creds.loading}
+                  onChanged={creds.reload}
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={aiBusy || thieuDeDungAnh.length > 0}
+                  onClick={() => void dungAnh()}
+                  title={thieuDeDungAnh.length ? 'Chưa đủ điều kiện — xem lý do bên dưới'
+                                               : 'Dựng ảnh từ ảnh thật của các món'}
+                >
+                  {aiBusy ? 'Đang dựng ảnh…' : 'Dựng ảnh bằng AI'}
+                </button>
+                <span className="muted-2 text-xs">
+                  Gửi kèm {anhThamChieu.length} ảnh sản phẩm thật làm mẫu.
+                  {aiProvider === 'xai' && ' Khoảng 0,2 USD một ảnh.'}
+                </span>
+              </div>
+
+              {thieuDeDungAnh.length > 0 && (
+                <div className="notice mt-3">
+                  <p className="text-sm">Nút &ldquo;Dựng ảnh bằng AI&rdquo; chưa bấm được vì:</p>
+                  <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+                    {thieuDeDungAnh.map((m) => <li key={m}>{m}</li>)}
+                  </ul>
+                </div>
+              )}
+
+              {aiMessage && (
+                <p className={aiMessage.ok ? 'hint' : 'hint-error'}>{aiMessage.text}</p>
+              )}
+
+              {aiUrls.length > 0 && (
+                <div className="mt-3">
+                  <p className="eyebrow mb-2">Ảnh AI vừa dựng — bấm để chọn làm ảnh bài</p>
+                  <ImagePicker
+                    urls={aiUrls}
+                    selected={heroDraft ?? ''}
+                    onPick={chonAnhAi}
+                    label=""
+                  />
+                  <p className="hint">
+                    Chọn xong vẫn phải bấm &ldquo;Lưu ảnh đại diện&rdquo; ở khối bên dưới.
+                    Bài dùng ảnh AI phải được đánh dấu và vẫn qua kiểm duyệt.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -1230,7 +1390,25 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                   placeholder="Hoặc dán địa chỉ ảnh"
                   onChange={(e) => set(it.id, { imageUrl: e.target.value })}
                 />
+                {laAnhMauTrong(imageUrl) && (
+                  <p className="hint-error">
+                    Đây là ảnh mẫu (ô vuông xám), không phải ảnh sản phẩm thật. Dựng ảnh
+                    AI từ nó là mất tiền vô ích — bấm &ldquo;Lấy thông tin&rdquo; để lấy
+                    ảnh thật từ link.
+                  </p>
+                )}
               </div>
+
+              {/* Cac anh doc duoc tu link — bam de chon anh dung cho mon nay. */}
+              {(d.imageChoices?.length ?? 0) > 0 && (
+                <div className="sm:col-span-2">
+                  <ImagePicker
+                    urls={d.imageChoices!}
+                    selected={imageUrl}
+                    onPick={(u) => set(it.id, { imageUrl: u })}
+                  />
+                </div>
+              )}
 
               <div className="sm:col-span-2">
                 <label className="label">Link affiliate</label>
@@ -1483,6 +1661,15 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                 placeholder="Hoặc dán địa chỉ ảnh"
                 onChange={(e) => setMoi((x) => ({ ...x, imageUrl: e.target.value }))}
               />
+              {moi.imageChoices.length > 0 && (
+                <div className="mt-3">
+                  <ImagePicker
+                    urls={moi.imageChoices}
+                    selected={moi.imageUrl}
+                    onPick={(u) => setMoi((x) => ({ ...x, imageUrl: u }))}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -1507,6 +1694,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                 setMoi({
       url: '', name: '', price: '', imageUrl: '',
       category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
+      imageChoices: [],
     });
               }}
             >

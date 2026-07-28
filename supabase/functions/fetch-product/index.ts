@@ -243,23 +243,100 @@ function decodeEntities(s: string): string {
  * gia con te hon la de trong cho nguoi dung tu dien. Nen chi nhan cac dang ro
  * rang, va tu choi khoang gia ("100.000 - 200.000") vi khong biet lay so nao.
  */
+/*
+  =============================================================================
+  GOM NHIEU ANH SAN PHAM, khong chi mot
+
+  VI SAO CAN NHIEU HON MOT
+    Anh duy nhat lay duoc tu the chia se (og:image) la anh bia do nguoi ban
+    chon — thuong la anh ghep co chu quang cao, hoac anh nguoi mau chup xa.
+    Ca hai deu la anh TE NHAT de lam mau cho AI dung lai mon do.
+
+    Cho nguoi dang chon giua vai anh thi ho chon duoc anh chup ro mon do nhat,
+    va anh do vua lam anh hien tren website vua lam anh mau cho AI.
+
+  LAY O DAU RA
+    1. Cac the og:image / twitter:image (co trang khai bao nhieu the).
+    2. Duong dan anh nam ngay trong HTML tro toi CDN anh cua chinh san do.
+       Trang san pham nao cung nhung san danh sach anh trong mot khoi JSON;
+       khong can hieu cau truc JSON do, chi can nhat ra cac duong dan anh.
+
+  CHI NHAN CDN CUA SAN. Quet ca trang lay moi duong dan .jpg se vo phai icon,
+  banner quang cao, anh dai dien nguoi ban. Gioi han vao dung CDN anh san pham
+  la cach re nhat de khong phai loc rac ve sau.
+
+  KHONG HUA DU BA ANH. Co link chi co dung mot anh, va do la su that cua link
+  do chu khong phai loi. Ham tra ve nhung gi doc duoc.
+  =============================================================================
+*/
+const CDN_ANH = [
+  'down-vn.img.susercontent.com',
+  'cf.shopee.vn',
+  'ibyteimg.com',
+  'tiktokcdn.com',
+  'tiktokcdn-us.com',
+];
+
+function gomAnh(html: string, og: Record<string, string>, toiDa = 6): string[] {
+  const ra: string[] = [];
+  const them = (u: string | undefined) => {
+    if (!u) return;
+    const sach = u.trim().replace(/&amp;/g, '&');
+    if (!sach.startsWith('https://')) return;
+    if (ra.length >= toiDa) return;
+    // So khong phan biet duoi anh: cung mot anh o hai kich thuoc van la mot anh
+    // trung — nhung khong doan xa hon the, vi moi san dat ten mot kieu.
+    if (!ra.includes(sach)) ra.push(sach);
+  };
+
+  them(og['og:image']);
+  them(og['twitter:image']);
+
+  for (const m of html.matchAll(/https:\/\/[^"'\s\\<>]+/g)) {
+    if (ra.length >= toiDa) break;
+    const u = m[0];
+    if (!CDN_ANH.some((d) => u.includes(d))) continue;
+    // Bo cac duong dan khong phai anh tinh (video, sprite, icon nho).
+    if (/\.(mp4|webm|m3u8|svg)(\?|$)/i.test(u)) continue;
+    them(u);
+  }
+
+  return ra;
+}
+
 function parsePriceVnd(text: string | undefined): number | null {
   if (!text) return null;
 
-  // Khoang gia thi bo qua — khong doan.
-  // Phai cho phep ky hieu tien te nam GIUA con so va dau gach:
-  // "100.000₫ - 200.000₫" la mot khoang gia, khong phai gia 100.000đ.
-  if (/\d[\d.,]*\s*(?:₫|đ|vnd)?\s*[-–—~]\s*\d/i.test(text)) return null;
+  /*
+    KHOANG GIA THI LAY SO NHO NHAT, khong bo qua nua.
 
-  const m = /(\d[\d.,]{2,})\s*(?:₫|đ\b|vnd\b|VND\b)/i.exec(text);
-  if (!m) return null;
+    Ban truoc gap "100.000₫ - 200.000₫" la tra ve null, voi ly do "khong doan
+    bua". Ly do do dung ve nguyen tac nhung sai ve ket qua: phan lon trang san
+    pham tren san deu hien mot khoang gia (vi nhieu size, nhieu mau), nen o gia
+    gan nhu luon trong va nguoi dang phai tu go tay tung mon.
 
-  const digits = m[1].replace(/[.,]/g, '');
-  const n = Number(digits);
+    Lay so NHO NHAT chu khong phai so lon hay trung binh, vi do la con so ma
+    nguoi mua nhin thay dau tien tren san va la con so ho so sanh. Giao dien
+    ghi ro day la "gia tu", de khong ai hieu nham la gia chot.
 
-  // Gioi han hop ly cho pham vi san pham cua website (150k - 700k, cho bien rong)
-  if (!Number.isFinite(n) || n < 10_000 || n > 100_000_000) return null;
-  return n;
+    Van bo qua khi CA HAI DAU deu khong doc duoc — mot khoang gia hong thi
+    khong co gi de lay.
+  */
+  const dsSo = [...text.matchAll(/(\d[\d.,]{2,})\s*(?:₫|đ\b|vnd\b|VND\b)/gi)]
+    .map((m) => Number(m[1].replace(/[.,]/g, '')))
+    // Gioi han hop ly cho pham vi san pham cua website (150k - 700k, cho bien rong)
+    .filter((n) => Number.isFinite(n) && n >= 10_000 && n <= 100_000_000);
+
+  if (dsSo.length === 0) {
+    // Con so KHONG kem ky hieu tien te: chi chap nhan khi ca chuoi la mot so,
+    // vi day la truong hop product:price:amount tra ve "320000".
+    const tron = text.trim().replace(/[.,]/g, '');
+    const n = Number(tron);
+    if (/^\d+$/.test(tron) && Number.isFinite(n) && n >= 10_000 && n <= 100_000_000) return n;
+    return null;
+  }
+
+  return Math.min(...dsSo);
 }
 
 Deno.serve(async (req) => {
@@ -384,12 +461,16 @@ Deno.serve(async (req) => {
     parsePriceVnd(og['og:description']) ??
     parsePriceVnd(og['og:title']);
 
+  const anhList = gomAnh(html, og);
+
   return json({
     ok: true,
     result: {
       name: name.slice(0, 200),
       price_vnd: priceVnd,
-      image_url: og['og:image'] ?? og['twitter:image'] ?? null,
+      image_url: anhList[0] ?? null,
+      /** Cac anh doc duoc, de nguoi dang chon mot. Co the it hon ba. */
+      image_urls: anhList,
       platform: platformOf(resolved.host),
       resolved_url: resolved.finalUrl,
       resolved_host: resolved.host,

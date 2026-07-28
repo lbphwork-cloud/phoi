@@ -326,6 +326,112 @@ async function generateWithOpenAI(
   return images;
 }
 
+/*
+  =============================================================================
+  xAI (Grok) — NHA CUNG CAP DUY NHAT DA DO DUOC LA DUNG LAI DUNG ANH SAN PHAM
+
+  PHEP THU TREN KEY THAT, cung mot cau lenh:
+    * Khong kem anh mau  -> ao polo xanh, quan tay xam. Bia hoan toan.
+    * Kem hai anh san pham -> dung ao len xam gan co xe va quan be xep ly cua
+      hai mon do; ca cai tui va cai dong ho trong anh goc cung theo sang.
+
+  Do la ca ly do website nay can AI. Mot buc anh dep ve mot bo do KHONG co that
+  thi khong dung duoc vao viec gi — nguoi xem bam vao link va nhan mot mon khac.
+
+  =============================================================================
+  CAI BAY: /v1/images/generations NHAN ANH MAU ROI VUT DI
+
+  Endpoint tao anh thong thuong cua xAI la cho ai cung se noi vao dau tien. No
+  nhan anh mau va TRA VE 200 KEM MOT TAM ANH — nhung anh mau bi bo qua hoan
+  toan. Da thu sau ten truong (image, images, image_url, reference_images,
+  input_image, image_urls): ca sau deu 200, khong loi, khong canh bao.
+
+  Kiem chung bang cach gui gia tri rac vao tung truong: neu API doc truong do
+  that thi phai bao loi. Ca sau van 200. Doi chung: gui ten mo hinh sai -> 404
+  ngay, tuc la endpoint co kiem tra dau vao, chi la no khong nhan anh.
+
+  Noi vao endpoint do thi website deu dan sinh ra quan ao bia, va KHONG AI NHAN
+  RA vi moi lan goi deu bao thanh cong.
+
+  DUNG CHO LA /v1/images/edits VOI `images: [{url}, ...]`.
+  No la endpoint duy nhat chiu bao loi — no tu choi mot anh 1x1 pixel voi cau
+  "kich thuoc toi thieu 8 pixel", tuc la no co mo anh ra xem that.
+
+  KHONG DOI SANG /v1/images/generations DU NO TRONG "CHUAN" HON.
+  =============================================================================
+
+  TRUYEN DUONG DAN, KHONG NHUNG BASE64. Anh san pham nam tren Storage cong khai
+  cua chinh project nay nen xAI tai ve duoc. Nhung base64 vao than yeu cau se
+  lam mot lan goi bon anh nang vai megabyte, cham va de vo gioi han kich thuoc.
+*/
+async function generateWithXai(
+  apiKey: string,
+  prompt: string,
+  model: string,
+  referenceUrls: string[] = [],
+): Promise<GeneratedImage[]> {
+  const anh = referenceUrls
+    .filter((u) => {
+      try {
+        const x = new URL(u);
+        return x.protocol === 'https:' && isAllowedImageHost(x);
+      } catch { return false; }
+    })
+    .slice(0, 6)
+    .map((url) => ({ url }));
+
+  const res = await fetch('https://api.x.ai/v1/images/edits', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: model || 'grok-imagine-image',
+      prompt,
+      ...(anh.length ? { images: anh } : {}),
+    }),
+    signal: AbortSignal.timeout(120_000),
+  });
+
+  const text = await res.text();
+
+  if (!res.ok) {
+    let detail = text.slice(0, 400);
+    try { detail = JSON.parse(text)?.error ?? detail; } catch { /* giu nguyen */ }
+
+    if (res.status === 401 || res.status === 403) {
+      throw new Error('API key của Grok không hợp lệ hoặc không có quyền dùng mô hình này.');
+    }
+    if (res.status === 429) {
+      throw new Error('Grok báo vượt hạn mức hoặc hết tín dụng trong tài khoản xAI.');
+    }
+    throw new Error(`Grok trả về lỗi ${res.status}: ${detail}`);
+  }
+
+  const data = (JSON.parse(text) as {
+    data?: Array<{ b64_json?: string; url?: string }>;
+  })?.data ?? [];
+
+  const images: GeneratedImage[] = [];
+  for (const d of data) {
+    if (d.b64_json) {
+      images.push({ mimeType: 'image/jpeg', base64: d.b64_json });
+    } else if (d.url) {
+      // xAI tra ve duong dan TAM — phai tai ve ngay roi luu vao Storage cua
+      // minh, neu khong vai gio nua bai dang se tro toi mot anh khong con.
+      const img = await fetch(d.url, { signal: AbortSignal.timeout(60_000) });
+      const buf = new Uint8Array(await img.arrayBuffer());
+      let bin = '';
+      for (const b of buf) bin += String.fromCharCode(b);
+      images.push({
+        mimeType: img.headers.get('content-type')?.split(';')[0] ?? 'image/jpeg',
+        base64: btoa(bin),
+      });
+    }
+  }
+
+  if (images.length === 0) throw new Error('Grok không trả về ảnh nào.');
+  return images;
+}
+
 /**
  * Mo hinh viet chu. Khac han mo hinh tao anh.
  *
@@ -352,11 +458,13 @@ async function generateWithOpenAI(
 const TEXT_MODELS: Record<string, string[]> = {
   gemini: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'],
   openai: ['gpt-4o-mini'],
+  xai: ['grok-4.5', 'grok-4.3'],
 };
 
 const DEFAULT_TEXT_MODEL: Record<string, string> = {
   gemini: TEXT_MODELS.gemini[0],
   openai: 'gpt-4o-mini',
+  xai: TEXT_MODELS.xai[0],
 };
 
 /**
@@ -406,21 +514,29 @@ async function generateText(
     throw new Error(`Gemini trả về ${loiCuoi}`);
   }
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  /*
+    xAI dung DUNG dang yeu cau cua OpenAI, chi khac dia chi. Nen mot doan ma
+    cho ca hai — viet hai ban gan giong nhau la hai cho de lech nhau ve sau.
+  */
+  const goc = provider === 'xai' ? 'https://api.x.ai' : 'https://api.openai.com';
+  const ten = provider === 'xai' ? 'Grok' : 'OpenAI';
+
+  const res = await fetch(`${goc}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }] }),
   });
-  if (!res.ok) throw new Error(`OpenAI trả về ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) throw new Error(`${ten} trả về ${res.status}: ${(await res.text()).slice(0, 200)}`);
   const j = await res.json();
   const text = j?.choices?.[0]?.message?.content ?? '';
-  if (!text.trim()) throw new Error('OpenAI không trả về chữ nào.');
+  if (!text.trim()) throw new Error(`${ten} không trả về chữ nào.`);
   return text;
 }
 
 const DEFAULT_MODEL: Record<string, string> = {
   gemini: 'gemini-2.5-flash-image',
   openai: 'gpt-image-1',
+  xai: 'grok-imagine-image',
 };
 
 // ---------------------------------------------------------------------------
@@ -454,12 +570,7 @@ Deno.serve(async (req) => {
     .eq('id', uid)
     .maybeSingle();
 
-  if (profile?.role !== 'admin') {
-    return json(
-      { ok: false, error: 'Giai đoạn này chỉ quản trị viên được tạo ảnh bằng AI.' },
-      403,
-    );
-  }
+  const laAdmin = profile?.role === 'admin';
 
   // --- Doc tham so --------------------------------------------------------
   let body: {
@@ -482,6 +593,31 @@ Deno.serve(async (req) => {
   const prompt = String(body.prompt ?? '').trim();
   const outfitId = body.outfitId ?? null;
   const mode = body.mode === 'text' ? 'text' : 'image';
+
+  /*
+    CHAN THEO VIEC, KHONG CHAN CA CUA.
+
+    Truoc day mot dong `if (role !== 'admin') return 403` dat ngay dau ham,
+    chan CA hai duong. Ket qua la nguoi dung thuong dan API key cua chinh ho
+    vao roi bam "Viet bang AI" va nhan mot cau tu choi, du viec do khong ton
+    cua ai dong nao ngoai tien cua chinh ho.
+
+    Gio tach hai duong:
+      * DUNG ANH — chi quan tri vien. Day la quyet dinh cua chu website: anh AI
+        con phai qua kiem duyet, va moi tam anh la tien that.
+      * VIET CHU — ai dang nhap cung duoc, mien co key cua chinh minh. Khong
+        co key thi khong goi duoc gi, nen khong the tieu tien cua nguoi khac.
+  */
+  if (mode === 'image' && !laAdmin) {
+    return json(
+      {
+        ok: false,
+        error: 'Giai đoạn này chỉ quản trị viên được dựng ảnh bằng AI. '
+          + 'Bạn vẫn dùng được nút viết mô tả bằng AI với key của mình.',
+      },
+      403,
+    );
+  }
   const referenceUrls = Array.isArray(body.referenceUrls)
     ? body.referenceUrls.filter((x): x is string => typeof x === 'string')
     : [];
@@ -489,7 +625,7 @@ Deno.serve(async (req) => {
     body.model ?? (mode === 'text' ? DEFAULT_TEXT_MODEL[provider] : DEFAULT_MODEL[provider]) ?? '',
   );
 
-  if (!['gemini', 'openai'].includes(provider)) {
+  if (!['gemini', 'openai', 'xai'].includes(provider)) {
     return json(
       {
         ok: false,
@@ -606,7 +742,9 @@ Deno.serve(async (req) => {
     const images =
       provider === 'gemini'
         ? await generateWithGemini(apiKey, prompt, model, referenceUrls)
-        : await generateWithOpenAI(apiKey, prompt, model);
+        : provider === 'xai'
+          ? await generateWithXai(apiKey, prompt, model, referenceUrls)
+          : await generateWithOpenAI(apiKey, prompt, model);
 
     // --- Tai anh len storage ----------------------------------------------
     // Duong dan phai bat dau bang user id de khop policy trong 0004_storage.sql.

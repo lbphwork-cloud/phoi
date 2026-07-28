@@ -54,6 +54,19 @@ const GOI_Y: Record<AiProvider, Partial<Record<AiKeyPurpose, string>>> = {
     text: 'Lấy key ở platform.openai.com/api-keys. Tính tiền theo lượng chữ.',
     image: 'Lấy key ở platform.openai.com/api-keys. Tính tiền theo từng ảnh.',
   },
+  /*
+    GROK LA NHA CUNG CAP DUY NHAT DA DUOC DO LA DUNG ANH SAN PHAM THAT DUOC.
+
+    Phep thu: cung mot cau lenh, khong kem anh -> ra mot bo do bia hoan toan.
+    Kem hai anh san pham -> ra dung hai mon do. Gemini khong lam duoc viec nay
+    vi han muc anh cua goi mien phi bang 0, khong phai vi mo hinh kem.
+  */
+  xai: {
+    text: 'Lấy key ở console.x.ai. Tính tiền theo lượng chữ.',
+    image:
+      'Lấy key ở console.x.ai. Đây là lựa chọn duy nhất đã đo được là dựng lại '
+      + 'đúng quần áo trong ảnh sản phẩm thật. Khoảng 0,2 USD mỗi ảnh — có tính tiền.',
+  },
   local_comfyui: {
     text: 'ComfyUI chạy trên máy bạn, không cần key.',
     image: 'ComfyUI chạy trên máy bạn, không cần key.',

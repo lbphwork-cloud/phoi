@@ -22,7 +22,7 @@
 
 import { getSupabase } from './supabase/client';
 
-export type AiProviderId = 'gemini' | 'openai';
+export type AiProviderId = 'gemini' | 'openai' | 'xai';
 
 /** Boi canh chup. Chon san thay vi de go tu do, de anh dong bo giua cac bai. */
 export const SCENES = [
