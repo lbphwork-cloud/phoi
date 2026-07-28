@@ -1,10 +1,86 @@
 # PHỐI
 
-Website gợi ý phối đồ nam cho thị trường Việt Nam. Người xem chọn gu, hệ thống
-xếp lại thứ tự outfit cho riêng họ, bấm ra Shopee hoặc TikTok Shop để mua. Người
-đăng bài gắn link affiliate của chính họ và hưởng toàn bộ hoa hồng.
+Website gợi ý phối đồ nam cho thị trường Việt Nam. Sản phẩm trong khoảng
+150.000 – 700.000đ. Đối tượng: nam 20–30 tuổi.
 
-Sản phẩm trong khoảng 150.000 – 700.000đ. Đối tượng: nam 20–30 tuổi.
+**Tìm outfit để mặc.** Lọc theo phong cách, dịp, màu và khoảng giá. Khai gu một
+lần thì thứ tự bài được xếp lại cho riêng bạn; thêm ngày sinh thì có gợi ý màu
+theo mệnh — chỉ là tham khảo thời trang, không phải bói toán.
+
+**Đăng outfit của mình để kiếm hoa hồng.** Ai cũng đăng được. Link affiliate là
+link của chính người đăng, hoa hồng về thẳng tài khoản họ. Bài qua kiểm duyệt
+trước khi hiện công khai.
+
+**Vài tính năng đáng chú ý**
+
+- Dán link Shopee hoặc TikTok, hệ thống tự đọc tên, giá và ảnh sản phẩm. Ba
+  đường: máy chủ, công cụ chạy trên máy cá nhân, và tiện ích Chrome — sàn chặn
+  đường này thì còn đường kia.
+- Tự đặt tên set đồ, viết mô tả và dựng câu lệnh tạo ảnh, chạy bằng quy tắc nên
+  không tốn tiền API.
+- Tạo ảnh minh hoạ bằng AI từ chính ảnh sản phẩm thật, có gắn nhãn rõ và phải
+  qua duyệt trước khi hiện.
+- Chỉnh chữ, ảnh và kiểu chữ của toàn website ngay trong trang quản trị, có
+  khung xem trước.
+- Người dùng tự xem, tải và xoá dữ liệu cá nhân của mình.
+
+---
+
+## Hiện trạng
+
+Website đã chạy được. Phần dưới đây liệt kê thẳng những chỗ còn yếu, để ai tiếp
+nhận không phải tự dò ra.
+
+### Sửa được ngay
+
+- **99 bài không có link thật.** Link hiện là chỗ trống dạng
+  `shopee.vn/cho-thay-link-...`, bấm vào ra trang hỏng. Đây là khuyết điểm lớn
+  nhất — website affiliate mà chưa link được tới sản phẩm nào.
+- **99 bài chỉ có áo và quần.** Giày, túi, phụ kiện nhìn thấy trong ảnh nhưng
+  không có trong bài, nên tổng giá và danh sách mua đều thiếu.
+- **Không có ô tìm kiếm.** Có 100 bài mà chỉ lọc được theo phong cách, dịp, màu,
+  giá — không gõ tên tìm được.
+- **Chưa có trang chính sách riêng tư và điều khoản**, trong khi đang thu thập
+  email, ngày sinh và lịch sử phản hồi.
+- **Chưa công bố quan hệ tiếp thị.** Link affiliate phải nói rõ với người đọc —
+  yêu cầu của cả Shopee lẫn TikTok.
+- **Bài đăng sau lần build gần nhất không có thẻ xem trước riêng.** Gửi link qua
+  Zalo hiện thông tin chung của website, chỉ đúng sau lần dựng lại kế tiếp.
+- **Không có nút chia sẻ** ở trang chi tiết.
+- **Không có kiểm thử tự động cho giao diện.** Gần 400 phép kiểm chỉ phủ phần
+  tính toán và database; lỗi hiển thị vẫn phải mở trình duyệt xem.
+- **Nhật ký quản trị chưa có trang xem** — có ghi nhưng phải truy database.
+
+### Vướng chi phí, hạn mức hoặc bên thứ ba
+
+- **Không lấy được giá Shopee tự động.** Shopee chặn máy chủ và xếp phiên đăng
+  nhập tự động là "trình cào". Chỉ còn đường tiện ích chạy trong trình duyệt của
+  chính người dùng.
+- **TikTok Shop không trả về giá** qua đường đọc nhanh.
+- **Giá sẽ cũ dần.** Không có cách cập nhật tự động, mà giá sàn đổi liên tục.
+- **Chưa có tài khoản affiliate** Shopee/TikTok nên chưa có link kiếm tiền thật.
+- **Chưa có tên miền riêng** — đang dùng `phoi.pages.dev`.
+- **Tạo ảnh AI gần như không dùng được.** Gemini hạn mức ảnh bằng 0; Grok tính
+  khoảng 0,2 đô mỗi ảnh.
+- **Hạn mức miễn phí Supabase:** 5GB băng thông/tháng, database ngủ khi không
+  dùng nên lần vào đầu tiên sau khi ngủ sẽ chậm.
+- **Ảnh chưa tối ưu** — bản xuất tĩnh tắt phần tối ưu ảnh của Next.
+
+### Không sửa được, hoặc phải đổi kiến trúc
+
+- **Khoá công khai Supabase luôn nằm trong mã nguồn trình duyệt.** Không giấu
+  được; mọi bảo vệ thật nằm ở phân quyền phía database.
+- **Bài mới không có trang tĩnh cho tới lần dựng lại kế tiếp.** Đã có đường dự
+  phòng cho người dùng, nhưng Google và bot mạng xã hội đọc HTML thô nên vẫn
+  không thấy bài mới. Muốn hết hẳn phải bỏ xuất tĩnh, tức bỏ hosting miễn phí.
+- **Không chạy được việc theo lịch** — không có máy chủ chạy nền, nên không có
+  job kiểm link chết hay cập nhật giá định kỳ.
+- **Ngũ hành không kiểm chứng được.** Đây là quan niệm văn hoá, không phải dữ
+  liệu đúng sai; website chỉ nói là gợi ý tham khảo.
+- **Không kiểm soát được sàn** — giao diện, API và chính sách affiliate của sàn
+  đổi lúc nào cũng được.
+- **Không biết ai thật sự mua.** Không có dữ liệu chuyển đổi ngoài thống kê của
+  chính sàn.
 
 ---
 
