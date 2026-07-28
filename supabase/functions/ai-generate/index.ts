@@ -87,9 +87,10 @@ interface GeneratedImage {
 /**
  * Google Gemini.
  *
- * Vi sao uu tien nha cung cap nay: co goi mien phi cho tao anh (khoang 500 anh
- * moi ngay), khong can the tin dung. Nhieu hon nhu cau cua mot nguoi van hanh
- * gap nhieu lan.
+ * KHONG CO GOI MIEN PHI CHO TAO ANH. Cau nay truoc day ghi "khoang 500 anh moi
+ * ngay, khong can the tin dung" va no sai: han muc anh cua goi mien phi bang 0,
+ * do thang tren hai key khac nhau cua chu website. Muon tao anh thi phai bat
+ * thanh toan cho du an tren Google Cloud. Phan VIET CHU thi van mien phi that.
  *
  * TEN MO HINH CO THE DOI. Google doi ten mo hinh anh kha thuong xuyen
  * (gemini-2.0-flash-exp-image-generation -> gemini-2.5-flash-image-preview ->
@@ -332,11 +333,29 @@ async function generateWithOpenAI(
  * khoa API da duoc ma hoa va giai ma o day roi; tach ra nghia la nhan doi doan
  * ma cham vao khoa, ma cang it noi cham vao khoa cang tot.
  */
-// gemini-2.5-flash da bi Google ngung cap cho tai khoan MOI (tra 404 kem loi
-// "no longer available to new users"), nen mac dinh la 2.0-flash. Ten mo hinh
-// van nhan tu tham so `model` de doi duoc ma khong phai trien khai lai.
+/*
+  MOT DANH SACH, KHONG PHAI MOT TEN MO HINH.
+
+  Google vua ngung mo hinh vua doi han muc lien tuc, va hai viec do bieu hien
+  y het nhau doi voi nguoi dung: nut khong chay. Du an nay dinh hai lan roi.
+
+    * Lan mot: gemini-2.5-flash tra 404 "no longer available to new users" voi
+      key luc do, nen toi ghi cung 2.0-flash.
+    * Lan hai: mot key khac cua chu website chay 2.5-flash BINH THUONG, nhung
+      2.0-flash lai tra 429 "limit: 0". Ghi cung ten mo hinh nao cung sai —
+      chi la sai voi ai.
+
+  Nen thu LAN LUOT theo danh sach: 404 (mo hinh khong con) va 429 (du an khong
+  co han muc cho MO HINH DO) deu chuyen sang ten ke tiep. Loi cuoi cung duoc
+  giu lai de bao cho dung, thay vi bao mot cau chung chung.
+*/
+const TEXT_MODELS: Record<string, string[]> = {
+  gemini: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'],
+  openai: ['gpt-4o-mini'],
+};
+
 const DEFAULT_TEXT_MODEL: Record<string, string> = {
-  gemini: 'gemini-2.0-flash',
+  gemini: TEXT_MODELS.gemini[0],
   openai: 'gpt-4o-mini',
 };
 
@@ -354,19 +373,37 @@ async function generateText(
   model: string,
 ): Promise<string> {
   if (provider === 'gemini') {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      },
-    );
-    if (!res.ok) throw new Error(`Gemini trả về ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    const j = await res.json();
-    const text = j?.candidates?.[0]?.content?.parts?.map((x: { text?: string }) => x.text ?? '').join('') ?? '';
-    if (!text.trim()) throw new Error('Gemini không trả về chữ nào.');
-    return text;
+    // Mo hinh do nguoi dung chon di truoc, roi den cac ten du phong. Trung
+    // nhau thi bo, de khong goi hai lan cung mot ten.
+    const ungVien = [...new Set([model, ...TEXT_MODELS.gemini])].filter(Boolean);
+    let loiCuoi = '';
+
+    for (const ten of ungVien) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${ten}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        },
+      );
+
+      if (res.ok) {
+        const j = await res.json();
+        const text = j?.candidates?.[0]?.content?.parts
+          ?.map((x: { text?: string }) => x.text ?? '').join('') ?? '';
+        if (!text.trim()) throw new Error('Gemini không trả về chữ nào.');
+        return text;
+      }
+
+      loiCuoi = `${res.status}: ${(await res.text()).slice(0, 200)}`;
+      // 404 = mo hinh khong con; 429 = du an khong co han muc cho mo hinh nay.
+      // Ca hai deu co the het o ten ke tiep. Cac loi khac (sai key, bi cam)
+      // thi doi ten mo hinh cung vo ich.
+      if (res.status !== 404 && res.status !== 429) break;
+    }
+
+    throw new Error(`Gemini trả về ${loiCuoi}`);
   }
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {

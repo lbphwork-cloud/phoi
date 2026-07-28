@@ -341,8 +341,16 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
    */
   const descReady = (() => {
     const missing: string[] = [];
-    if (!credsLoading && !imageCred) {
-      missing.push(`Chưa có API key ${PROVIDER_LABEL[aiProvider]} — dán vào ô dưới phần ảnh đại diện.`);
+    /*
+      HOI KEY VIET CHU, khong phai key dung anh.
+
+      Dong nay truoc day kiem `imageCred`. Hoi cac o key con chung mot cai thi
+      no dung; tu luc tach lam hai o thi no sai va sai theo huong te nhat: chu
+      website da dan mot key viet chu hop le vao, nut van mo, va ly do hien ra
+      la "Chua co API key" — mot cau noi doi ve dung thu ho vua lam xong.
+    */
+    if (!credsLoading && !textCred) {
+      missing.push(`Chưa có API key ${PROVIDER_LABEL[aiProvider]} để viết chữ — dán vào ô "API key để viết chữ".`);
     }
     if (items.every((i) => !i.name.trim())) {
       missing.push('Chưa nhập món nào. AI cần biết viết về cái gì.');

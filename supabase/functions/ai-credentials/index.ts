@@ -149,9 +149,27 @@ async function decryptStoredKey(
  *   het han muc    -> key dung, phai tao key o du an moi hoac bat thanh toan
  *   khong goi duoc -> loi mang, thu lai
  */
+/*
+  CAC MO HINH DE THU, THEO DUNG VIEC KEY SE LAM.
+
+  LOI DA SUA, va no tung bao SAI ve mot key TOT.
+    Ban truoc thu ca hai muc dich bang dung mot mo hinh: gemini-2.0-flash.
+    Key moi cua chu website chay gemini-2.5-flash binh thuong, nhung
+    2.0-flash tra 429 "limit: 0" — nen website tuyen bo key hong trong khi no
+    dung duoc. Nguoi dung khong co cach nao biet dieu do la sai.
+
+  Nen: thu DUNG nhom mo hinh cua tung viec, va thu lan luot ca nhom. Mot ten
+  het han muc khong co nghia la ca key hong.
+*/
+const PROBE_MODELS: Record<string, string[]> = {
+  text: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'],
+  image: ['gemini-2.5-flash-image', 'gemini-3.1-flash-image'],
+};
+
 async function probeKey(
   provider: string,
   key: string,
+  purpose: 'text' | 'image' = 'text',
 ): Promise<{ ok: boolean; error?: string; note?: string }> {
   if (provider === 'local_comfyui') {
     return { ok: true, note: 'ComfyUI chạy trên máy bạn, không có key để thử.' };
@@ -159,34 +177,54 @@ async function probeKey(
 
   try {
     if (provider === 'gemini') {
-      // Mot chu, mot token. Gan nhu khong ton gi, nhung di qua dung cai han
-      // muc ma viec tao anh se dung.
-      const r = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent' +
-          `?key=${encodeURIComponent(key)}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: 'OK' }] }],
-            generationConfig: { maxOutputTokens: 1 },
-          }),
-        },
-      );
-      const text = await r.text();
+      const ungVien = PROBE_MODELS[purpose] ?? PROBE_MODELS.text;
+      let r: Response | null = null;
+      let text = '';
+      let chay = '';
 
-      if (r.ok) return { ok: true, note: 'Key dùng được — vừa gọi thử và Google trả lời bình thường.' };
+      for (const ten of ungVien) {
+        r = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${ten}:generateContent`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'OK' }] }],
+              // Chi gioi han so chu khi thu duong VIET CHU. Duong dung anh
+              // khong nhan tham so nay, va gui vao lam Google tu choi.
+              ...(purpose === 'text' ? { generationConfig: { maxOutputTokens: 1 } } : {}),
+            }),
+          },
+        );
+        text = await r.text();
+        chay = ten;
 
-      if (r.status === 429) {
+        // 404 = mo hinh khong con; 429 = mo hinh nay khong co han muc. Ca hai
+        // deu co the het o ten ke tiep.
+        if (r.ok || (r.status !== 404 && r.status !== 429)) break;
+      }
+
+      if (r?.ok) {
         return {
-          ok: false,
-          error:
-            'Key hợp lệ nhưng hạn mức đang bằng 0, nên không tạo được gì. ' +
-            'Vào aistudio.google.com/apikey, bấm "Create API key in new project" để lấy key ' +
-            'trong một dự án mới, hoặc bật thanh toán cho dự án hiện tại.',
+          ok: true,
+          note: `Key dùng được để ${purpose === 'image' ? 'dựng ảnh' : 'viết chữ'} `
+            + `(vừa gọi thử ${chay} và Google trả lời bình thường).`,
         };
       }
-      if (r.status === 400 || r.status === 401 || r.status === 403) {
+
+      if (r?.status === 429) {
+        return {
+          ok: false,
+          error: purpose === 'image'
+            ? 'Key hợp lệ nhưng hạn mức DỰNG ẢNH đang bằng 0 — gói miễn phí của Google '
+              + 'không kèm hạn mức ảnh nào. Phải bật thanh toán cho dự án trên Google Cloud. '
+              + 'Key này vẫn có thể dùng được cho phần viết chữ.'
+            : 'Key hợp lệ nhưng hạn mức viết chữ đang bằng 0. '
+              + 'Vào aistudio.google.com/apikey, bấm "Create API key in new project" để lấy key '
+              + 'trong một dự án mới, hoặc bật thanh toán cho dự án hiện tại.',
+        };
+      }
+      if (r?.status === 400 || r?.status === 401 || r?.status === 403) {
         return {
           ok: false,
           error:
@@ -194,7 +232,7 @@ async function probeKey(
             'Generative Language API. Tạo key mới ở aistudio.google.com/apikey.',
         };
       }
-      return { ok: false, error: `Google trả về ${r.status}: ${text.slice(0, 200)}` };
+      return { ok: false, error: `Google trả về ${r?.status}: ${text.slice(0, 200)}` };
     }
 
     // OpenAI: chi kiem tra key co hop le khong.
@@ -307,7 +345,7 @@ Deno.serve(async (req) => {
     if (!key) {
       return json({ ok: false, error: 'Chưa có key nào để thử.' }, 400);
     }
-    const result = await probeKey(provider, key);
+    const result = await probeKey(provider, key, purpose as 'text' | 'image');
     return json(result, result.ok ? 200 : 200); // Khong phai loi HTTP: day la ket qua chan doan.
   }
 

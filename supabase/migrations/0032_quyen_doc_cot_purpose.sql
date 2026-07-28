@@ -1,0 +1,25 @@
+-- =============================================================================
+-- Cap quyen DOC cot `purpose` cua ai_credentials
+--
+-- LOI IM LANG, VA NO LAM HONG MOI CHO HOI "DA CO KEY CHUA".
+--
+-- Migration 0026 them cot `purpose` de mot nguoi giu duoc hai key cho cung mot
+-- nha cung cap — mot de viet chu, mot de dung anh. No cap quyen UPDATE cho cot
+-- do, nhung QUEN quyen SELECT.
+--
+-- Bang nay bi thu hoi quyen doc toan bang tu 0002 (vi cot encrypted_key khong
+-- duoc phep ra khoi database), roi cap lai theo TUNG COT. Mot cot khong nam
+-- trong danh sach do thi khong doc duoc — va cau truy van cua trinh duyet co
+-- liet ke `purpose`, nen ca cau bi tu choi.
+--
+-- BIEU HIEN: nguoi dung dan key, he thong bao "Da luu key. Key dung duoc", roi
+-- ngay ben duoi nut "Viet bang AI" van mo kem ly do "Chua co API key". Hai cau
+-- do mau thuan nhau tren cung mot man hinh, va cau sai lai la cau ma nguoi
+-- dung phai tin.
+--
+-- KHONG cap quyen doc `encrypted_key` — do la ca ly do bang nay bi siet ngay tu
+-- dau. Key da ma hoa chi duoc giai ma trong Edge Function bang service role.
+-- `purpose` thi khong phai bi mat: no chi noi key nay dung vao viec gi.
+-- =============================================================================
+
+grant select (purpose) on ai_credentials to authenticated;

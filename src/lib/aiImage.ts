@@ -402,14 +402,19 @@ export interface GenerateResult {
  * `clone()` truoc khi doc: than Response chi doc duoc mot lan, va co the co cho
  * khac cung dang muon doc no.
  */
-async function edgeErrorMessage(error: unknown, fallbackHint: string): Promise<string> {
+async function edgeErrorMessage(
+  error: unknown,
+  fallbackHint: string,
+  /** Viec dang lam. Quyet dinh cau giai thich khi han muc bang 0. */
+  viec: 'text' | 'image' = 'image',
+): Promise<string> {
   const ctx = (error as { context?: unknown })?.context;
 
   if (ctx && typeof (ctx as Response).clone === 'function') {
     try {
       const body = (await (ctx as Response).clone().json()) as { error?: string };
       if (typeof body?.error === 'string' && body.error.trim()) {
-        return withQuotaHelp(body.error.trim());
+        return withQuotaHelp(body.error.trim(), viec);
       }
     } catch {
       // Khong phai JSON — roi xuong duoi dung thong bao chung.
@@ -446,7 +451,7 @@ async function edgeErrorMessage(error: unknown, fallbackHint: string): Promise<s
  * Phan biet duoc hai cai nay la khac biet giua "cho mot ngay vo ich" va "lam
  * dung viec can lam".
  */
-function withQuotaHelp(message: string): string {
+function withQuotaHelp(message: string, viec: 'text' | 'image' = 'image'): string {
   if (!/hạn mức|quota|429|limit/i.test(message)) return message;
 
   // "limit: 0", "limit_value: 0", "limit\": 0" — Google viet moi noi mot kieu.
@@ -455,12 +460,27 @@ function withQuotaHelp(message: string): string {
   const gocRutGon = message.length > 220 ? message.slice(0, 220) + '…' : message;
 
   if (hetSach) {
+    /*
+      HAI CAU KHAC NHAU CHO HAI VIEC, va truoc day chi co mot.
+
+      Cau cu ghi "khong co han muc mien phi nao — KE CA CHO VIET CHU". Voi key
+      hien tai cua chu website cau do sai: viet chu chay binh thuong, chi dung
+      anh la bang 0. Mot cau bao loi noi sai ve thu vua chay duoc la thu lam
+      nguoi ta di sua dung cai khong hong.
+    */
+    if (viec === 'image') {
+      return (
+        'Dự án Google của key này không có hạn mức DỰNG ẢNH — gói miễn phí của Google ' +
+        'không kèm hạn mức ảnh nào, nên chờ sang ngày mai cũng không đổi. Muốn dựng ảnh ' +
+        'thì phải bật thanh toán cho dự án trên Google Cloud. Phần viết chữ có thể vẫn ' +
+        `dùng được bằng chính key này. (Nguyên văn lỗi: ${gocRutGon})`
+      );
+    }
+
     return (
-      'Dự án Google của key này không có hạn mức miễn phí nào — kể cả cho viết chữ. ' +
-      'Chờ sang ngày mai cũng không thay đổi. Cách sửa: vào aistudio.google.com/apikey, ' +
-      'bấm "Create API key in new project" để lấy key trong một dự án mới, rồi dán key ' +
-      'đó vào ô API key ở đây. Nếu vẫn cần dựng ảnh thì phải bật thanh toán cho dự án ' +
-      `trên Google Cloud. (Nguyên văn lỗi: ${gocRutGon})`
+      'Dự án Google của key này không có hạn mức viết chữ. Chờ sang ngày mai cũng không ' +
+      'thay đổi. Cách sửa: vào aistudio.google.com/apikey, bấm "Create API key in new ' +
+      `project" để lấy key trong một dự án mới, rồi dán vào ô API key ở đây. (Nguyên văn lỗi: ${gocRutGon})`
     );
   }
 
@@ -561,6 +581,7 @@ export async function requestAiDescription(args: {
         message: await edgeErrorMessage(
           error,
           'Nếu chưa triển khai function ai-generate, xem supabase/functions/README.md.',
+          'text',
         ),
       };
     }
