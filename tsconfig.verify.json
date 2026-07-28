@@ -16,5 +16,5 @@
     "noEmitOnError": true,
     "types": ["node"]
   },
-  "include": ["src/lib/nguhanh/**/*.ts", "src/lib/scoring.ts", "src/lib/affiliate.ts", "src/lib/guessColor.ts", "scripts/verify-nguhanh.ts", "scripts/verify-scoring.ts", "scripts/verify-guess-color.ts"]
+  "include": ["src/lib/nguhanh/**/*.ts", "src/lib/scoring.ts", "src/lib/affiliate.ts", "src/lib/guessColor.ts", "src/lib/linkPayload.ts", "scripts/verify-nguhanh.ts", "scripts/verify-scoring.ts", "scripts/verify-guess-color.ts", "scripts/verify-link-payload.ts"]
 }

@@ -26,11 +26,42 @@ export type AiProviderId = 'gemini' | 'openai';
 
 /** Boi canh chup. Chon san thay vi de go tu do, de anh dong bo giua cac bai. */
 export const SCENES = [
+  /*
+    NEN TRANG DUNG DAU VA LA MAC DINH, theo yeu cau cua chu website.
+
+    Day cung la lua chon dung cho muc dich cua trang: anh o day de NHIN RO BO
+    DO. Mot con pho hay mot quan ca phe deu dep hon, nhung chung dua vao khung
+    hinh mau sac va chi tiet canh tranh voi chinh mon do — va tren mot the nho
+    trong luoi thi thu nguoi ta thay truoc la cai nen chu khong phai cai ao.
+
+    Nen trang con mot loi nua: no ghep duoc voi nhau. Muoi bai anh nen trang
+    nam canh nhau thanh mot bo; muoi bai moi bai mot boi canh thi thanh mot
+    dong anh nhat tu nhieu noi.
+  */
+  { id: 'trang', label: 'Nền trắng (mặc định)',
+    en: 'pure white seamless background, soft even studio lighting, subject fully separated from background, no props, no shadows on the backdrop' },
   { id: 'studio', label: 'Phông studio trơn', en: 'seamless neutral studio backdrop, soft even lighting' },
   { id: 'pho', label: 'Phố Việt Nam', en: 'quiet Vietnamese city street, morning light, shallow depth of field' },
   { id: 'cafe', label: 'Quán cà phê', en: 'minimal cafe interior, warm window light' },
   { id: 'kien-truc', label: 'Kiến trúc tối giản', en: 'minimal concrete architecture, overcast daylight' },
   { id: 'bien', label: 'Ven biển', en: 'coastal boardwalk, late afternoon sun' },
+] as const;
+
+/**
+ * Goc nguoi mau, doi theo TUNG LAN TAO.
+ *
+ * Truoc day cau lenh viet cung "one Southeast Asian man" — moi anh tren ca
+ * website deu la mot kieu nguoi. Chu website muon doi ngau nhien theo tung lan,
+ * va do la yeu cau dung: mot trang thoi trang chi co mot kieu nguoi mau thi
+ * nguoi xem khong thay minh trong do.
+ *
+ * KHONG NGAU NHIEN THAT SU ma xoay theo so `variation` — cung mot bai bam tao
+ * lai se ra goc nguoi khac, nhung mot cau lenh cu the luon cho ra cung mot ket
+ * qua. Ngau nhien that se lam khong ai lap lai duoc mot anh da thich.
+ */
+export const MODEL_ORIGINS = [
+  'Southeast Asian', 'East Asian', 'South Asian', 'European',
+  'Latin American', 'West African', 'Middle Eastern',
 ] as const;
 
 /** Kieu nguoi mau. Giu it lua chon de anh giua cac bai nhin lien mach. */
@@ -109,11 +140,27 @@ export function buildImagePrompt(input: PromptInput): string {
     // Khi co anh mau, phai noi RO rang cac anh dau vao la quan ao can tai hien.
     // Khong noi thi mo hinh hay coi chung la "anh tham khao phong cach" va ve
     // ra mot bo do khac han.
+    /*
+      DOAN NAY LA THU QUYET DINH ANH RA CO GIONG DO THAT HAY KHONG.
+
+      Mot cau lenh bang chu khong bao gio ta noi mot hoa tiet, mot kieu co ao,
+      mot duong may. Anh mau thi ta duoc — nen khi CO anh mau, phai noi that ro
+      rang chung la QUAN AO CAN VE LAI, khong phai anh tham khao phong cach.
+      Khong noi ro thi mo hinh coi chung la "cam hung" va ve ra mot bo do khac
+      han, dep nhung khong phai bo do ban dang ban.
+
+      Khong co anh mau thi noi thang la dang ta bang chu — de nguoi dung biet vi
+      sao ket qua khong giong, thay vi tuong mo hinh kem.
+    */
     input.hasReferences
-      ? 'The attached images are the actual garments to depict. Reproduce their ' +
-        'colour, cut and material faithfully. Do not substitute different garments.'
-      : '',
-    `Subject: one Southeast Asian man, mid-twenties, ${model.en}, natural expression, standing.`,
+      ? 'CRITICAL: the attached images are the actual garments to depict. Reproduce '
+        + 'their exact colour, cut, proportion, fabric texture and any visible pattern '
+        + 'or detail. Match them garment by garment. Do not substitute, restyle or '
+        + '"improve" any garment. Fidelity to the attached images outranks every other '
+        + 'instruction in this prompt.'
+      : 'No reference images were supplied, so the garments are described in words only.',
+    `Subject: one ${MODEL_ORIGINS[(input.variation ?? 0) % MODEL_ORIGINS.length]} man, `
+      + `mid-twenties, ${model.en}, natural expression, standing.`,
     `Outfit to depict — ${garments}.`,
     fillers.length
       ? `Complete the look with ${fillers.join(', ')} — keep these secondary and unobtrusive.`
@@ -252,20 +299,54 @@ async function edgeErrorMessage(error: unknown, fallbackHint: string): Promise<s
 }
 
 /**
- * Loi het han muc thi kem luon viec can lam.
+ * Loi het han muc: NOI MOT CAU, CHI MOT NOI CAN DEN.
  *
- * "Da het han muc" dung nhung chua du: nguoi doc van phai tu di tim xem sua o
- * dau. Han muc bang 0 cua Google khong tu het sau vai gio — phai tao key trong
- * mot du an khac hoac bat thanh toan.
+ * ===========================================================================
+ * BAN TRUOC DAN HAI CAU VAO NHAU VA CHI RA HAI CHO KHAC NHAU.
+ *
+ * No lay nguyen cau loi cua Google — cau do dan toi ai.google.dev — roi noi
+ * them cau cua toi, dan toi aistudio.google.com. Nguoi doc nhan duoc hai dia
+ * chi cho cung mot viec va khong biet vao cai nao. Chu website bao dung dieu
+ * do. Loi cua toi.
+ *
+ * Ban nay THAY HAN cau cua Google chu khong noi them. Cau goc van duoc giu o
+ * cuoi trong ngoac cho ai muon tra cuu, nhung no khong con la thu doc dau
+ * tien.
+ * ===========================================================================
+ *
+ * HAI TINH HUONG KHAC HAN NHAU, va goi chung la "het han muc" thi sai mot nua:
+ *
+ *   limit = 0  -> Du an Google cua key nay KHONG CO han muc mien phi nao ca,
+ *                 ke ca cho viet chu. Cho den sang mai cung khong co gi doi.
+ *                 Phai tao key trong mot du an KHAC, hoac bat thanh toan.
+ *
+ *   limit > 0  -> Da dung het phan cua hom nay. Doi sang ngay mai la lai chay.
+ *
+ * Phan biet duoc hai cai nay la khac biet giua "cho mot ngay vo ich" va "lam
+ * dung viec can lam".
  */
 function withQuotaHelp(message: string): string {
-  if (!/hạn mức|quota|429/i.test(message)) return message;
-  if (/aistudio/i.test(message)) return message;
+  if (!/hạn mức|quota|429|limit/i.test(message)) return message;
+
+  // "limit: 0", "limit_value: 0", "limit\": 0" — Google viet moi noi mot kieu.
+  const hetSach = /limit[^0-9a-z]{0,12}0(\D|$)/i.test(message);
+
+  const gocRutGon = message.length > 220 ? message.slice(0, 220) + '…' : message;
+
+  if (hetSach) {
+    return (
+      'Dự án Google của key này không có hạn mức miễn phí nào — kể cả cho viết chữ. ' +
+      'Chờ sang ngày mai cũng không thay đổi. Cách sửa: vào aistudio.google.com/apikey, ' +
+      'bấm "Create API key in new project" để lấy key trong một dự án mới, rồi dán key ' +
+      'đó vào ô API key ở đây. Nếu vẫn cần dựng ảnh thì phải bật thanh toán cho dự án ' +
+      `trên Google Cloud. (Nguyên văn lỗi: ${gocRutGon})`
+    );
+  }
+
   return (
-    message +
-    ' Nếu lỗi này lặp lại mãi thì hạn mức của dự án đang là 0: vào ' +
-    'aistudio.google.com/apikey, bấm "Create API key in new project" để lấy key ' +
-    'trong dự án mới, hoặc bật thanh toán cho dự án hiện tại.'
+    'Đã dùng hết hạn mức của hôm nay. Sang ngày mai là dùng lại được. ' +
+    'Nếu cần dùng ngay thì vào aistudio.google.com/apikey lấy key trong một dự án ' +
+    `khác, rồi dán vào ô API key ở đây. (Nguyên văn lỗi: ${gocRutGon})`
   );
 }
 

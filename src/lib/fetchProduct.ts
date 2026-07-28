@@ -28,6 +28,7 @@ import { getSupabase } from './supabase/client';
 import { checkAffiliateUrl } from './affiliate';
 import type { FetchJobResult, Platform } from './supabase/types';
 import { guessColorSlugs } from './guessColor';
+import { readPayloadFromUrl } from './linkPayload';
 
 export type FetchTier = 1 | 2 | 3;
 
@@ -168,6 +169,39 @@ export async function fetchProductFromUrl(
   const linkCheck = checkAffiliateUrl(url);
   if (!linkCheck.ok) {
     return { ok: false, tier: 3, data: null, message: linkCheck.message };
+  }
+
+  /*
+    BAC 0 — DOC NGAY TRONG CHINH DUONG DAN, KHONG GOI MANG.
+
+    Duong dan chia se cua TikTok mang san ten va anh san pham trong tham so
+    `og_info`. Doc thang tu do thi khong cho, khong bi chan, va khong hong khi
+    san doi HTML.
+
+    DAY LA DUONG DUY NHAT HOAT DONG VOI TIKTOK. Bac 1 goi tu may chu Supabase,
+    ma TikTok chan may chu la rat gat — nen bac 1 gan nhu luon tra ve rong voi
+    link TikTok. Chu website bao "link tiktok chua lay duoc thong tin", va do
+    la mo ta dung.
+
+    KHONG CO GIA trong `og_info`. Neu chi lay duoc ten va anh thi VAN di tiep
+    bac 1 de tim gia — nhung phan da lay duoc thi giu lai, khong vut di.
+  */
+  const trongLink = readPayloadFromUrl(url);
+  if (trongLink && (trongLink.name || trongLink.imageUrl)) {
+    onProgress?.('Đọc được tên và ảnh ngay trong đường dẫn, không cần gọi sàn.');
+    return {
+      ok: true,
+      tier: 1,
+      data: {
+        name: trongLink.name ?? '',
+        price_vnd: null,
+        image_url: trongLink.imageUrl,
+        platform: linkCheck.platform,
+      },
+      message:
+        'Lấy được tên và ảnh ngay trong đường dẫn chia sẻ. ' +
+        'Đường dẫn không mang theo giá — bạn nhập giá bằng tay nhé.',
+    };
   }
 
   if (!opts.skipTier1) {

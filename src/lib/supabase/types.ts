@@ -206,6 +206,19 @@ export interface FetchJobResult {
   /** Nguon lay duoc du lieu: 'og' = the Open Graph, 'dom' = doc DOM */
   source?: 'og' | 'dom' | 'manual';
   raw?: Record<string, string>;
+  /**
+   * Nhan cac bien the doc duoc tren trang san — "Trắng", "Đen", "XL", "Size M"...
+   *
+   * CHUA LOC. Local Helper khong biet bang 17 mau cua website nen no khong
+   * quyet dinh cai nao la mau; no dua ve tat ca va website tu doi chieu. Chia
+   * viec nhu vay thi doi bang mau khong phai cap nhat helper tren may nguoi
+   * dung.
+   *
+   * Chi co khi di qua Local Helper (trinh duyet that). Duong doc HTML tho
+   * khong bao gio co, vi danh sach bien the chi hien ra sau khi JavaScript cua
+   * san chay.
+   */
+  variant_labels?: string[];
 }
 
 export interface AiCredentialPublic {

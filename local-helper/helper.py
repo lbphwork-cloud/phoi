@@ -541,6 +541,9 @@ class PageData:
     name: str | None
     price_vnd: int | None
     image_url: str | None
+    # Nhan cac bien the doc duoc tren trang. Chua loc — website se doi chieu
+    # voi bang mau cua no. Rong nghia la khong doc duoc, khong phai "khong co".
+    variant_labels: list[str]
     resolved_url: str
     resolved_host: str | None
     source: str
@@ -673,6 +676,10 @@ def read_via_http(url: str) -> PageData | None:
         resolved_host=host,
         source="http-og",
         raw=og,
+        # Duong nay chi doc HTML tho, khong chay JavaScript cua san — ma danh
+        # sach bien the chi xuat hien sau khi JavaScript do chay. Nen o day
+        # luon rong, va do la su that chu khong phai thieu sot.
+        variant_labels=[],
     )
 
 
@@ -691,6 +698,43 @@ OG_SCRIPT = """() => {
   out['__title'] = document.title || '';
   out['__h1'] = document.querySelector('h1')?.innerText?.trim() || '';
   out['__bodyText'] = (document.body?.innerText || '').slice(0, 4000);
+
+  /* ------------------------------------------------------------------
+     TEN CAC BIEN THE (mau, size...) — thu ma the Open Graph khong co.
+
+     Danh sach mau chi ton tai trong DOM sau khi JavaScript cua san chay,
+     nen chi doc duoc o day, trong mot trinh duyet that. Ham may chu doc
+     HTML tho khong bao gio thay no.
+
+     KHONG DOAN CAI NAO LA MAU O DAY. Lay ve TOAN BO nhan cua moi nhom
+     bien the roi de phia Python loc — trong nay khong co bang 17 mau de
+     doi chieu, ma doan bang tu khoa o hai noi la co ngay hai ket qua
+     khac nhau.
+
+     Nhieu bo chon cho nhieu cach dung DOM khac nhau giua Shopee, TikTok
+     va cac ban giao dien cua chung. Cai nao khong co thi bo qua.
+  ------------------------------------------------------------------ */
+  const nhan = new Set();
+  const BO_CHON = [
+    '[class*="variation"] button', '[class*="variation"] [role="button"]',
+    '[class*="sku"] button', '[class*="Sku"] button',
+    '[class*="option"] button', '[data-tt*="sku"] *[role="button"]',
+    'button[aria-label]', '[class*="product-variation"] *',
+  ];
+  for (const sel of BO_CHON) {
+    let els = [];
+    try { els = document.querySelectorAll(sel); } catch (e) { continue; }
+    for (const el of els) {
+      const t = (el.innerText || el.getAttribute('aria-label') || '').trim();
+      // Nhan mau la mot cum ngan. Bo qua chuoi dai — do la mo ta, khong
+      // phai ten bien the.
+      if (t && t.length <= 30) nhan.add(t);
+      if (nhan.size >= 120) break;
+    }
+    if (nhan.size >= 120) break;
+  }
+  out['__variants'] = [...nhan].join('\\n');
+
   return out;
 }"""
 
@@ -779,6 +823,11 @@ def read_product_page(page: Any, url: str, interactive: bool) -> PageData:
     if image and not image.startswith("http"):
         image = urljoin(final_url, image)
 
+    # Tach nhan bien the thanh danh sach, bo trung va bo chuoi rong.
+    variant_labels = [
+        t.strip() for t in (og.get("__variants") or "").split("\n") if t.strip()
+    ]
+
     return PageData(
         name=name[:200] or None,
         price_vnd=price,
@@ -787,6 +836,7 @@ def read_product_page(page: Any, url: str, interactive: bool) -> PageData:
         resolved_host=host,
         source=source,
         raw={k: v for k, v in og.items() if not k.startswith("__")},
+        variant_labels=variant_labels[:120],
     )
 
 
@@ -920,6 +970,9 @@ def process_job(
         "resolved_host": data.resolved_host,
         "source": data.source,
         "raw": data.raw,
+        # Website tu doi chieu voi bang 17 mau cua no. Helper khong quyet dinh
+        # cai nao la mau — no chi dua ve nhung gi doc duoc.
+        "variant_labels": data.variant_labels,
     }
 
     sb.finish(job_id, result)

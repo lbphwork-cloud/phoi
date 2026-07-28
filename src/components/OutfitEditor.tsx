@@ -82,7 +82,10 @@ interface DraftItem {
   name: string;
   category: ProductCategory;
   role: ItemRole;
+  /** Mau THUC SU dung trong set do nay. Mot mau. Di vao bo loc va hop menh. */
   colorSlug: string;
+  /** Cac mau ma chinh link do dang ban tren san. Nhieu mau. Chi de tham khao. */
+  availableColorSlugs: string[];
   priceVnd: string;
   imageUrl: string;
   affiliateUrl: string;
@@ -160,7 +163,7 @@ function readExtensionPayload(): { item: DraftItem | null; error: string | null 
 let keySeq = 0;
 const newItem = (): DraftItem => ({
   key: `item-${++keySeq}`,
-  name: '', category: 'ao', role: 'top', colorSlug: '',
+  name: '', category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
   priceVnd: '', imageUrl: '', affiliateUrl: '', platform: null,
   source: null, fetchNote: '', busy: false,
 });
@@ -475,6 +478,24 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       imageUrl: it.imageUrl || d.image_url || '',
       // Chi dien mau khi nguoi dung CHUA chon: khong ghi de lua chon cua ho.
       colorSlug: it.colorSlug || guessColorSlug(d.name ?? '') || '',
+      /*
+        MAU CON BAN TREN SAN — chi co khi di qua Local Helper.
+
+        Helper mo trinh duyet that nen no doc duoc danh sach bien the; duong
+        doc HTML tho thi khong, vi danh sach do chi hien ra sau khi JavaScript
+        cua san chay. Nen o day rong nghia la "khong doc duoc", khong phai
+        "mon nay chi co mot mau" — va do la ly do van giu duong tich tay.
+
+        Doi chieu tung nhan bien the voi bang mau that. Mot nhan nhu "Trắng
+        kem" cho ra mot mau; "Size XL" khong cho ra gi va bi bo qua.
+      */
+      availableColorSlugs: it.availableColorSlugs.length
+        ? it.availableColorSlugs
+        : [...new Set(
+            (d.variant_labels ?? []).flatMap((nhan) =>
+              guessColorSlugs(nhan, tax.colors.map((c) => c.slug)),
+            ),
+          )],
       category: it.name ? it.category : guessedCat,
       role: it.name ? it.role : (roleFromCategory(guessedCat) as ItemRole),
       platform: d.platform ?? check.platform,
@@ -592,6 +613,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             name: it.name.trim(),
             category: it.category,
             color_slug: it.colorSlug || null,
+            available_color_slugs: it.availableColorSlugs,
             price_vnd: it.priceVnd ? Number(it.priceVnd) : null,
             price_checked_at: it.priceVnd ? new Date().toISOString() : null,
             image_url: it.imageUrl || null,
@@ -767,8 +789,21 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                   </select>
                 </div>
 
+                {/*
+                  HAI KHAI NIEM MAU KHAC NHAU, va truoc day chi co mot o cho ca hai.
+
+                  "Mau dung trong set" la mau THUC SU xuat hien trong bo do nay —
+                  mot mau, va la thu di vao bo loc va vao phep tinh hop menh.
+
+                  "Mau con ban tren san" la danh sach mau ma chinh cai link do
+                  dang ban — nhieu mau, chi de nguoi mua biet con lua chon nao.
+
+                  Gop hai thu lam mot thi hong ca hai: hoac bo loc "mau trang"
+                  tra ve nhung set khong he co mau trang, hoac nguoi mua khong
+                  biet mon do con mau nao khac.
+                */}
                 <div>
-                  <label className="label">Màu</label>
+                  <label className="label">Màu dùng trong set</label>
                   <select
                     value={it.colorSlug}
                     onChange={(e) => patch(it.key, { colorSlug: e.target.value })}
@@ -777,6 +812,36 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                     <option value="">— Không rõ —</option>
                     {tax.colors.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
                   </select>
+                  <p className="hint">Màu thật sự có trong bộ đồ này. Chọn một.</p>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="label">Các màu còn bán trên sàn</label>
+                  <div className="flex flex-wrap gap-2">
+                    {tax.colors.map((c) => (
+                      <button
+                        key={c.slug}
+                        type="button"
+                        className="chip"
+                        aria-pressed={it.availableColorSlugs.includes(c.slug)}
+                        onClick={() =>
+                          patch(it.key, {
+                            availableColorSlugs: it.availableColorSlugs.includes(c.slug)
+                              ? it.availableColorSlugs.filter((x) => x !== c.slug)
+                              : [...it.availableColorSlugs, c.slug],
+                          })
+                        }
+                      >
+                        <span className="swatch" style={{ background: c.hex }} />
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="hint">
+                    Cùng một link thường bán nhiều màu. Tích những màu link đó đang có —
+                    người xem sẽ biết còn lựa chọn nào. Không bắt buộc, và không ảnh hưởng
+                    tới bộ lọc hay gợi ý theo mệnh.
+                  </p>
                 </div>
 
                 <div>
@@ -853,12 +918,31 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           placeholder="Ví dụ: Tối giản trắng đen ngày thường"
         />
 
-        {/* NUT "Viet mo ta bang AI" DA CHUYEN XUONG KHOI AI O CUOI TRANG.
-            Ly do: AI viet mo ta dua tren cac mon, phong cach va mau — tuc la
-            no chi chay duoc khi moi thu khac da dien xong. Dat nut ngay canh o
-            nhap nay la moi nguoi bam vao no dau tien, va nhan mot danh sach
-            "chua viet duoc vi...". */}
-        <label className="label" htmlFor="desc">Mô tả</label>
+        {/*
+          NUT NAM NGAY CANH O CUA NO.
+
+          Toi tung day nut nay xuong cuoi trang, hieu nham mot yeu cau. Do la
+          sai: bam mot nut o cuoi trang de chu hien ra o giua trang thi phai
+          cuon nguoc len moi biet no viet gi. Mot cai nut phai nam trong tam
+          mat cua thu ma no thay doi.
+
+          Van de that dang sau yeu cau kia — bam vao khi chua du dieu kien roi
+          nhan mot danh sach "con thieu..." — duoc chua bang cach khac: nut mo
+          di khi chua du, va LY DO hien ngay duoi no, ngay tai cho.
+        */}
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <label className="label mb-0" htmlFor="desc">Mô tả</label>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={descBusy || !descReady.ok}
+            onClick={() => void generateDescription()}
+            title={descReady.ok ? 'AI viết một bản nháp dựa trên các món đã nhập'
+                                : 'Chưa đủ thông tin — xem lý do bên dưới'}
+          >
+            {descBusy ? 'Đang viết…' : 'Viết bằng AI'}
+          </button>
+        </div>
 
         <textarea
           id="desc"
@@ -870,8 +954,26 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           placeholder="Vì sao cách phối này hợp lý. Một hai câu là đủ."
         />
 
+        {/* Noi RO con thieu gi, ngay duoi cai nut bi mo — thay vi khoa nut roi
+            de nguoi dung tu doan. */}
+        {!descReady.ok && (
+          <div className="notice mt-2">
+            <p className="text-sm">Nút &ldquo;Viết bằng AI&rdquo; chưa bấm được vì:</p>
+            <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+              {descReady.missing.map((m) => <li key={m}>{m}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {descMessage && (
+          <div className={`mt-2 notice ${descMessage.ok ? '' : 'notice-danger'}`}>
+            <p className="text-sm">{descMessage.text}</p>
+          </div>
+        )}
+
         <p className="hint mb-5">
-          Một hai câu là đủ. Cuối trang có nút để AI viết giúp bản nháp.
+          Một hai câu là đủ. AI viết dựa trên các món và phong cách bạn đã nhập; kết
+          quả là <strong>bản nháp</strong> — đọc lại và sửa cho đúng ý trước khi đăng.
         </p>
 
         <div className="mb-5 grid gap-4 sm:grid-cols-2">
@@ -954,49 +1056,9 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           cung se mat y het neu khong co ai noi truoc.
       */}
       <Block
-        title="Công cụ AI"
-        note="Tuỳ chọn. Không dùng cũng đăng bài được — mọi thứ ở đây chỉ để đỡ mất công."
+        title="Dựng ảnh bằng AI"
+        note="Tuỳ chọn, và tốn tiền. Không dùng cũng đăng bài được — tải ảnh của bạn ở khối trên là đủ."
       >
-        {/* --- Nhom 1: viet chu, mien phi ------------------------------- */}
-        <div>
-          <p className="eyebrow mb-3">Viết mô tả — miễn phí</p>
-          <p className="hint mb-4">
-            Key Gemini miễn phí <strong>viết chữ được</strong>. AI viết dựa trên các
-            món, phong cách và màu bạn đã nhập ở trên. Kết quả là{' '}
-            <strong>bản nháp</strong> — đọc lại và sửa cho đúng ý bạn trước khi đăng.
-          </p>
-
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={descBusy || !descReady.ok}
-            onClick={() => void generateDescription()}
-          >
-            {descBusy ? 'Đang viết…' : 'Viết mô tả bằng AI'}
-          </button>
-
-          {/* Noi RO con thieu gi thay vi chi khoa nut roi de nguoi dung tu doan. */}
-          {!descReady.ok && (
-            <div className="notice mt-3">
-              <p className="text-sm">Chưa viết được vì:</p>
-              <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
-                {descReady.missing.map((m) => <li key={m}>{m}</li>)}
-              </ul>
-            </div>
-          )}
-
-          {descMessage && (
-            <div className={`mt-3 notice ${descMessage.ok ? '' : 'notice-danger'}`}>
-              <p className="text-sm">{descMessage.text}</p>
-            </div>
-          )}
-
-          <p className="hint mt-3">
-            Viết xong, chữ được điền vào ô <strong>Mô tả</strong> ở khối
-            &ldquo;Thông tin set đồ&rdquo; phía trên.
-          </p>
-        </div>
-
         {/* ---------------------------------------------------------------- */}
         {/* Tao anh set do bang AI                                            */}
         {/*                                                                   */}
@@ -1185,6 +1247,37 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
               </p>
             </div>
           )}
+
+          {/*
+            GHI CHU VE ANH DINH KEM — dat NGAY TREN nut tao anh.
+
+            Day khong phai chu trang tri. Anh cua tung mon duoc GUI KEM cau lenh
+            len mo hinh, va do la thu quyet dinh anh ra co giong do that hay
+            khong. Mot cau lenh bang chu khong bao gio ta noi mot hoa tiet hay
+            mot duong may; anh mau thi ta duoc.
+
+            Nguoi dung khong the doan ra dieu nay tu giao dien. Neu khong noi,
+            ho se bo qua o anh cua tung mon — o do trong nhu mot muc tuy chon —
+            roi ket luan la AI dung kem.
+          */}
+          <div className="notice mb-4">
+            <p className="eyebrow mb-2">Ảnh từng món được gửi kèm câu lệnh</p>
+            <p className="text-sm leading-relaxed">
+              Ảnh của mỗi món trong set được <strong>đính kèm</strong> khi gọi AI, và
+              câu lệnh yêu cầu AI vẽ lại <strong>đúng</strong> màu, phom, chất vải và
+              hoạ tiết trong những ảnh đó.
+            </p>
+            <p className="muted mt-2 text-sm leading-relaxed">
+              Vì vậy <strong>món nào càng có ảnh rõ thì kết quả càng giống</strong>.
+              Món để trống ảnh thì AI phải tự bịa ra, và cái nó bịa sẽ không giống
+              món bạn đang bán. Muốn ảnh giống nhất: điền đủ ảnh cho cả bốn món trước
+              khi bấm tạo.
+            </p>
+            <p className="muted-2 mt-2 text-sm">
+              Đang gửi kèm: <strong>{items.filter((i) => i.imageUrl).length}</strong>
+              {' / '}{items.length} ảnh món.
+            </p>
+          </div>
 
           <button
             type="button"
