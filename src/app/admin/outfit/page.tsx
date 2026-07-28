@@ -7,6 +7,7 @@ import { EmptyState, Spinner } from '@/components/site';
 import { StatusTag } from '@/components/outfit';
 import { AdminOutfitItems } from '@/components/AdminOutfitItems';
 import { OrphanProducts } from '@/components/AdminOrphanProducts';
+import { SortHeader, useTableSort, useSorted } from '@/components/SortHeader';
 import { deleteOutfit, confirmDelete } from '@/lib/deleteOutfit';
 import { useAsyncData, useTaxonomy } from '@/lib/hooks';
 import { formatRelative, formatVnd } from '@/lib/format';
@@ -20,7 +21,10 @@ const FILTERS: Array<OutfitStatus | 'all'> = [
 export default function AdminOutfitsPage() {
   const tax = useTaxonomy();
   const [status, setStatus] = useState<OutfitStatus | 'all'>('all');
+  /** Loc theo phong cach. 'all' = khong loc. */
+  const [style, setStyle] = useState<string>('all');
   const [q, setQ] = useState('');
+  const sort = useTableSort<'title' | 'style' | 'price' | 'status' | 'created'>('created', 'desc');
   /** Set do dang mo xem san pham ben trong. Moi luc chi mot. */
   const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -42,14 +46,25 @@ export default function AdminOutfitsPage() {
   const rows = useMemo(() => data ?? [], [data]);
   const error = actionError ?? loadError;
 
-  const visible = useMemo(() => {
+  const loc = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return rows.filter(
       (r) =>
         (status === 'all' || r.status === status) &&
+        (style === 'all' || r.style_slug === style) &&
         (!needle || r.title.toLowerCase().includes(needle)),
     );
-  }, [rows, status, q]);
+  }, [rows, status, style, q]);
+
+  const visible = useSorted(loc, sort, (r, k) => {
+    switch (k) {
+      case 'title': return r.title;
+      case 'style': return tax.styleLabel(r.style_slug);
+      case 'price': return r.total_price_vnd;
+      case 'status': return STATUS_LABEL[r.status];
+      case 'created': return r.created_at;
+    }
+  });
 
   /**
    * Doi trang thai truc tiep. Chi admin lam duoc: cot status van nam trong
@@ -126,6 +141,46 @@ export default function AdminOutfitsPage() {
         ))}
       </div>
 
+      {/*
+        LOC THEO PHONG CACH.
+
+        Danh sach nay len toi 400 dong va nam trong mot bang. Muon sua ba bai
+        workwear thi truoc day phai doc het ca bang de tim ra chung — trong khi
+        phong cach da la mot cot san trong du lieu.
+
+        Dung <select> chu khong phai chip nhu bo loc trang thai: co chin phong
+        cach, chin cai chip nua se lam hang bo loc dai gap doi va day ca bang
+        xuong duoi man hinh.
+      */}
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <label className="label mb-0" htmlFor="style-filter">Phong cách</label>
+        <select
+          id="style-filter"
+          className="field max-w-xs"
+          value={style}
+          onChange={(e) => setStyle(e.target.value)}
+        >
+          <option value="all">Tất cả phong cách</option>
+          {tax.styles.map((st) => (
+            <option key={st.slug} value={st.slug}>{st.label}</option>
+          ))}
+        </select>
+
+        {(style !== 'all' || status !== 'all' || q.trim()) && (
+          <button
+            type="button"
+            className="btn btn-sm btn-quiet"
+            onClick={() => { setStyle('all'); setStatus('all'); setQ(''); }}
+          >
+            Bỏ lọc
+          </button>
+        )}
+
+        <p className="muted-2 text-sm">
+          {visible.length}/{rows.length} set đồ
+        </p>
+      </div>
+
       {error && <div className="notice notice-danger mb-6">{error}</div>}
 
       {visible.length === 0 ? (
@@ -136,11 +191,11 @@ export default function AdminOutfitsPage() {
             <thead>
               <tr>
                 <th>Ảnh</th>
-                <th>Tên</th>
-                <th>Phong cách</th>
-                <th>Giá</th>
-                <th>Trạng thái</th>
-                <th>Tạo</th>
+                <SortHeader sort={sort} colKey="title">Tên</SortHeader>
+                <SortHeader sort={sort} colKey="style">Phong cách</SortHeader>
+                <SortHeader sort={sort} colKey="price">Giá</SortHeader>
+                <SortHeader sort={sort} colKey="status">Trạng thái</SortHeader>
+                <SortHeader sort={sort} colKey="created">Tạo</SortHeader>
                 <th>Thao tác</th>
               </tr>
             </thead>

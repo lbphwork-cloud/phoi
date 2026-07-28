@@ -71,7 +71,18 @@ interface DraftItem {
   availableColorSlugs: string[];
   priceVnd: string;
   imageUrl: string;
+  /**
+   * Link tiep thi cua CHINH nguoi dang. Day la link nguoi xem se bam.
+   *
+   * Tach khoi `productUrl` vi hai thu nay khac nhau ve BAN CHAT: link tiep thi
+   * mang ma gioi thieu cua nguoi dang va la thu tra hoa hong cho ho; link goc
+   * chi tro toi san pham. Truoc day gop lam mot o, nen ai chua co tai khoan
+   * tiep thi thi khong dang bai duoc — trong khi ho hoan toan co the dan link
+   * thuong va bo sung ma gioi thieu sau.
+   */
   affiliateUrl: string;
+  /** Link san pham thuong, khong co ma gioi thieu. Khong bat buoc. */
+  productUrl: string;
   platform: Platform | null;
   /**
    * Du lieu tori tu dau. Dung ten thay vi so vi tung co bug o day: gia tri 0
@@ -147,7 +158,7 @@ let keySeq = 0;
 const newItem = (): DraftItem => ({
   key: `item-${++keySeq}`,
   name: '', category: 'ao', role: 'top', colorSlug: '', availableColorSlugs: [],
-  priceVnd: '', imageUrl: '', affiliateUrl: '', platform: null,
+  priceVnd: '', imageUrl: '', affiliateUrl: '', productUrl: '', platform: null,
   source: null, fetchNote: '', busy: false,
 });
 
@@ -444,8 +455,21 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   // Lay du lieu tu link
   // -------------------------------------------------------------------------
 
-  const runFetch = async (it: DraftItem) => {
-    const check = checkAffiliateUrl(it.affiliateUrl);
+  /**
+   * Lay thong tin tu MOT link cu the, khong phai tu mot o co dinh.
+   *
+   * Moi mon gio co hai o link — link tiep thi va link thuong — va MOI O CO NUT
+   * LAY THONG TIN RIENG. Bam o nao thi doc o do.
+   *
+   * Vi sao khong tu chon giup: hai link co the tro toi hai bien the khac nhau
+   * cua cung mot mon (khac mau, khac size). Tu chon nghia la co luc doc nham
+   * cai nguoi dung khong dinh, va ho khong co cach nao bao lai. Mot cai nut
+   * canh moi o thi khong bao gio nham.
+   */
+  const runFetch = async (it: DraftItem, which: 'affiliate' | 'product') => {
+    const url = which === 'affiliate' ? it.affiliateUrl : it.productUrl;
+
+    const check = checkAffiliateUrl(url);
     if (!check.ok) {
       patch(it.key, { fetchNote: check.message, source: null });
       return;
@@ -453,7 +477,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
     patch(it.key, { busy: true, fetchNote: 'Bắt đầu…', platform: check.platform });
 
-    const out = await fetchProductFromUrl(it.affiliateUrl, session?.user.id ?? null, {
+    const out = await fetchProductFromUrl(url, session?.user.id ?? null, {
       onProgress: (m) => patch(it.key, { fetchNote: m }),
     });
 
@@ -545,14 +569,33 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     if (!occasionSlug) return 'Chưa chọn dịp sử dụng.';
     if (colorSlugs.length === 0) return 'Chọn ít nhất một màu chủ đạo.';
 
-    const real = items.filter((i) => i.name.trim() || i.affiliateUrl.trim());
+    const real = items.filter(
+      (i) => i.name.trim() || i.affiliateUrl.trim() || i.productUrl.trim(),
+    );
     if (real.length === 0) return 'Thêm ít nhất một sản phẩm.';
 
     for (const [i, it] of real.entries()) {
       if (!it.name.trim()) return `Sản phẩm ${i + 1}: chưa có tên.`;
-      if (!it.affiliateUrl.trim()) return `Sản phẩm ${i + 1}: chưa có link mua.`;
-      const c = checkAffiliateUrl(it.affiliateUrl);
-      if (!c.ok) return `Sản phẩm ${i + 1}: ${c.message}`;
+
+      /*
+        CAN IT NHAT MOT LINK, KHONG BAT BUOC CA HAI.
+
+        Nguoi chua co tai khoan tiep thi van dang bai duoc bang link thuong —
+        va do la dieu nen the: bat ho phai co ma gioi thieu truoc khi duoc dang
+        la dung mot rao can hanh chinh de chan mot viec ho da san sang lam.
+        Bo sung link tiep thi sau la mot lan sua bai.
+      */
+      const linkMua = it.affiliateUrl.trim() || it.productUrl.trim();
+      if (!linkMua) return `Sản phẩm ${i + 1}: chưa có link nào (tiếp thị hoặc link thường).`;
+
+      for (const [nhan, u] of [
+        ['link tiếp thị', it.affiliateUrl.trim()],
+        ['link thường', it.productUrl.trim()],
+      ] as const) {
+        if (!u) continue;
+        const c = checkAffiliateUrl(u);
+        if (!c.ok) return `Sản phẩm ${i + 1} (${nhan}): ${c.message}`;
+      }
       if (it.priceVnd && Number.isNaN(Number(it.priceVnd))) {
         return `Sản phẩm ${i + 1}: giá phải là số.`;
       }
@@ -611,12 +654,22 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
       if (e1 || !outfit) throw new Error(e1?.message ?? 'Không tạo được set đồ.');
 
-      const real = items.filter((i) => i.name.trim() && i.affiliateUrl.trim());
+      const real = items.filter(
+        (i) => i.name.trim() && (i.affiliateUrl.trim() || i.productUrl.trim()),
+      );
 
       for (const [idx, it] of real.entries()) {
         setProgress(`Đang lưu sản phẩm ${idx + 1}/${real.length}…`);
 
-        const platform = it.platform ?? platformFromUrl(it.affiliateUrl);
+        /*
+          LINK NGUOI XEM BAM = LINK TIEP THI, NEU CO.
+
+          Khong co link tiep thi thi dung link thuong — nguoi xem van mua duoc,
+          chi la khong ai nhan hoa hong. Chan bai vi thieu ma gioi thieu se lam
+          mat ca bai lan nguoi mua, doi lay khong gi.
+        */
+        const linkMua = it.affiliateUrl.trim() || it.productUrl.trim();
+        const platform = it.platform ?? platformFromUrl(linkMua);
         if (!platform) throw new Error(`Sản phẩm ${idx + 1}: không nhận ra sàn từ link.`);
 
         const { data: product, error: e2 } = await sb
@@ -630,7 +683,10 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             price_checked_at: it.priceVnd ? new Date().toISOString() : null,
             image_url: it.imageUrl || null,
             source_platform: platform,
-            source_url: it.affiliateUrl.trim(),
+            // `source_url` la link GOC de doi chieu ve sau — uu tien link
+            // thuong vi no khong mang ma gioi thieu cua ai. Khong co thi danh
+            // luu link tiep thi, van hon la de trong.
+            source_url: it.productUrl.trim() || it.affiliateUrl.trim(),
             created_by: uid,
             fetched_meta: it.source ? { source: it.source } : null,
           })
@@ -647,7 +703,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             product_id: product.id,
             owner_id: uid,
             platform,
-            url: it.affiliateUrl.trim(),
+            url: linkMua,
           })
           .select('id')
           .single();
@@ -732,24 +788,70 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                 )}
               </div>
 
-              <label className="label">Link mua trên Shopee hoặc TikTok</label>
+              {/*
+                HAI O LINK, MOI O MOT NUT LAY THONG TIN.
+
+                Truoc day chi co mot o va no vua la link nguoi xem bam, vua la
+                link de doc thong tin. Hai vai tro do khong phai mot:
+
+                  Link tiep thi mang ma gioi thieu cua nguoi dang — do la thu
+                  tra hoa hong cho ho, va la thu nguoi xem se bam.
+
+                  Link thuong chi tro toi san pham. Ai chua co tai khoan tiep
+                  thi thi chi co cai nay.
+
+                Gop lam mot o nghia la chua co ma gioi thieu thi khong dang bai
+                duoc — mot rao can hanh chinh chan mot viec ho da san sang lam.
+
+                MOI O MOT NUT RIENG chu khong phai mot nut tu doan nen doc o
+                nao: hai link co the tro toi hai bien the khac nhau cua cung mot
+                mon (khac mau, khac size). Tu doan nghia la co luc doc nham cai
+                nguoi dung khong dinh, va ho khong co cach nao bao lai.
+              */}
+              <label className="label">Link tiếp thị của bạn</label>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input
                   value={it.affiliateUrl}
                   onChange={(e) => patch(it.key, { affiliateUrl: e.target.value, fetchNote: '' })}
                   className="field"
-                  placeholder="https://shopee.vn/..."
+                  placeholder="https://shopee.vn/... (có mã giới thiệu của bạn)"
                   inputMode="url"
                 />
                 <button
                   type="button"
                   className="btn btn-sm shrink-0"
                   disabled={it.busy || !it.affiliateUrl.trim()}
-                  onClick={() => runFetch(it)}
+                  onClick={() => runFetch(it, 'affiliate')}
                 >
                   {it.busy ? 'Đang lấy…' : 'Lấy thông tin'}
                 </button>
               </div>
+              <p className="hint">
+                Đây là link người xem bấm khi mua. Hoa hồng sàn trả về thẳng tài khoản bạn.
+              </p>
+
+              <label className="label mt-4">Link thường (không bắt buộc)</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={it.productUrl}
+                  onChange={(e) => patch(it.key, { productUrl: e.target.value, fetchNote: '' })}
+                  className="field"
+                  placeholder="https://shopee.vn/... (link sản phẩm bình thường)"
+                  inputMode="url"
+                />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet shrink-0"
+                  disabled={it.busy || !it.productUrl.trim()}
+                  onClick={() => runFetch(it, 'product')}
+                >
+                  {it.busy ? 'Đang lấy…' : 'Lấy thông tin'}
+                </button>
+              </div>
+              <p className="hint">
+                Chỉ cần <strong>một trong hai</strong> ô có link. Nếu chỉ có ô này thì người
+                xem vẫn bấm mua được — chỉ là không ai nhận hoa hồng.
+              </p>
 
               {it.fetchNote && (
                 <p className={it.source ? 'hint' : 'hint-error'}>

@@ -32,7 +32,7 @@
  * post_reviews, ghi admin_audit_log — va bat buoc co ly do khi yeu cau sua.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getSupabase } from '@/lib/supabase/client';
 import { EmptyState, Spinner } from '@/components/site';
@@ -93,6 +93,19 @@ export default function ModerationPage() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
 
+  /*
+    TIM VA LOC TRONG HANG DOI KIEM DUYET.
+
+    Hang doi lay toi 60 bai. Voi 60 the day du anh va danh sach san pham thi
+    cuon het mot lan la rat lau — va thuong quan tri vien vao day vi mot bai cu
+    the, hoac vi muon duyet dut mot phong cach.
+
+    Loc o day KHONG goi lai database: 60 dong da nam san trong bo nho, va goi
+    lai chi de doi bo loc se lam mat cho dang cuon.
+  */
+  const [q, setQ] = useState('');
+  const [style, setStyle] = useState('all');
+
   const { data, loading, error: loadError, reload } = useAsyncData<OutfitWithItems[]>(
     filter,
     (sb) => {
@@ -115,7 +128,17 @@ export default function ModerationPage() {
     },
   );
 
-  const rows = data ?? [];
+  const tatCa = useMemo(() => data ?? [], [data]);
+
+  const rows = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return tatCa.filter(
+      (o) =>
+        (style === 'all' || o.style_slug === style) &&
+        (!needle || o.title.toLowerCase().includes(needle)),
+    );
+  }, [tatCa, style, q]);
+
   const error = actionError ?? loadError;
 
   /** Gia tri hien tai cua mot truong: uu tien ban dang sua. */
@@ -263,7 +286,11 @@ export default function ModerationPage() {
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="display-sm">Kiểm duyệt</h1>
-          <p className="muted-2 text-sm">{rows.length} bài trong danh sách</p>
+          <p className="muted-2 text-sm">
+            {rows.length === tatCa.length
+              ? `${rows.length} bài trong danh sách`
+              : `${rows.length}/${tatCa.length} bài khớp bộ lọc`}
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -285,11 +312,40 @@ export default function ModerationPage() {
         </div>
       </div>
 
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="field max-w-xs"
+          placeholder="Tìm theo tên bài"
+          aria-label="Tìm bài trong hàng đợi"
+        />
+        <select
+          className="field max-w-xs"
+          value={style}
+          onChange={(e) => setStyle(e.target.value)}
+          aria-label="Lọc theo phong cách"
+        >
+          <option value="all">Tất cả phong cách</option>
+          {tax.styles.map((st) => (
+            <option key={st.slug} value={st.slug}>{st.label}</option>
+          ))}
+        </select>
+        {(q.trim() || style !== 'all') && (
+          <button type="button" className="btn btn-sm btn-quiet"
+                  onClick={() => { setQ(''); setStyle('all'); }}>
+            Bỏ lọc
+          </button>
+        )}
+      </div>
+
       {error && <div className="notice notice-danger mb-6">{error}</div>}
 
       {rows.length === 0 ? (
-        <EmptyState title="Không có bài nào cần duyệt">
-          Hàng đợi trống. Bài mới sẽ hiện ở đây khi có người gửi duyệt.
+        <EmptyState title={tatCa.length === 0 ? 'Không có bài nào cần duyệt' : 'Không có bài nào khớp'}>
+          {tatCa.length === 0
+            ? 'Hàng đợi trống. Bài mới sẽ hiện ở đây khi có người gửi duyệt.'
+            : 'Thử bỏ bớt bộ lọc.'}
         </EmptyState>
       ) : (
         <div className="flex flex-col gap-12">

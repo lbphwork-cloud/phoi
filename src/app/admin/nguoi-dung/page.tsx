@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
 import { EmptyState, Spinner } from '@/components/site';
 import { useAuth } from '@/lib/hooks';
 import { formatDate, formatRelative } from '@/lib/format';
 import type { Profile, UserRole } from '@/lib/supabase/types';
+import { SortHeader, useTableSort, useSorted } from '@/components/SortHeader';
 
 interface DataRequest {
   id: string;
@@ -24,6 +25,34 @@ export default function AdminUsersPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
+
+  /*
+    TIM VA LOC CHO DANH SACH NGUOI DUNG.
+
+    Bang nay khong co gioi han: cang nhieu nguoi dang ky thi no cang dai. Tim
+    mot tai khoan cu the bang mat tren mot bang dai la viec khong lam duoc, va
+    do dung la luc quan tri vien can tim — khi co ai do bao cao mot tai khoan.
+  */
+  const [q, setQ] = useState('');
+  const [locQuyen, setLocQuyen] = useState<'all' | 'admin' | 'user'>('all');
+  const sort = useTableSort<'name' | 'role' | 'joined'>('joined', 'desc');
+
+  const loc = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    return users.filter(
+      (u) =>
+        (locQuyen === 'all' || u.role === locQuyen) &&
+        (!needle || (u.display_name ?? '').toLowerCase().includes(needle)),
+    );
+  }, [users, locQuyen, q]);
+
+  const visible = useSorted(loc, sort, (u, k) => {
+    switch (k) {
+      case 'name': return u.display_name;
+      case 'role': return u.role;
+      case 'joined': return u.created_at;
+    }
+  });
 
   useEffect(() => {
     const sb = getSupabase();
@@ -149,21 +178,48 @@ export default function AdminUsersPage() {
           <code> user_private </code>chỉ cho chính chủ đọc, quản trị viên cũng không có quyền.
         </p>
 
-        {users.length === 0 ? (
-          <EmptyState title="Chưa có tài khoản nào" />
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className="field max-w-xs"
+            placeholder="Tìm theo tên hiển thị"
+            aria-label="Tìm người dùng theo tên hiển thị"
+          />
+          <select
+            className="field max-w-40"
+            value={locQuyen}
+            onChange={(e) => setLocQuyen(e.target.value as 'all' | 'admin' | 'user')}
+            aria-label="Lọc theo quyền"
+          >
+            <option value="all">Mọi quyền</option>
+            <option value="admin">Quản trị viên</option>
+            <option value="user">Người dùng</option>
+          </select>
+          {(q.trim() || locQuyen !== 'all') && (
+            <button type="button" className="btn btn-sm btn-quiet"
+                    onClick={() => { setQ(''); setLocQuyen('all'); }}>
+              Bỏ lọc
+            </button>
+          )}
+          <p className="muted-2 text-sm">{visible.length}/{users.length} tài khoản</p>
+        </div>
+
+        {visible.length === 0 ? (
+          <EmptyState title={users.length === 0 ? 'Chưa có tài khoản nào' : 'Không có tài khoản nào khớp'} />
         ) : (
           <div className="scroll-x">
             <table className="data">
               <thead>
                 <tr>
-                  <th>Tên hiển thị</th>
-                  <th>Quyền</th>
-                  <th>Tham gia</th>
+                  <SortHeader sort={sort} colKey="name">Tên hiển thị</SortHeader>
+                  <SortHeader sort={sort} colKey="role">Quyền</SortHeader>
+                  <SortHeader sort={sort} colKey="joined">Tham gia</SortHeader>
                   <th>Thao tác</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {visible.map((u) => (
                   <tr key={u.id}>
                     <td>
                       <span className="font-medium">{u.display_name}</span>

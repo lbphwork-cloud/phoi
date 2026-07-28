@@ -850,6 +850,25 @@ img { max-width: 100%; height: auto; }
   }
 }
 
+/* Tieu de cot bam duoc. Trong y het mot tieu de thuong cho toi khi di chuot
+   qua — mot bang co bay tieu de trong nhu bay cai nut se nhin nhu mot thanh
+   cong cu chu khong phai mot bang. */
+.sort-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sort-header:hover { text-decoration: underline; }
+
 /* --- Bang va khoi rong ----------------------------------------------- */
 
 /* Noi dung rong phai tu cuon trong hop rieng, khong lam ca trang cuon ngang. */
