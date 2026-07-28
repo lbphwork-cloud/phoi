@@ -67,6 +67,12 @@ interface ItemDraft {
   availableColorSlugs?: string[];
   /** Cac anh doc duoc tu link o lan bam "Lay thong tin" gan nhat. */
   imageChoices?: string[];
+  /**
+   * Link thuong cua san pham (products.source_url) — link KHONG mang ma gioi
+   * thieu. Truoc day khoi nay chi sua duoc link tiep thi, nen mot mon dang giu
+   * link thuong sai thi khong co duong nao sua tu trang quan tri.
+   */
+  sourceUrl?: string;
 }
 
 export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
@@ -353,8 +359,13 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
    * moi bam Luu. Tu ghi de du lieu dang cong khai bang mot thu vua doc ve tu
    * mot trang ben ngoai la viec khong duoc phep lam khong hoi.
    */
-  const fetchFromLink = async (item: OutfitWithItems['outfit_items'][number]) => {
-    const url = draft[item.id]?.affiliateUrl ?? item.affiliate_links?.url ?? '';
+  const fetchFromLink = async (
+    item: OutfitWithItems['outfit_items'][number],
+    o: 'affiliate' | 'thuong' = 'affiliate',
+  ) => {
+    const url = o === 'thuong'
+      ? (draft[item.id]?.sourceUrl ?? item.products?.source_url ?? '')
+      : (draft[item.id]?.affiliateUrl ?? item.affiliate_links?.url ?? '');
     if (!url.trim()) {
       setFetchNote((x) => ({ ...x, [item.id]: 'Chưa có link để lấy.' }));
       return;
@@ -621,6 +632,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
       if (d.imageUrl !== undefined) patch.image_url = d.imageUrl.trim();
       if (d.price !== undefined) patch.price_vnd = Number(d.price.replace(/\D/g, '')) || 0;
       if (d.category !== undefined) patch.category = d.category;
+      if (d.sourceUrl !== undefined) patch.source_url = d.sourceUrl.trim() || null;
       // Chuoi rong -> null, khong phai chuoi rong: cot co rang buoc doi chieu
       // voi bang mau, va '' khong phai mot mau hop le.
       if (d.colorSlug !== undefined) patch.color_slug = d.colorSlug || null;
@@ -760,7 +772,14 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
     setAiBusy(false);
     setAiMessage({ ok: r.ok, text: r.message });
-    if (r.ok && r.urls.length) setAiUrls(r.urls);
+
+    if (r.ok && r.urls.length) {
+      setAiUrls(r.urls);
+      // Gan ngay anh dau vao o anh dai dien. Nguoi ta vua bam nut dung anh dai
+      // dien — bat bam them mot lan nua de "chon" no la mot buoc thua.
+      setHeroDraft(r.urls[0]);
+      setHeroSaved(false);
+    }
   };
 
   /** Dat mot anh AI vua dung lam anh dai dien cua set. Van phai bam Luu. */
@@ -812,6 +831,8 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
           </div>
           <input
             className="field"
+            name="outfit-title"
+            autoComplete="off"
             value={oTitle}
             maxLength={120}
             onChange={(e) => patchOutfit({ title: e.target.value })}
@@ -1035,89 +1056,6 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
               </p>
             </div>
 
-            {/* ------------------------------------------------------------ */}
-            {/* DUNG ANH BANG AI, ngay tai day                               */}
-            {/*                                                               */}
-            {/* Chi quan tri vien — may chu chan cung, va day la khoi chi     */}
-            {/* quan tri vien mo duoc. Nguoi dang bai van dung duoc nut viet  */}
-            {/* mo ta bang AI o trang tao bai voi key cua chinh ho.           */}
-            {/* ------------------------------------------------------------ */}
-            <div className="border-t pt-3" style={{ borderColor: 'var(--line)' }}>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="label">Dịch vụ AI</label>
-                  <select
-                    className="field"
-                    value={aiProvider}
-                    onChange={(e) => setAiProvider(e.target.value as AiProviderId)}
-                  >
-                    <option value="xai">Grok — dựng đúng ảnh sản phẩm (trả tiền)</option>
-                    <option value="gemini">Gemini — hạn mức ảnh miễn phí bằng 0</option>
-                    <option value="openai">ChatGPT (OpenAI) — trả tiền</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-3">
-                <AiKeyBox
-                  provider={aiProvider as never}
-                  purpose="image"
-                  active={creds.activeFor(aiProvider as never, 'image')
-                    ?? creds.activeFor(aiProvider as never, 'text')}
-                  sharedWithText={!creds.activeFor(aiProvider as never, 'image')
-                    && Boolean(creds.activeFor(aiProvider as never, 'text'))}
-                  loading={creds.loading}
-                  onChanged={creds.reload}
-                />
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  className="btn btn-sm"
-                  disabled={aiBusy || thieuDeDungAnh.length > 0}
-                  onClick={() => void dungAnh()}
-                  title={thieuDeDungAnh.length ? 'Chưa đủ điều kiện — xem lý do bên dưới'
-                                               : 'Dựng ảnh từ ảnh thật của các món'}
-                >
-                  {aiBusy ? 'Đang dựng ảnh…' : 'Dựng ảnh bằng AI'}
-                </button>
-                <span className="muted-2 text-xs">
-                  Gửi kèm {anhThamChieu.length} ảnh sản phẩm thật làm mẫu.
-                  {aiProvider === 'xai' && ' Khoảng 0,2 USD một ảnh.'}
-                </span>
-              </div>
-
-              {thieuDeDungAnh.length > 0 && (
-                <div className="notice mt-3">
-                  <p className="text-sm">Nút &ldquo;Dựng ảnh bằng AI&rdquo; chưa bấm được vì:</p>
-                  <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
-                    {thieuDeDungAnh.map((m) => <li key={m}>{m}</li>)}
-                  </ul>
-                </div>
-              )}
-
-              {aiMessage && (
-                <p className={aiMessage.ok ? 'hint' : 'hint-error'}>{aiMessage.text}</p>
-              )}
-
-              {aiUrls.length > 0 && (
-                <div className="mt-3">
-                  <p className="eyebrow mb-2">Ảnh AI vừa dựng — bấm để chọn làm ảnh bài</p>
-                  <ImagePicker
-                    urls={aiUrls}
-                    selected={heroDraft ?? ''}
-                    onPick={chonAnhAi}
-                    label=""
-                  />
-                  <p className="hint">
-                    Chọn xong vẫn phải bấm &ldquo;Lưu ảnh đại diện&rdquo; ở khối bên dưới.
-                    Bài dùng ảnh AI phải được đánh dấu và vẫn qua kiểm duyệt.
-                  </p>
-                </div>
-              )}
-            </div>
-
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -1191,6 +1129,82 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
             onChange={(e) => { setHeroDraft(e.target.value); setHeroSaved(false); }}
           />
 
+          {/*
+            NUT DUNG ANH AI NAM NGAY DAY, canh o anh dai dien.
+
+            Truoc day no nam trong khoi cau lenh phia tren VA chi hien ra sau
+            khi bam "Tao cau lenh" — nen muon mot tam anh dai dien phai bam hai
+            nut khong lien quan gi den nhau. Nguoi dung dang o o anh dai dien:
+            do la luc ho can no.
+
+            Khoi cau lenh phia tren van giu — o do co chon boi canh, dang nguoi
+            mau, va xem/sua cau lenh. Day la duong tat cho viec hay lam nhat.
+          */}
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={aiBusy || thieuDeDungAnh.length > 0}
+              onClick={() => void dungAnh()}
+              title={thieuDeDungAnh.length ? `Chưa bấm được: ${thieuDeDungAnh[0]}`
+                                           : 'Dựng ảnh từ ảnh thật của các món'}
+            >
+              {aiBusy ? 'Đang dựng ảnh…' : 'Dựng ảnh bằng AI'}
+            </button>
+
+            <select
+              className="field w-auto"
+              value={aiProvider}
+              onChange={(e) => setAiProvider(e.target.value as AiProviderId)}
+              aria-label="Dịch vụ AI"
+            >
+              <option value="xai">Grok — dựng đúng ảnh sản phẩm</option>
+              <option value="gemini">Gemini — hạn mức ảnh bằng 0</option>
+              <option value="openai">ChatGPT (OpenAI)</option>
+            </select>
+
+            <span className="muted-2 text-xs">
+              Gửi kèm {anhThamChieu.length} ảnh sản phẩm thật. Ảnh dựng xong tự điền vào
+              ô trên — vẫn phải bấm Lưu.
+              {aiProvider === 'xai' && ' Khoảng 0,2 USD một ảnh.'}
+            </span>
+          </div>
+
+          {thieuDeDungAnh.length > 0 && (
+            <div className="notice mt-3">
+              <p className="text-sm">Nút &ldquo;Dựng ảnh bằng AI&rdquo; chưa bấm được vì:</p>
+              <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+                {thieuDeDungAnh.map((m) => <li key={m}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {/* O nhap key nam NGAY DAY, canh cai nut can den no. Truoc day no
+              nam trong khoi cau lenh phia tren va chi hien sau khi bam mo. */}
+          <div className="mt-3">
+            <AiKeyBox
+              provider={aiProvider as never}
+              purpose="image"
+              active={creds.activeFor(aiProvider as never, 'image')
+                ?? creds.activeFor(aiProvider as never, 'text')}
+              sharedWithText={!creds.activeFor(aiProvider as never, 'image')
+                && Boolean(creds.activeFor(aiProvider as never, 'text'))}
+              loading={creds.loading}
+              onChanged={creds.reload}
+            />
+          </div>
+
+          {aiMessage && (
+            <p className={aiMessage.ok ? 'hint' : 'hint-error'}>{aiMessage.text}</p>
+          )}
+
+          {aiUrls.length > 1 && (
+            <div className="mt-3">
+              <p className="eyebrow mb-2">Các ảnh vừa dựng — bấm để đổi</p>
+              <ImagePicker urls={aiUrls} selected={heroUrl} onPick={chonAnhAi} label="" />
+            </div>
+          )}
+
           <div className="mt-3 flex items-center gap-3">
             <button
               type="button"
@@ -1234,6 +1248,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
         const price = d.price ?? String(p?.price_vnd ?? '');
         const imageUrl = d.imageUrl ?? p?.image_url ?? '';
         const affiliateUrl = d.affiliateUrl ?? it.affiliate_links?.url ?? '';
+        const sourceUrl = d.sourceUrl ?? p?.source_url ?? '';
         const category = d.category ?? p?.category ?? 'phu_kien';
         const role = d.role ?? it.role;
         const colorSlug = d.colorSlug ?? p?.color_slug ?? '';
@@ -1409,6 +1424,40 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                   />
                 </div>
               )}
+
+              {/*
+                HAI O LINK, VA HAI O DEU LAY DUOC THONG TIN.
+
+                  * Link thuong    — link san pham binh thuong, khong mang ma
+                                     gioi thieu. Dung de doi chieu va de lay
+                                     thong tin khi link tiep thi bi rut gon.
+                  * Link affiliate — link co ma gioi thieu cua nguoi dang. DAY
+                                     moi la link nguoi xem bam vao.
+
+                Trang tao bai da co ca hai tu lau; khoi sua nay thi chi co mot,
+                nen mot mon dang giu link thuong sai khong co duong nao sua.
+              */}
+              <div className="sm:col-span-2">
+                <label className="label">Link thường (không có mã giới thiệu)</label>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className="field"
+                    value={sourceUrl}
+                    inputMode="url"
+                    autoComplete="off"
+                    placeholder="https://shopee.vn/..."
+                    onChange={(e) => set(it.id, { sourceUrl: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-quiet shrink-0"
+                    disabled={fetchingId === it.id || busy || !sourceUrl.trim()}
+                    onClick={() => void fetchFromLink(it, 'thuong')}
+                  >
+                    {fetchingId === it.id ? 'Đang lấy…' : 'Lấy thông tin'}
+                  </button>
+                </div>
+              </div>
 
               <div className="sm:col-span-2">
                 <label className="label">Link affiliate</label>

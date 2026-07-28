@@ -277,29 +277,91 @@ const CDN_ANH = [
   'tiktokcdn-us.com',
 ];
 
-function gomAnh(html: string, og: Record<string, string>, toiDa = 6): string[] {
-  const ra: string[] = [];
-  const them = (u: string | undefined) => {
-    if (!u) return;
-    const sach = u.trim().replace(/&amp;/g, '&');
-    if (!sach.startsWith('https://')) return;
-    if (ra.length >= toiDa) return;
-    // So khong phan biet duoi anh: cung mot anh o hai kich thuoc van la mot anh
-    // trung — nhung khong doan xa hon the, vi moi san dat ten mot kieu.
-    if (!ra.includes(sach)) ra.push(sach);
-  };
+/**
+ * Ma dinh danh cua mot tam anh, bo het duoi va bo kich thuoc.
+ *
+ * Shopee tro cung MOT tam anh bang nhieu duong dan khac nhau:
+ *     .../file/vn-11134207-81ztc-mo3iwq9vjv9c0e
+ *     .../file/vn-11134207-81ztc-mo3iwq9vjv9c0e.webp
+ *     .../file/vn-11134207-81ztc-mo3iwq9vjv9c0e@resize_w640_nl.webp
+ *
+ * Ban truoc coi day la ba anh khac nhau, nen khoi chon anh hien ra sau tam
+ * anh ma thuc te chi la mot — chu website dem duoc va goi dung ten: "lay rat
+ * nhieu anh ma bi trung".
+ */
+function maAnh(u: string): string {
+  const cuoi = u.split('/').pop() ?? u;
+  return cuoi.split('@')[0].replace(/\.(webp|jpe?g|png|avif)$/i, '');
+}
 
-  them(og['og:image']);
-  them(og['twitter:image']);
+/*
+  =============================================================================
+  GOM ANH SAN PHAM — VA LOAI ANH KHONG PHAI CUA SAN PHAM
+
+  VAN DE THU HAI, do bang chinh link cua chu website: trong so cac anh gom
+  duoc co ca ANH DAI DIEN CUA SHOP va mot anh nen dung chung cua Shopee.
+
+  CACH PHAN BIET, do tren HTML that cua hai trang san pham:
+
+      trang quan:  anh san pham xuat hien 20 lan
+                   anh shop / anh dung chung xuat hien 2 lan
+      trang ao:    sau anh san pham xuat hien 17-51 lan
+                   anh shop / anh dung chung xuat hien 2 lan
+
+  Ly do khoang cach lon nhu vay: anh trong thu vien san pham duoc nhac lai o
+  moi bien the kich thuoc (srcset), o the preload, o anh nho ben duoi. Anh dai
+  dien shop chi xuat hien mot cho.
+
+  Nen luat la: DEM SO LAN MA ANH DO XUAT HIEN TRONG HTML, giu lai nhung anh
+  duoc nhac tu ba lan tro len. Nguong ba chu khong phai muoi: de con cho cac
+  trang co it bien the hon.
+
+  GIOI HAN THAT SU, noi ro chu khong giau: HTML ma san tra ve cho bot xem
+  truoc link chi chua mot phan thu vien anh. Trang quan cua chu website chi co
+  DUNG MOT anh san pham trong do. Nhung anh nhin thay bang mat khi mo trang la
+  do JavaScript tai ve sau — muon lay du thi phai qua Local Helper (trinh duyet
+  that tren may). Do la gioi han cua duong doc nhanh, khong phai loi cua ham.
+  =============================================================================
+*/
+function gomAnh(html: string, og: Record<string, string>, toiDa = 6): string[] {
+  /** Ma anh -> so lan xuat hien trong HTML. */
+  const dem = new Map<string, number>();
+  /** Ma anh -> duong dan sach nhat gap duoc (khong duoi, khong kich thuoc). */
+  const duong = new Map<string, string>();
 
   for (const m of html.matchAll(/https:\/\/[^"'\s\\<>]+/g)) {
-    if (ra.length >= toiDa) break;
     const u = m[0];
     if (!CDN_ANH.some((d) => u.includes(d))) continue;
-    // Bo cac duong dan khong phai anh tinh (video, sprite, icon nho).
     if (/\.(mp4|webm|m3u8|svg)(\?|$)/i.test(u)) continue;
-    them(u);
+
+    const ma = maAnh(u);
+    if (!ma) continue;
+    dem.set(ma, (dem.get(ma) ?? 0) + 1);
+
+    // Giu ban KHONG co kich thuoc: no la anh goc, to nhat, va la ban dung lam
+    // mau cho AI tot nhat. Ban @resize_w640 chi de hien nhanh tren trang san.
+    if (!u.includes('@') && !duong.has(ma)) duong.set(ma, u);
+    else if (!duong.has(ma)) duong.set(ma, u.split('@')[0]);
   }
+
+  const anhBia = og['og:image'] ?? og['twitter:image'] ?? '';
+  const maBia = anhBia ? maAnh(anhBia) : '';
+
+  const ra: string[] = [];
+  const themVao = (ma: string) => {
+    const u = duong.get(ma);
+    if (u && !ra.includes(u) && ra.length < toiDa) ra.push(u);
+  };
+
+  // Anh bia luon dung dau — do la anh san CHU DONG cong bo cho tam san pham.
+  if (maBia) themVao(maBia);
+
+  // Con lai: chi giu anh duoc nhac tu ba lan tro len, xep theo so lan giam dan
+  // (anh duoc nhac nhieu nhat gan nhu luon la anh chinh cua thu vien).
+  [...dem.entries()]
+    .filter(([ma, n]) => n >= 3 && ma !== maBia)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([ma]) => themVao(ma));
 
   return ra;
 }

@@ -69,9 +69,30 @@ async function tryEdgeFunction(url: string): Promise<FetchOutcome> {
       };
     }
 
+    /*
+      NOI RO KHI KHONG CO GIA, thay vi de o gia trong va im lang.
+
+      Da do tren link that cua chu website: HTML ma Shopee tra ve cho bot xem
+      truoc link KHONG HE CHUA GIA — o do chi co ten, mot anh, va mot cau
+      quang cao chung ("... gia tot. Mua hang qua mang uy tin..."). API san
+      pham cua Shopee thi tra 403 voi may chu.
+
+      Nghia la duong doc nhanh KHONG BAO GIO lay duoc gia Shopee, du sua cach
+      doc the nao. Khong noi ra thi nguoi dung se bam di bam lai va tuong may
+      hong — chu website da bao "gia khong duoc lay" dung nhu vay.
+    */
+    const co = r.result;
+    const thieu: string[] = [];
+    if (!co.price_vnd) thieu.push('giá');
+    if (!co.image_urls?.length && !co.image_url) thieu.push('ảnh');
+
     return {
-      ok: true, tier: 1, data: r.result,
-      message: 'Lấy được từ thẻ Open Graph của sàn.',
+      ok: true, tier: 1, data: co,
+      message: thieu.length === 0
+        ? `Lấy được tên, giá và ${co.image_urls?.length ?? 1} ảnh từ sàn.`
+        : `Lấy được tên${co.image_urls?.length ? ` và ${co.image_urls.length} ảnh` : ''}. `
+          + `Sàn không công bố ${thieu.join(' và ')} cho đường đọc nhanh — `
+          + 'nhập tay, hoặc chạy Local Helper trên máy để đọc bằng trình duyệt thật.',
     };
   } catch {
     return {

@@ -484,7 +484,22 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     setAiBusy(false);
     setAiMessage({ ok: r.ok, text: r.message });
 
-    if (r.ok && r.urls.length > 0) setAiUrls(r.urls);
+    if (r.ok && r.urls.length > 0) {
+      setAiUrls(r.urls);
+      /*
+        TU GAN NGAY ANH DAU VAO O ANH DAI DIEN.
+
+        Truoc day anh hien ra kem dong chu "Bam de dung anh nay" — mot buoc
+        thua: nguoi ta vua bam nut tao anh dai dien, khong co ly do gi de ho
+        khong muon dung no. Van con cac anh khac de bam neu muon doi.
+
+        Danh dau "anh do AI tao" LUON DI KEM, khong de nguoi dung tu tich:
+        quen tich mot lan la bai len song ma khong co nhan AI.
+      */
+      setHeroPreview(r.urls[0]);
+      setHeroUrlDirect(r.urls[0]);
+      setAiGenerated(true);
+    }
   };
 
   const uploadItemImage = async (it: DraftItem, file: File) => {
@@ -1148,8 +1163,18 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
         {thieuTen.length > 0 && (
           <p className="hint">Chưa đặt tên tự động được: {thieuTen.join(' ')}</p>
         )}
+        {/*
+          autoComplete="off" + name khong giong truong dang nhap.
+
+          Khong co hai thu nay thi Chrome tu dien DIA CHI EMAIL da luu vao day:
+          no thay mot o chu tron o dau bieu mau va doan day la o dang nhap. Chu
+          website mo trang tao bai va thay email cua chinh minh nam san trong o
+          "Ten set do".
+        */}
         <input
           id="title"
+          name="outfit-title"
+          autoComplete="off"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="field mb-5"
@@ -1272,6 +1297,34 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           onPick={(f) => pickHero(f)}
         />
         {heroError && <p className="hint-error">{heroError}</p>}
+
+        {/*
+          NUT DUNG ANH AI NAM NGAY DAY, canh o anh dai dien.
+
+          Truoc day no nam mai duoi cuoi trang trong khoi AI, va chi hien ra
+          sau khi bam mot nut khac. Nguoi dung dang o o "Anh dai dien" — do
+          chinh la luc ho can no, va la cho duy nhat ho se tim.
+
+          Cai o duoi kia van giu: o do co chon boi canh, dang nguoi mau, xem
+          cau lenh. Day la duong tat cho truong hop thuong gap nhat.
+        */}
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={aiBusy || !aiReady.ok}
+            onClick={() => { setAiRound(0); void generateAiImage(); }}
+            title={aiReady.ok ? 'Dựng ảnh từ ảnh thật của các món'
+                              : 'Chưa đủ điều kiện — xem lý do ở khối AI cuối trang'}
+          >
+            {aiBusy ? 'Đang dựng ảnh…' : 'Dựng ảnh bằng AI'}
+          </button>
+          <span className="muted-2 text-xs">
+            {aiReady.ok
+              ? 'Ảnh dựng xong tự điền vào đây. Chọn bối cảnh và xem câu lệnh ở khối AI cuối trang.'
+              : `Chưa bấm được: ${aiReady.missing[0]}`}
+          </span>
+        </div>
 
         {heroPreview && (
           <div className="mt-4 max-w-sm">
