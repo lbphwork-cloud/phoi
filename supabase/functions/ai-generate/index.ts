@@ -506,11 +506,24 @@ Deno.serve(async (req) => {
       .select('encrypted_key, is_active')
       .eq('owner_id', uid)
       .eq('provider', provider)
+      /*
+        LAY DUNG KEY CHO DUNG VIEC.
+
+        `mode` da noi day la lan goi viet chu hay dung anh, va moi tai khoan gio
+        giu hai key rieng cho hai viec do (migration 0026). Voi Google, hai viec
+        nay thuoc hai muc gia khac han: key trong du an mien phi viet chu duoc
+        nhung han muc anh bang 0.
+
+        Lay nham key thi loi bao ve se la "het han muc" — mot cau dan nguoi dung
+        di sai huong hoan toan, vi key ho vua nap tien van con nguyen.
+      */
+      .eq('purpose', mode)
       .maybeSingle();
 
     if (!cred) {
+      const viec = mode === 'text' ? 'viết chữ' : 'dựng ảnh';
       return await fail(
-        `Chưa có API key cho ${provider}. Vào trang AI để nhập key của bạn.`,
+        `Chưa có API key ${provider} cho việc ${viec}. Nhập key vào ô ngay cạnh nút bạn vừa bấm.`,
         400,
       );
     }
@@ -585,7 +598,8 @@ Deno.serve(async (req) => {
       .from('ai_credentials')
       .update({ last_used_at: new Date().toISOString() })
       .eq('owner_id', uid)
-      .eq('provider', provider);
+      .eq('provider', provider)
+      .eq('purpose', mode);
 
     // CO Y khong tu gan anh vao outfit. Quan tri vien phai xem roi tu chon —
     // day la mot phan cua quy tac "anh AI luon qua kiem duyet tay".

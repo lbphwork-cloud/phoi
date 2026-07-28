@@ -18,7 +18,7 @@
     "//verify:schema": "Chạy toàn bộ migration trên Postgres thật (PGlite/WASM) rồi kiểm tra trigger, RLS, quyền cấp cột và dữ liệu mẫu.",
     "verify:schema": "node scripts/verify-schema.mjs",
     "//verify:lib": "Kiểm chứng module ngũ hành (âm lịch, nạp âm), bộ chấm điểm gợi ý, bộ đoán màu và bộ đọc thông tin từ link.",
-    "verify:lib": "tsc -p tsconfig.verify.json && node .verify-out/scripts/verify-nguhanh.js && node .verify-out/scripts/verify-scoring.js && node .verify-out/scripts/verify-guess-color.js && node .verify-out/scripts/verify-link-payload.js",
+    "verify:lib": "tsc -p tsconfig.verify.json && node .verify-out/scripts/verify-nguhanh.js && node .verify-out/scripts/verify-scoring.js && node .verify-out/scripts/verify-guess-color.js && node .verify-out/scripts/verify-link-payload.js && node .verify-out/scripts/verify-outfit-naming.js",
     "//verify:helper": "Kiểm chứng Local Helper và đối chiếu danh sách tên miền giữa Python / SQL / TypeScript / Edge Function.",
     "verify:helper": "python3 local-helper/verify_helper.py",
     "//doctor": "Kiem tra .env.local dien dung chua, bang cach goi that vao Supabase.",

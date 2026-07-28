@@ -86,12 +86,19 @@ export function boDau(s: string): string {
 /**
  * Tra ve cac slug mau doan duoc tu ten (va mo ta) san pham.
  *
- * TOI DA HAI MAU. Mot mon do hiem khi duoc mo ta bang ba mau tro len; neu tim
- * ra ba mau thi gan nhu chac chan hai trong so do la doan nham tu mot chu
- * khac — vi du "vang" trong "vang anh" hay "do" trong "do bo". Lay hai mau
- * khop dau tien va dung lai an toan hon la tich bua ca ba.
+ * MAC DINH TOI DA HAI MAU. Mot mon do MAC TREN NGUOI hiem khi duoc mo ta bang
+ * ba mau tro len; tim ra ba mau thi gan nhu chac chan hai trong so do la doan
+ * nham tu mot chu khac — "vang" trong "vang anh", "do" trong "do bo".
+ *
+ * NHUNG KHI DOC "CAC MAU CON BAN TREN SAN" thi nguoc lai: mot cai ao ban nam
+ * mau la binh thuong, va cat con ba mau la mat thong tin that. Do la ly do
+ * `max` la tham so chu khong phai so viet cung — hai cach dung, hai nguong.
  */
-export function guessColorSlugs(text: string, allowed?: string[]): string[] {
+export function guessColorSlugs(
+  text: string,
+  allowed?: string[],
+  max = 2,
+): string[] {
   // `hay` bi CAT DAN trong vong lap: moi lan mot tu khoa khop, doan chu da khop
   // bi xoa khoi chuoi. Khong lam vay thi "nau nhat" khop xong van con nguyen
   // chu "nau" cho mau "nau" khop tiep, va mot mon do ra hai mau nau.
@@ -99,7 +106,7 @@ export function guessColorSlugs(text: string, allowed?: string[]): string[] {
   const found: string[] = [];
 
   for (const { slug, key } of CAP_DAI_TRUOC) {
-    if (found.length >= 2) break;
+    if (found.length >= max) break;
     if (found.includes(slug)) continue;
     if (allowed && !allowed.includes(slug)) continue;
 

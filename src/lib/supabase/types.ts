@@ -229,4 +229,6 @@ export interface AiCredentialPublic {
   is_active: boolean;
   last_used_at: string | null;
   created_at: string;
+  /** Key nay dung de viet chu hay dung anh. Xem migration 0026. */
+  purpose: 'text' | 'image';
 }

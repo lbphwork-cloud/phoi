@@ -37,3 +37,33 @@ for (const [ten, mong] of cases) {
 console.log(`\n>>> ${pass} PASS, ${fail} FAIL`);
 
 if (fail) process.exitCode = 1;
+
+// ---------------------------------------------------------------------------
+// "Cac mau con ban tren san" — doc TAT CA mau viet trong ten, khong cat con hai.
+//
+// Nguoi ban hay liet ke het mau vao ten de len tim kiem. Do la nguon duy nhat
+// lay duoc danh sach mau ma khong can Local Helper.
+// ---------------------------------------------------------------------------
+console.log('\n=== Nhieu mau tren mot link ===');
+{
+  const nhieuMau: Array<[string, number]> = [
+    ['Áo thun nam nhiều màu: trắng, đen, be, navy, xám đậm', 5],
+    ['Quần jogger nam - màu đen / olive / nâu', 3],
+    ['Giày sneaker trắng', 1],
+  ];
+  let p2 = 0, f2 = 0;
+  for (const [ten, mong] of nhieuMau) {
+    const got = guessColorSlugs(ten, undefined, 17);
+    const ok = got.length === mong;
+    console.log((ok ? '  [PASS] ' : '  [FAIL] ') + ten + ' -> ' + got.length
+      + ' mau [' + got.join(', ') + ']' + (ok ? '' : `  (mong doi ${mong})`));
+    ok ? p2++ : f2++;
+  }
+  // Mac dinh van phai cat con 2 — do la nguong cho "mau dung trong set".
+  const macDinh = guessColorSlugs('Áo thun nam nhiều màu: trắng, đen, be, navy');
+  const ok = macDinh.length === 2;
+  console.log((ok ? '  [PASS] ' : '  [FAIL] ') + 'mac dinh van cat con 2 mau -> ' + macDinh.length);
+  ok ? p2++ : f2++;
+  console.log(`\n>>> them ${p2} PASS, ${f2} FAIL`);
+  if (f2) process.exitCode = 1;
+}

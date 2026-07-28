@@ -33,6 +33,10 @@ import {
   fetchProductFromUrl, guessCategory, guessColorSlug, platformFromUrl, roleFromCategory,
 } from '@/lib/fetchProduct';
 import { guessColorSlugs } from '@/lib/guessColor';
+import { AiKeyBox } from '@/components/AiKeyBox';
+import {
+  datTenTheoQuyTac, vietMoTaTheoQuyTac, thieuGiDeDatTen, thieuGiDeVietMoTa,
+} from '@/lib/outfitNaming';
 import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
 import { UploadButton } from '@/components/UploadButton';
@@ -42,7 +46,7 @@ import {
   type AiProviderId,
 } from '@/lib/aiImage';
 import {
-  useAiCredentials, useKeyInput, useLastAiError, testAiKey, deleteAiKey,
+  useAiCredentials, useLastAiError,
 } from '@/lib/aiCredentials';
 import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import type { ItemRole, Platform, ProductCategory } from '@/lib/supabase/types';
@@ -54,27 +58,6 @@ const PROVIDER_LABEL: Record<AiProviderId, string> = {
 };
 
 /** Lay key o dau, va tra tien hay khong. */
-/*
-  DONG NAY TUNG NOI SAI, VA CAI SAI DO TON THOI GIAN THAT.
-
-  Ban cu ghi "Lay key mien phi... Khong can the tin dung" ngay duoi nut tao
-  anh. Doc xong thi hieu la key mien phi tao duoc anh. Khong phai: goi mien
-  phi cua Gemini cho TAO CHU, con han muc TAO ANH bang 0. Bam nut se an mot
-  loi 429 kem chu "limit: 0" — mot cau khong noi len duoc rang van de nam o
-  goi cuoc chu khong nam o key.
-
-  Chu website da mat thoi gian di lay key roi moi phat hien. Nguoi dung cung
-  se mat y het neu dong nay khong noi thang.
-*/
-const PROVIDER_KEY_NOTE: Record<AiProviderId, string> = {
-  gemini:
-    'Lấy key ở aistudio.google.com/apikey — bấm "Create API key". Key miễn phí ' +
-    'VIẾT CHỮ được nhưng KHÔNG DỰNG ẢNH được: hạn mức ảnh của gói miễn phí bằng 0. ' +
-    'Muốn dựng ảnh thì phải bật thanh toán cho project trên Google Cloud.',
-  openai:
-    'Lấy key ở platform.openai.com/api-keys. Tạo ảnh là dịch vụ trả tiền, ' +
-    'tính theo từng ảnh.',
-};
 
 interface DraftItem {
   /** Khoa tam trong giao dien, khong phai id trong database */
@@ -213,36 +196,11 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   // Key AI cua chinh nguoi dang dang nhap. Quyet dinh nut tao anh co bam duoc
   // hay khong — xem aiReady ben duoi.
   const creds = useAiCredentials();
-  const keyInput = useKeyInput(creds.reload);
   const credsLoading = creds.loading;
-  const activeCred = creds.activeFor(aiProvider);
+  // Hai key rieng cho hai viec — xem chu thich trong AiKeyBox.
+  const textCred = creds.activeFor(aiProvider, 'text');
+  const imageCred = creds.activeFor(aiProvider, 'image');
   const lastAiError = useLastAiError(aiProvider);
-
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [keyBusy, setKeyBusy] = useState(false);
-  const [keyProbe, setKeyProbe] = useState<{ ok: boolean; text: string } | null>(null);
-
-  // Ket qua moi nhat, du den tu luc luu key hay luc bam "Thu key".
-  const keyMessage = keyProbe ?? keyInput.message;
-
-  const probeKey = async () => {
-    setKeyBusy(true);
-    setKeyProbe(null);
-    const r = await testAiKey(aiProvider);
-    setKeyBusy(false);
-    setKeyProbe({ ok: r.ok, text: r.message });
-  };
-
-  const removeKey = async () => {
-    if (!activeCred) return;
-    if (!window.confirm(`Xoá key ${activeCred.key_hint}? Bạn sẽ phải dán lại key mới.`)) return;
-
-    setKeyBusy(true);
-    const r = await deleteAiKey(activeCred.id);
-    setKeyBusy(false);
-    setKeyProbe({ ok: r.ok, text: r.message });
-    if (r.ok) { creds.reload(); setShowKeyInput(true); }
-  };
 
   // Doc du lieu tu tien ich Chrome NGAY TRONG ham khoi tao state.
   //
@@ -321,7 +279,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
     // Dieu kien dau tien va de sua nhat: co key chua. Truoc day khong kiem o
     // day nen nut luon bam duoc, bam xong doi mot luc roi nhan loi tu Google.
-    if (!credsLoading && !activeCred) {
+    if (!credsLoading && !imageCred) {
       missing.push(`Chưa có API key ${PROVIDER_LABEL[aiProvider]} — dán vào ô ngay trên.`);
     }
     if (named.length === 0) {
@@ -346,7 +304,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
    */
   const descReady = (() => {
     const missing: string[] = [];
-    if (!credsLoading && !activeCred) {
+    if (!credsLoading && !imageCred) {
       missing.push(`Chưa có API key ${PROVIDER_LABEL[aiProvider]} — dán vào ô dưới phần ảnh đại diện.`);
     }
     if (items.every((i) => !i.name.trim())) {
@@ -396,6 +354,28 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
     hasReferences: true,
     variation: aiRound,
   });
+
+  /*
+    DAU VAO CHO BO DAT TEN VA VIET MO TA BANG QUY TAC.
+
+    Tinh lai moi lan render — re hon nhieu so voi mot vong goi mang, va nho vay
+    nut goi y luon phan anh dung nhung gi dang co tren man hinh.
+  */
+  const namingInput = {
+    styleLabel: styleSlug ? tax.styleLabel(styleSlug) : '',
+    occasionLabel: occasionSlug ? tax.occasionLabel(occasionSlug) : '',
+    colorLabels: colorSlugs.map((x) => tax.colorLabel(x)),
+    items: items.map((i) => ({
+      roleLabel: ITEM_ROLE_LABEL[i.role],
+      name: i.name,
+      colorLabel: i.colorSlug ? tax.colorLabel(i.colorSlug) : undefined,
+    })),
+  };
+
+  const tenGoiY = datTenTheoQuyTac(namingInput);
+  const moTaGoiY = vietMoTaTheoQuyTac(namingInput);
+  const thieuTen = thieuGiDeDatTen(namingInput);
+  const thieuMoTa = thieuGiDeVietMoTa(namingInput);
 
   /** AI viet mo ta bang tieng Viet. Ket qua la BAN NHAP, nguoi dung sua lai. */
   const generateDescription = async () => {
@@ -491,11 +471,26 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       */
       availableColorSlugs: it.availableColorSlugs.length
         ? it.availableColorSlugs
-        : [...new Set(
-            (d.variant_labels ?? []).flatMap((nhan) =>
+        : [...new Set([
+            // 1. Nhan bien the doc duoc tren trang (chi co qua Local Helper).
+            ...(d.variant_labels ?? []).flatMap((nhan) =>
               guessColorSlugs(nhan, tax.colors.map((c) => c.slug)),
             ),
-          )],
+            /*
+              2. Cac mau viet ngay trong TEN san pham — thu ma chinh duong dan
+                 luon mang theo.
+
+                 Nguoi ban tren san Viet Nam hay liet ke het mau vao ten:
+                 "Ao thun nam nhieu mau trang den be navy". Doc tu do thi lay
+                 duoc danh sach mau ma KHONG can Local Helper, khong can may
+                 bat, khong goi mang.
+
+                 `max` de 17 chu khong phai 2: o day dang hoi "link nay ban
+                 nhung mau nao", va mot cai ao ban nam mau la binh thuong. Cat
+                 con hai mau la mat thong tin that.
+            */
+            ...guessColorSlugs(d.name ?? '', tax.colors.map((c) => c.slug), 17),
+          ])],
       category: it.name ? it.category : guessedCat,
       role: it.name ? it.role : (roleFromCategory(guessedCat) as ItemRole),
       platform: d.platform ?? check.platform,
@@ -908,7 +903,63 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
 
       {/* ------------------------------------------------------------------ */}
       <Block title="Thông tin set đồ">
-        <label className="label" htmlFor="title">Tên set đồ</label>
+        {/*
+          PHONG CACH VA DIP LEN TRUOC TEN SET DO.
+
+          Ca hai deu BAT BUOC, con ten set do thi co the de he thong dat giup.
+          Thu bat buoc phai duoc hoi truoc — nguoi dung dien tu tren xuong, va
+          neu o bat buoc nam duoi cung thi ho cham no cuoi cung, dung luc da
+          muon bam Luu.
+
+          Va co mot ly do thu hai, quan trong hon: BO DAT TEN TU DONG CAN HAI O
+          NAY. Chua chon phong cach thi khong dat noi mot cai ten co nghia. Hoi
+          truoc thi den luc xuong o ten da co san mot goi y.
+        */}
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="style">Phong cách</label>
+            <select id="style" value={styleSlug} onChange={(e) => setStyleSlug(e.target.value)} className="field">
+              <option value="">— Chọn —</option>
+              {tax.styles.map((s) => <option key={s.slug} value={s.slug}>{s.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="occ">Dịp sử dụng</label>
+            <select id="occ" value={occasionSlug} onChange={(e) => setOccasionSlug(e.target.value)} className="field">
+              <option value="">— Chọn —</option>
+              {tax.occasions.map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+
+        {/*
+          DAT TEN BANG QUY TAC, KHONG GOI AI.
+
+          Mot cai ten set do chi can tra loi ba cau: phong cach gi, mau gi, mac
+          dip nao — va ca ba nguoi dung DA CHON ngay phia tren. Goi mot mo hinh
+          ngon ngu de ghep ba chuoi da biet lai voi nhau la cham, ton tien, can
+          API key ma phan lon nguoi dang bai khong co, va cho ra ket qua khong
+          doan truoc duoc.
+
+          Quy tac thi tuc thi, mien phi, chay duoc khi mat mang. Xem
+          src/lib/outfitNaming.ts.
+        */}
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <label className="label mb-0" htmlFor="title">Tên set đồ</label>
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={!tenGoiY}
+            onClick={() => tenGoiY && setTitle(tenGoiY)}
+            title={tenGoiY ? `Đặt thành: ${tenGoiY}` : thieuTen.join(' ')}
+          >
+            Đặt tên tự động
+          </button>
+        </div>
+        {thieuTen.length > 0 && (
+          <p className="hint">Chưa đặt tên tự động được: {thieuTen.join(' ')}</p>
+        )}
         <input
           id="title"
           value={title}
@@ -932,16 +983,31 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
         */}
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <label className="label mb-0" htmlFor="desc">Mô tả</label>
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={descBusy || !descReady.ok}
-            onClick={() => void generateDescription()}
-            title={descReady.ok ? 'AI viết một bản nháp dựa trên các món đã nhập'
-                                : 'Chưa đủ thông tin — xem lý do bên dưới'}
-          >
-            {descBusy ? 'Đang viết…' : 'Viết bằng AI'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quy tac TRUOC, AI SAU. Nut nay khong can key, khong cho, khong
+                ton tien — nen no la nut chinh. Nut AI la duong danh cho ai
+                muon mot doan co giong dieu rieng. */}
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!moTaGoiY}
+              onClick={() => moTaGoiY && setDescription(moTaGoiY)}
+              title={moTaGoiY ? 'Viết ngay từ dữ liệu bạn đã nhập, không cần AI'
+                              : thieuMoTa.join(' ')}
+            >
+              Viết tự động
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              disabled={descBusy || !descReady.ok}
+              onClick={() => void generateDescription()}
+              title={descReady.ok ? 'AI viết một bản nháp dựa trên các món đã nhập'
+                                  : 'Chưa đủ thông tin — xem lý do bên dưới'}
+            >
+              {descBusy ? 'Đang viết…' : 'Viết bằng AI'}
+            </button>
+          </div>
         </div>
 
         <textarea
@@ -976,21 +1042,16 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           quả là <strong>bản nháp</strong> — đọc lại và sửa cho đúng ý trước khi đăng.
         </p>
 
-        <div className="mb-5 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="style">Phong cách</label>
-            <select id="style" value={styleSlug} onChange={(e) => setStyleSlug(e.target.value)} className="field">
-              <option value="">— Chọn —</option>
-              {tax.styles.map((s) => <option key={s.slug} value={s.slug}>{s.label}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="occ">Dịp sử dụng</label>
-            <select id="occ" value={occasionSlug} onChange={(e) => setOccasionSlug(e.target.value)} className="field">
-              <option value="">— Chọn —</option>
-              {tax.occasions.map((o) => <option key={o.slug} value={o.slug}>{o.label}</option>)}
-            </select>
-          </div>
+        {/* O key cho viec VIET CHU, dat ngay duoi cai nut can den no. Key nay
+            khac key dung anh: voi Google, hai viec thuoc hai muc gia khac han. */}
+        <div className="mb-5">
+          <AiKeyBox
+            provider={aiProvider}
+            purpose="text"
+            active={textCred}
+            loading={credsLoading}
+            onChanged={creds.reload}
+          />
         </div>
 
         <p className="label">Màu chủ đạo</p>
@@ -1075,101 +1136,19 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
             &ldquo;Ảnh tạo bởi AI&rdquo; và vẫn phải qua kiểm duyệt.
           </p>
 
-          {/* ------------------------------------------------------------ */}
-          {/* API key cua chinh ban                                        */}
-          {/*                                                              */}
-          {/* Dat NGAY TAI DAY chu khong o mot trang quan tri rieng. Cai   */}
-          {/* thieu de bam duoc nut phai nam canh cai nut do.              */}
-          {/*                                                              */}
-          {/* LUON CO DUONG DOI KEY, ke ca khi da co key.                  */}
-          {/* Ban dau toi an o nhap di khi tai khoan da co key — nghe hop  */}
-          {/* ly, nhung KEY HONG TRONG Y HET KEY TOT. Dung tinh canh hien  */}
-          {/* gio: co key, key vo dung vi han muc bang 0, va khong co       */}
-          {/* duong nao thay ma khong roi trang.                            */}
-          {/* ------------------------------------------------------------ */}
-          <div className="notice mb-5">
-            {credsLoading ? (
-              <p className="muted text-sm">Đang kiểm tra key…</p>
-            ) : (
-              <>
-                {activeCred ? (
-                  <div className="mb-3 flex flex-wrap items-center gap-3">
-                    <p className="text-sm">
-                      Key {PROVIDER_LABEL[aiProvider]}: <code>{activeCred.key_hint}</code>
-                    </p>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-quiet"
-                      disabled={keyBusy}
-                      onClick={() => void probeKey()}
-                    >
-                      {keyBusy ? 'Đang thử…' : 'Thử key'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-quiet"
-                      onClick={() => setShowKeyInput((v) => !v)}
-                    >
-                      {showKeyInput ? 'Thôi' : 'Đổi key'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-sm btn-quiet btn-danger"
-                      disabled={keyBusy}
-                      onClick={() => void removeKey()}
-                    >
-                      Xoá key
-                    </button>
-                  </div>
-                ) : (
-                  <p className="mb-3 text-sm">
-                    Tài khoản bạn <strong>chưa có key {PROVIDER_LABEL[aiProvider]}</strong>.
-                    PHỐI <strong>không kèm sẵn key nào</strong> — mỗi người dùng key của
-                    chính mình, nên tiền dùng AI tính vào tài khoản bạn chứ không phải
-                    của ai khác. Dán key vào ô bên dưới để bắt đầu.
-                  </p>
-                )}
+          <AiKeyBox
+            provider={aiProvider}
+            purpose="image"
+            active={imageCred}
+            loading={credsLoading}
+            onChanged={creds.reload}
+          />
 
-                {/* Loi gan nhat cua nha cung cap. Day la thu duy nhat phan biet
-                    duoc key con song va key da chet ma khong phai bam thu. */}
-                {activeCred && lastAiError && !keyMessage && (
-                  <p className="hint-error">Lần gọi gần nhất thất bại: {lastAiError}</p>
-                )}
-
-                {(!activeCred || showKeyInput) && (
-                  <>
-                    <p className="hint mb-3">{PROVIDER_KEY_NOTE[aiProvider]}</p>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <input
-                        type="password"
-                        className="field"
-                        value={keyInput.rawKey}
-                        onChange={(e) => keyInput.setRawKey(e.target.value)}
-                        placeholder="Dán API key của bạn vào đây"
-                        autoComplete="off"
-                        aria-label={`API key ${PROVIDER_LABEL[aiProvider]}`}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-sm shrink-0"
-                        disabled={keyInput.busy || !keyInput.rawKey.trim()}
-                        onClick={() => {
-                          setShowKeyInput(false);
-                          void keyInput.submit(aiProvider);
-                        }}
-                      >
-                        {keyInput.busy ? 'Đang lưu và thử…' : 'Lưu key'}
-                      </button>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
-
-            {keyMessage && (
-              <p className={keyMessage.ok ? 'hint' : 'hint-error'}>{keyMessage.text}</p>
-            )}
-          </div>
+          {/* Loi gan nhat cua nha cung cap. Day la thu duy nhat phan biet duoc
+              key con song va key da chet ma khong phai bam thu. */}
+          {imageCred && lastAiError && (
+            <p className="hint-error mt-2">Lần gọi gần nhất thất bại: {lastAiError}</p>
+          )}
 
           <div className="mb-4 grid gap-3 sm:grid-cols-3">
             <div>

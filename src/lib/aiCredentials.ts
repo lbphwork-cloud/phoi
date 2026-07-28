@@ -28,7 +28,7 @@ export interface AiCredentialState {
   creds: AiCredentialPublic[];
   loading: boolean;
   /** Key dang dung duoc cho nha cung cap nay, hoac null. */
-  activeFor: (provider: AiProvider) => AiCredentialPublic | null;
+  activeFor: (provider: AiProvider, purpose: AiKeyPurpose) => AiCredentialPublic | null;
   reload: () => void;
 }
 
@@ -40,7 +40,7 @@ export function useAiCredentials(): AiCredentialState {
         .from('ai_credentials')
         // KHONG select('*') — cot encrypted_key bi thu hoi quyen doc, select('*')
         // se loi. Phai liet ke tung cot duoc phep.
-        .select('id, owner_id, provider, key_hint, is_active, last_used_at, created_at')
+        .select('id, owner_id, provider, purpose, key_hint, is_active, last_used_at, created_at')
         .then(({ data: r, error }) => ({
           data: (r as AiCredentialPublic[] | null) ?? [],
           error,
@@ -52,7 +52,8 @@ export function useAiCredentials(): AiCredentialState {
   return {
     creds,
     loading,
-    activeFor: (provider) => creds.find((c) => c.provider === provider && c.is_active) ?? null,
+    activeFor: (provider, purpose) =>
+      creds.find((c) => c.provider === provider && c.purpose === purpose && c.is_active) ?? null,
     reload,
   };
 }
@@ -64,9 +65,22 @@ export function useAiCredentials(): AiCredentialState {
  * "AIza" — roi Google phat key dang "AQ.Ab8..." va giao dien tu choi mot key
  * hoan toan hop le. Chi kiem hai thu khong the sai: do dai va khoang trang.
  */
+/**
+ * Muc dich cua mot key: viet chu hay dung anh.
+ *
+ * Tach ra vi voi Google hai viec nay thuoc hai muc gia khac han nhau — key
+ * trong du an mien phi viet chu duoc nhung han muc anh bang 0. Nguoi dung
+ * thuong muon giu mot key mien phi cho phan chu va chi dung key co tra tien
+ * khi that su can anh.
+ *
+ * Dan cung mot chuoi vao ca hai o cung duoc. Tach ra la MO them lua chon.
+ */
+export type AiKeyPurpose = 'text' | 'image';
+
 export async function saveAiKey(
   provider: AiProvider,
   rawKey: string,
+  purpose: AiKeyPurpose = 'text',
 ): Promise<{ ok: boolean; message: string }> {
   const sb = getSupabase();
   if (!sb) return { ok: false, message: 'Chưa cấu hình Supabase.' };
@@ -82,7 +96,7 @@ export async function saveAiKey(
 
   try {
     const { data, error } = await sb.functions.invoke('ai-credentials', {
-      body: { action: 'save', provider, key },
+      body: { action: 'save', provider, key, purpose },
     });
 
     if (error) throw new Error(error.message);
@@ -129,13 +143,14 @@ export async function deleteAiKey(id: string): Promise<{ ok: boolean; message: s
  */
 export async function testAiKey(
   provider: AiProvider,
+  purpose: AiKeyPurpose = 'text',
 ): Promise<{ ok: boolean; message: string }> {
   const sb = getSupabase();
   if (!sb) return { ok: false, message: 'Chưa cấu hình Supabase.' };
 
   try {
     const { data, error } = await sb.functions.invoke('ai-credentials', {
-      body: { action: 'test', provider },
+      body: { action: 'test', provider, purpose },
     });
     if (error) throw new Error(error.message);
 
@@ -189,11 +204,11 @@ export function useKeyInput(reload: () => void) {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const submit = useCallback(
-    async (provider: AiProvider) => {
+    async (provider: AiProvider, purpose: AiKeyPurpose = 'text') => {
       setBusy(true);
       setMessage(null);
 
-      const saved = await saveAiKey(provider, rawKey);
+      const saved = await saveAiKey(provider, rawKey, purpose);
       if (!saved.ok) {
         setBusy(false);
         setMessage({ ok: false, text: saved.message });
@@ -205,7 +220,7 @@ export function useKeyInput(reload: () => void) {
       setRawKey('');
       reload();
 
-      const probe = await testAiKey(provider);
+      const probe = await testAiKey(provider, purpose);
       setBusy(false);
       setMessage({
         ok: probe.ok,

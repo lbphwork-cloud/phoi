@@ -105,7 +105,11 @@ function looksValid(provider: string, key: string): string | null {
  * Dung service role vi cot encrypted_key da bi REVOKE quyen doc cua role
  * authenticated — chinh chu cung khong select ra duoc. Do la co y.
  */
-async function decryptStoredKey(uid: string, provider: string): Promise<string | null> {
+async function decryptStoredKey(
+  uid: string,
+  provider: string,
+  purpose: string,
+): Promise<string | null> {
   const admin = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -116,6 +120,7 @@ async function decryptStoredKey(uid: string, provider: string): Promise<string |
     .select('encrypted_key')
     .eq('owner_id', uid)
     .eq('provider', provider)
+    .eq('purpose', purpose)
     .maybeSingle();
 
   if (!data?.encrypted_key) return null;
@@ -266,7 +271,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  let body: { action?: string; provider?: string; key?: string };
+  let body: { action?: string; provider?: string; key?: string; purpose?: string };
   try {
     body = await req.json();
   } catch {
@@ -278,6 +283,15 @@ Deno.serve(async (req) => {
   }
 
   const provider = String(body.provider ?? '');
+
+  /*
+    MUC DICH CUA KEY: viet chu hay dung anh.
+
+    Mac dinh 'text' chu khong bao loi khi thieu: cac ban giao dien cu goi ham
+    nay ma khong gui truong nay, va chung deu dang noi ve key viet chu. Bao loi
+    se lam chung hong ma khong duoc gi.
+  */
+  const purpose = body.purpose === 'image' ? 'image' : 'text';
   const rawKey = String(body.key ?? '');
 
   if (!['gemini', 'openai', 'local_comfyui'].includes(provider)) {
@@ -289,7 +303,7 @@ Deno.serve(async (req) => {
   // muc, key cua mot du an da bi xoa — tat ca deu luu duoc y het nhau, va chi
   // vo ra luc nguoi dung dang cho mot buc anh. Thu ngay tai day de biet lien.
   if (body.action === 'test') {
-    const key = rawKey || (await decryptStoredKey(uid, provider));
+    const key = rawKey || (await decryptStoredKey(uid, provider, purpose));
     if (!key) {
       return json({ ok: false, error: 'Chưa có key nào để thử.' }, 400);
     }
@@ -319,11 +333,12 @@ Deno.serve(async (req) => {
     {
       owner_id: uid,
       provider,
+      purpose,
       encrypted_key: encrypted,
       key_hint: provider === 'local_comfyui' ? '(máy cá nhân)' : hintOf(rawKey),
       is_active: true,
     },
-    { onConflict: 'owner_id,provider' },
+    { onConflict: 'owner_id,provider,purpose' },
   );
 
   if (dbErr) return json({ ok: false, error: dbErr.message }, 500);
@@ -334,8 +349,8 @@ Deno.serve(async (req) => {
     entity_type: 'ai_credential',
     // CO Y khong ghi key hay hint vao nhat ky. Nhat ky la noi de doc lai nhieu
     // lan, khong phai noi de du lieu bi mat nam.
-    detail: { provider },
+    detail: { provider, purpose },
   });
 
-  return json({ ok: true, provider, key_hint: hintOf(rawKey) });
+  return json({ ok: true, provider, purpose, key_hint: hintOf(rawKey) });
 });
