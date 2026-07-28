@@ -30,6 +30,7 @@ import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
 import { UploadButton } from '@/components/UploadButton';
 import { ITEM_ROLE_LABEL } from '@/lib/supabase/types';
+import type { ItemRole } from '@/lib/supabase/types';
 import type { OutfitWithItems } from '@/lib/supabase/types';
 
 /** Ban nhap cua mot mon. Chi chua truong nguoi dung da dong vao. */
@@ -62,6 +63,24 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   /** Mon dang lay thong tin tu link, va cau bao trang thai cua no. */
   const [fetchingId, setFetchingId] = useState<string | null>(null);
   const [fetchNote, setFetchNote] = useState<Record<string, string>>({});
+
+  /*
+    THEM MOT MON MOI VAO SET.
+
+    Truoc day mot set thieu mon thi khong co cach nao bo sung tu trang quan
+    tri — phai bao nguoi dang tu sua, hoac xoa ca bai lam lai. Ma phan lon
+    truong hop can them lai chinh la khi quan tri vien dang duyet: thay set
+    thieu mot doi giay, hoac mot mon bi go nham.
+
+    Giu trong mot khoi trang thai rieng chu khong nhet vao `draft`: `draft` la
+    ban nhap cua cac mon DA CO, khoa theo id — mon chua ton tai thi chua co id.
+  */
+  const [adding, setAdding] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addNote, setAddNote] = useState<string | null>(null);
+  const [moi, setMoi] = useState({
+    url: '', name: '', price: '', imageUrl: '', role: 'accessory' as ItemRole,
+  });
 
   // Anh dai dien cua ca set. Giu rieng khoi `draft` vi no thuoc bang outfits,
   // khong thuoc mon nao.
@@ -188,7 +207,12 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   };
 
   /**
-   * Lay lai thong tin mon tu link, ngay trong trang quan tri.
+   * Lay thong tin tu LINK DANG NAM TRONG O, ngay trong trang quan tri.
+   *
+   * DOC LINK TRONG O CHU KHONG PHAI LINK DA LUU. Neu nguoi duyet vua dan mot
+   * link khac vao thi lay theo link moi do — day la cach thay han mot mon bang
+   * mon khac ma khong phai xoa di lam lai: dan link moi, bam lay thong tin,
+   * xem lai, roi Luu.
    *
    * VI SAO CAN O DAY chu khong chi o trang tao bai
    *   Gia tren san doi lien tuc, va anh san pham cung bi nguoi ban thay. Bai da
@@ -237,6 +261,106 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
       [item.id]: `Đã điền vào ô bên dưới: ${Object.keys(moi).length} trường. `
         + 'Xem lại rồi bấm "Lưu món này".',
     }));
+  };
+
+  /** Lay thong tin cho MON DANG THEM (chua co trong database). */
+  const fetchForNew = async () => {
+    if (!moi.url.trim()) { setAddNote('Chưa có link để lấy.'); return; }
+
+    setAddBusy(true);
+    setAddNote('Bắt đầu…');
+
+    const out = await fetchProductFromUrl(moi.url, session?.user.id ?? null, {
+      onProgress: (m) => setAddNote(m),
+    });
+    setAddBusy(false);
+
+    if (!out.ok || !out.data) { setAddNote(out.message); return; }
+
+    const d = out.data;
+    setMoi((x) => ({
+      ...x,
+      name: x.name || d.name || '',
+      price: x.price || (d.price_vnd ? String(d.price_vnd) : ''),
+      imageUrl: x.imageUrl || d.image_url || '',
+    }));
+    setAddNote('Đã điền vào các ô bên dưới. Xem lại rồi bấm "Thêm vào set".');
+  };
+
+  /**
+   * Tao mot mon moi va gan vao set.
+   *
+   * BA BUOC, THEO DUNG THU TU: san pham -> link tiep thi -> dong noi vao set.
+   * Buoc sau can id cua buoc truoc, nen khong gop duoc. Buoc nao hong thi dung
+   * ngay va bao ro buoc do — khong de lai mot san pham mo coi ma nguoi dung
+   * khong biet la no da duoc tao.
+   *
+   * VI TRI = so lon nhat dang co cong mot. Bang co rang buoc unique
+   * (outfit_id, position), nen dem so mon roi lay lam vi tri se dung ngay vao
+   * mot cho da bi chiem khi truoc do co mon bi go (vi tri khong lien tuc nua).
+   */
+  const addItem = async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const uid = session?.user.id;
+    if (!uid) { setAddNote('Cần đăng nhập.'); return; }
+
+    if (!moi.name.trim()) { setAddNote('Chưa có tên sản phẩm.'); return; }
+
+    const check = checkAffiliateUrl(moi.url);
+    if (!check.ok) { setAddNote(check.message); return; }
+
+    setAddBusy(true);
+    setAddNote('Đang thêm…');
+
+    const { data: product, error: e1 } = await sb
+      .from('products')
+      .insert({
+        name: moi.name.trim(),
+        category: 'phu_kien',
+        price_vnd: Number(moi.price.replace(/\D/g, '')) || null,
+        price_checked_at: moi.price ? new Date().toISOString() : null,
+        image_url: moi.imageUrl.trim() || null,
+        source_platform: check.platform,
+        source_url: moi.url.trim(),
+        created_by: uid,
+      })
+      .select('id')
+      .single();
+
+    if (e1 || !product) { setAddBusy(false); setAddNote(`Sản phẩm: ${e1?.message}`); return; }
+
+    const { data: link, error: e2 } = await sb
+      .from('affiliate_links')
+      .insert({
+        product_id: product.id,
+        owner_id: uid,
+        platform: check.platform,
+        url: moi.url.trim(),
+      })
+      .select('id')
+      .single();
+
+    if (e2 || !link) { setAddBusy(false); setAddNote(`Link: ${e2?.message}`); return; }
+
+    const viTri = Math.max(-1, ...items.map((x) => x.position)) + 1;
+
+    const { error: e3 } = await sb.from('outfit_items').insert({
+      outfit_id: outfitId,
+      product_id: product.id,
+      affiliate_link_id: link.id,
+      role: moi.role,
+      position: viTri,
+    });
+
+    setAddBusy(false);
+    if (e3) { setAddNote(`Gán vào set: ${e3.message}`); return; }
+
+    setAdding(false);
+    setAddNote(null);
+    setMoi({ url: '', name: '', price: '', imageUrl: '', role: 'accessory' });
+    reload();
   };
 
   const save = async (item: OutfitWithItems['outfit_items'][number]) => {
@@ -445,15 +569,16 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                     disabled={fetchingId === it.id || busy || !affiliateUrl.trim()}
                     onClick={() => void fetchFromLink(it)}
                   >
-                    {fetchingId === it.id ? 'Đang lấy…' : 'Lấy lại thông tin'}
+                    {fetchingId === it.id ? 'Đang lấy…' : 'Lấy thông tin'}
                   </button>
                 </div>
                 {fetchNote[it.id] && (
                   <p className="hint">{fetchNote[it.id]}</p>
                 )}
                 <p className="hint">
-                  Chỉ nhận Shopee hoặc TikTok. Đổi link của bài đã đăng sẽ đưa bài quay lại
-                  chờ duyệt — quy tắc nằm ở tầng database.
+                  Chỉ nhận Shopee hoặc TikTok. Nút &ldquo;Lấy thông tin&rdquo; đọc{' '}
+                  <strong>link đang nằm trong ô</strong> — dán link khác vào rồi bấm là
+                  thay được cả món mà không phải xoá đi làm lại.
                 </p>
               </div>
 
@@ -497,6 +622,135 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
           </div>
         );
       })}
+
+      {/* ------------------------------------------------------------------ */}
+      {/* Them mot mon moi vao set                                           */}
+      {/*                                                                     */}
+      {/* Dat CUOI danh sach vi do la cho no se xuat hien sau khi them. Dat o */}
+      {/* dau thi mat phai di nguoc lai de tim mon vua tao.                   */}
+      {/* ------------------------------------------------------------------ */}
+      {!adding ? (
+        <button
+          type="button"
+          className="btn btn-sm self-start"
+          onClick={() => { setAdding(true); setAddNote(null); }}
+        >
+          Thêm món vào set
+        </button>
+      ) : (
+        <div className="flex flex-col gap-3 border p-4" style={{ borderColor: 'var(--fg)' }}>
+          <p className="eyebrow">Món mới</p>
+
+          <div>
+            <label className="label">Link Shopee hoặc TikTok</label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className="field"
+                value={moi.url}
+                inputMode="url"
+                placeholder="https://shopee.vn/..."
+                onChange={(e) => setMoi((x) => ({ ...x, url: e.target.value }))}
+              />
+              <button
+                type="button"
+                className="btn btn-sm btn-quiet shrink-0"
+                disabled={addBusy || !moi.url.trim()}
+                onClick={() => void fetchForNew()}
+              >
+                {addBusy ? 'Đang lấy…' : 'Lấy thông tin'}
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <label className="label">Tên sản phẩm</label>
+              <input
+                className="field"
+                value={moi.name}
+                maxLength={200}
+                onChange={(e) => setMoi((x) => ({ ...x, name: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="label">Vai trò trong set</label>
+              <select
+                className="field"
+                value={moi.role}
+                onChange={(e) => setMoi((x) => ({ ...x, role: e.target.value as ItemRole }))}
+              >
+                {Object.entries(ITEM_ROLE_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="label">Giá (đ)</label>
+              <input
+                className="field"
+                value={moi.price}
+                inputMode="numeric"
+                onChange={(e) =>
+                  setMoi((x) => ({ ...x, price: e.target.value.replace(/\D/g, '') }))
+                }
+              />
+              <p className="hint">{formatVnd(Number(moi.price) || 0)}</p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <label className="label">Ảnh</label>
+              <UploadButton
+                className="mb-2"
+                label="Chọn ảnh từ máy"
+                busy={addBusy}
+                maxBytes={IMAGE_LIMITS.product}
+                onPick={async (f) => {
+                  const userId = session?.user.id;
+                  if (!userId) { setAddNote('Cần đăng nhập để tải ảnh lên.'); return; }
+                  setAddBusy(true);
+                  const r = await uploadImage('product-images', userId, f);
+                  setAddBusy(false);
+                  if (!r.ok || !r.url) { setAddNote(r.message); return; }
+                  setMoi((x) => ({ ...x, imageUrl: r.url! }));
+                }}
+              />
+              <input
+                className="field"
+                value={moi.imageUrl}
+                placeholder="Hoặc dán địa chỉ ảnh"
+                onChange={(e) => setMoi((x) => ({ ...x, imageUrl: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          {addNote && <p className="hint">{addNote}</p>}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={addBusy || !moi.name.trim() || !moi.url.trim()}
+              onClick={() => void addItem()}
+            >
+              {addBusy ? 'Đang thêm…' : 'Thêm vào set'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              disabled={addBusy}
+              onClick={() => {
+                setAdding(false);
+                setAddNote(null);
+                setMoi({ url: '', name: '', price: '', imageUrl: '', role: 'accessory' });
+              }}
+            >
+              Huỷ
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

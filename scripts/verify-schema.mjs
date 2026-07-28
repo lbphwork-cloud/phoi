@@ -161,6 +161,51 @@ async function main() {
              'bo qua — du lieu mau khong co tai khoan nguoi dung thuong');
     }
 
+    /*
+      THEM MON MOI: VI TRI PHAI LA "LON NHAT + 1", KHONG PHAI "DEM SO MON".
+
+      Bang co rang buoc unique (outfit_id, position). Sau khi go mot mon o giua
+      thi vi tri khong con lien tuc — vi du con lai 0, 1, 3. Luc do "dem so mon"
+      ra 3, va chen vao vi tri 3 se dam thang vao mon dang co.
+
+      Phep kiem nay tao dung tinh canh do: xoa mon o giua roi thu chen bang ca
+      hai cach.
+    */
+    {
+      const [setKhac] = await q(`
+        select o.id,
+               (select count(*)::int from outfit_items oi where oi.outfit_id = o.id) as so_mon
+          from outfits o where is_seed and o.id <> '${setDo.id}' limit 1`);
+
+      // Tao mot lo hong: xoa mon o vi tri 1 (giua)
+      await q(`delete from outfit_items where outfit_id = '${setKhac.id}' and position = 1`);
+
+      const [vt] = await q(`
+        select max(position)::int as lon_nhat, count(*)::int as dem
+          from outfit_items where outfit_id = '${setKhac.id}'`);
+
+      report('them mon: vi tri khong con lien tuc sau khi go',
+             vt.dem !== vt.lon_nhat + 1,
+             `con ${vt.dem} mon nhung vi tri lon nhat la ${vt.lon_nhat}`);
+
+      // Cach SAI (dem so mon) phai dam vao mon dang co
+      const [dungRoi] = await q(`
+        select count(*)::int n from outfit_items
+         where outfit_id = '${setKhac.id}' and position = ${vt.dem}`);
+      report('them mon: dung "dem so mon" se dam vao mon dang co',
+             dungRoi.n === 1, `vi tri ${vt.dem} da bi chiem`);
+
+      // Cach DUNG (lon nhat + 1) phai chen duoc
+      const themVao = await q(`
+        insert into outfit_items (outfit_id, product_id, affiliate_link_id, role, position)
+        select '${setKhac.id}', product_id, affiliate_link_id, 'accessory', ${vt.lon_nhat + 1}
+          from outfit_items where outfit_id = '${setKhac.id}' limit 1
+        returning position`);
+      report('them mon: dung "lon nhat + 1" thi chen duoc',
+             themVao.length === 1 && themVao[0].position === vt.lon_nhat + 1,
+             `chen vao vi tri ${themVao[0]?.position}`);
+    }
+
     // Tra lai trang thai ban dau de cac phep kiem sau khong bi lech so lieu.
     await q(`insert into outfit_items (outfit_id, product_id, affiliate_link_id, role, position)
              select '${setDo.id}', p.id, al.id, 'accessory', 90
