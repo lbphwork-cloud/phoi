@@ -1,6 +1,6 @@
 # PHỐI
 
-> Repo để công khai cho giảng viên xem được toàn bộ mã nguồn và cách làm việc mà không phải cấp quyền từng người. Mọi khoá bí mật nằm ngoài repo; xem [Mô hình bảo mật](#mô-hình-bảo-mật).
+> Repo để công khai vì email nhận bàn giao là email doanh nghiệp, trên GitHub nó là tài khoản tổ chức — mà tổ chức thì không thêm được làm cộng tác viên của repo cá nhân, nên công khai là cách duy nhất để bên đó xem được. Mọi khoá bí mật nằm ngoài repo; xem [Mô hình bảo mật](#mô-hình-bảo-mật).
 
 Website gợi ý phối đồ nam cho thị trường Việt Nam. Sản phẩm trong khoảng
 150.000 – 700.000đ. Đối tượng: nam 20–30 tuổi.
