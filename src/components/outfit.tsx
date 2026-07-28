@@ -133,8 +133,23 @@ export function OutfitCard({
     if (kind === 'dislike') onDislike?.();
   };
 
+  /*
+    THE CAO BANG NHAU TRONG CUNG MOT HANG.
+
+    VAN DE: ten set do dai ngan khac nhau — co cai mot dong, co cai ba dong —
+    nen phan chu duoi anh cao thap khac nhau, va nut "Lưu vào giỏ" cua tung the
+    nam o do cao khac nhau. Nhin ca luoi thi hang khong con thang.
+
+    CACH CHUA: the la mot cot flex cao het o luoi, phan chu bi gioi han dung
+    HAI DONG, va nut bi day xuong day bang `mt-auto`. Nho vay moi nut deu nam
+    tren mot duong ngang, bat ke ten dai bao nhieu.
+
+    Chon giu BO CUC hon giu CHU DU: chu website noi ro "ưu tiên giữ bố cục
+    đều". Ten bi cat con doc duoc phan dau, va ten day du van nam trong thuoc
+    tinh title lan trang chi tiet.
+  */
   return (
-    <div ref={ref} className="reveal group/card relative">
+    <div ref={ref} className="reveal group/card relative flex h-full flex-col">
       {/*
         HAI NUT Y KIEN, dat canh nhau o goc tren ben phai.
 
@@ -219,9 +234,28 @@ export function OutfitCard({
           {outfit.status !== 'published' && <StatusTag status={outfit.status} />}
         </div>
 
-        <p className="display-xs mt-2 leading-snug">{outfit.title}</p>
+        {/*
+          TOI DA HAI DONG, du thi cat bang dau ba cham.
 
-        <p className="muted-2 mt-1 text-xs">
+          `minHeight` bang dung hai dong nen the co ten mot dong van chiem cho
+          bang the co ten hai dong — neu chi cat ma khong giu cho thi hang van
+          so le, chi do it hon.
+
+          2,75em = 2 dong x 1,375 (leading-snug). `em` o day tinh theo co chu
+          cua chinh the nay, nen no dung o moi co chu ma nguoi dung chon trong
+          trang Nội dung.
+        */}
+        <p
+          className="display-xs mt-2 line-clamp-2 leading-snug"
+          style={{ minHeight: '2.75em' }}
+          title={outfit.title}
+        >
+          {outfit.title}
+        </p>
+
+        {/* Mot dong, khong bao gio xuong dong: ba manh thong tin nay ngan va
+            deu nhau, cho xuong dong la lai them mot nguon lam lech chieu cao. */}
+        <p className="muted-2 mt-1 truncate text-xs">
           {tax.styleLabel(outfit.style_slug)}
           {outfit.occasion_slug && ` · ${tax.occasionLabel(outfit.occasion_slug)}`}
           {outfit.total_price_vnd !== null && ` · ${formatVndShort(outfit.total_price_vnd)}`}
@@ -273,7 +307,10 @@ export function OutfitCard({
           Nut tron o goc anh van con — no danh cho nguoi luot nhanh. Nut nay
           danh cho nguoi da doc ten va gia roi moi quyet dinh, va no khong the
           bi nham voi bat ky thu gi khac vi no co chu. */}
-      <div className="mt-3">
+      {/* `mt-auto` day nut xuong day the. Day la manh ghep con lai cua viec
+          cho cac hang thang nhau: khong co no thi nut van bam theo do dai cua
+          phan chu ngay tren no. */}
+      <div className="mt-auto pt-3">
         <SaveButton outfitId={outfit.id} full className="btn-sm w-full" />
       </div>
 
