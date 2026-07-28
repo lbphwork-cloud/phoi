@@ -63,15 +63,42 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
 /**
  * Dat bieu tuong tab trinh duyet tu o noi dung, luc trang dang chay.
  *
- * VI SAO CAN CA HAI DUONG
- *   Bieu tuong trong the <head> duoc ghi luc DUNG TRANG. Do la ban ma Google va
- *   Facebook doc. Nhung sua o quan tri xong ma phai doi mot lan trien khai moi
- *   thay bieu tuong moi thi rat kho hieu — nen component nay dat lai the <link>
- *   ngay khi trang tai xong, de trinh duyet thay lien.
+ * ===========================================================================
+ * BAN TRUOC CUA COMPONENT NAY LAM HONG TOAN BO VIEC CHUYEN TRANG.
  *
- *   Hai duong nay khong mau thuan: mot cho may tim kiem, mot cho nguoi dung.
- *   Cau giai thich do da duoc viet vao goi y cua chinh o nhap.
+ * No lam the nay:
+ *     for (const el of document.querySelectorAll('link[rel~="icon"]')) el.remove();
+ *
+ * Cai the <link rel="icon"> do KHONG phai cua no — do la the Next dung ra va
+ * React dang giu trong cay ao cua minh. Xoa mot nut ma React tuong minh dang
+ * giu thi lan doi giao dien tiep theo React di tim nut do va nhan ve null:
+ *
+ *     TypeError: Cannot read properties of null (reading 'removeChild')
+ *
+ * Hau qua: MOI lan chuyen trang bang JavaScript deu nem loi va than trang moi
+ * khong ve ra — chi con thanh menu va chan trang. Tai thang mot dia chi thi
+ * binh thuong, nen loi khong lo ra khi mo tung trang mot.
+ *
+ * VA NO CHI PHAT TAC KHI CO NGUOI TAI ANH LEN. O `site.favicon` de trong thi
+ * ham thoat som va khong xoa gi. Toi viet no luc o do con rong, thu bang trinh
+ * duyet, thay khong sao. Den khi chu website tai bieu tuong len thi ca website
+ * hong — va khong co gi trong ma nguon doi ca.
+ *
+ * Bai hoc: khong bao gio xoa mot nut DOM ma minh khong tu tao ra.
+ * ===========================================================================
+ *
+ * Ban nay chi dung MOT the do chinh no tao va danh dau. Nut cua Next duoc de
+ * yen. Trinh duyet lay the icon CUOI CUNG trong <head>, nen the them vao sau
+ * se thang ma khong phai xoa the nao ca.
+ *
+ * VI SAO VAN CAN CHAY LUC TRANG CHAY
+ *   Bieu tuong da duoc ghi vao HTML luc dung trang (xem generateMetadata trong
+ *   layout.tsx) — do la ban cho may tim kiem. Nhung sua o quan tri xong ma phai
+ *   doi mot lan trien khai moi thay bieu tuong moi thi rat kho hieu, nen o day
+ *   dat lai ngay cho nguoi dang sua.
  */
+const FAVICON_MARK = 'data-phoi-favicon';
+
 export function Favicon() {
   const c = useContent();
   const href = c.t('site.favicon', '');
@@ -79,14 +106,18 @@ export function Favicon() {
   useEffect(() => {
     if (!href) return;
 
-    // Xoa cac the icon co san roi dat lai mot cai. Chi doi `href` cua the cu
-    // thi mot so trinh duyet khong ve lai — chung chi doc the icon mot lan.
-    for (const el of document.querySelectorAll('link[rel~="icon"]')) el.remove();
+    // Chi tim the CUA CHINH COMPONENT NAY, nhan ra bang thuoc tinh danh dau.
+    let link = document.head.querySelector<HTMLLinkElement>(`link[${FAVICON_MARK}]`);
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      link.setAttribute(FAVICON_MARK, '');
+      document.head.appendChild(link);
+    }
+    if (link.href !== href) link.href = href;
 
-    const link = document.createElement('link');
-    link.rel = 'icon';
-    link.href = href;
-    document.head.appendChild(link);
+    // Khong don dep khi thoat: the nay do chinh component tao ra va no phai
+    // song suot phien. Go no ra moi lan chuyen trang se lam bieu tuong nhay.
   }, [href]);
 
   return null;

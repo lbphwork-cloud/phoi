@@ -247,10 +247,17 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="vi" className={`h-full ${FONT_VARS}`}>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
-      </head>
       <body className="flex min-h-full flex-col">
+        {/*
+          DAT O DAU <body> chu khong trong mot the <head> tu viet.
+
+          Next tu quan ly phan <head>; them mot the <head> viet tay vao layout
+          la buoc no phai hoa giai hai nguon cho cung mot cho. Dat o dau <body>
+          thi khong co tranh chap nao, va script van chay TRUOC khi trinh duyet
+          ve bat cu thu gi ben duoi no — do la thu tu phan tich HTML, khong phai
+          mot meo. Muc dich chong loe trang van dat duoc.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {/* Kieu chu do quan tri vien chon, do vao bien CSS o goc tai luc chay.
             Dat TRUOC moi thu khac de chu khong nhay kieu sau khi tai xong. */}
         <TypographyStyle />

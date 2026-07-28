@@ -47,22 +47,27 @@ const PROVIDERS: Array<{
   {
     id: 'gemini',
     label: 'Google Gemini',
-    note: 'Có gói miễn phí cho tạo ảnh, không cần thẻ tín dụng. Lấy key ở aistudio.google.com.',
-    keyHint: 'AIza…',
-    free: true,
+    // KHONG ghi "co goi mien phi cho tao anh" nua — do la mot cau sai.
+    // Goi mien phi cua Gemini cho TAO CHU; han muc TAO ANH bang 0.
+    note: 'Gói miễn phí viết chữ được nhưng không dựng ảnh được (hạn mức ảnh bằng 0). '
+      + 'Muốn dựng ảnh phải bật thanh toán trên Google Cloud. Lấy key ở aistudio.google.com.',
+    // Khong dung "AIza..." lam goi y trong o nhap: no nhin y het mot key that
+    // da duoc dien san, va chu website da hieu nham dung nhu vay.
+    keyHint: 'Dán key của bạn vào đây',
+    free: false,
   },
   {
     id: 'openai',
     label: 'OpenAI',
     note: 'Tạo ảnh là dịch vụ trả tiền, tính theo từng ảnh. Lấy key ở platform.openai.com.',
-    keyHint: 'sk-…',
+    keyHint: 'Dán key của bạn vào đây',
     free: false,
   },
   {
     id: 'local_comfyui',
     label: 'ComfyUI trên máy cá nhân',
     note: 'Không cần key. Local Helper sẽ nhận việc từ hàng đợi ai_jobs và chạy trên máy bạn.',
-    keyHint: '(không cần)',
+    keyHint: 'Không cần key',
     free: true,
   },
 ];

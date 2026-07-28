@@ -54,8 +54,10 @@ async function main() {
   report('17 mau',        nColors === 17, `co ${nColors}`);
   report('8 dip su dung', nOcc === 8,     `co ${nOcc}`);
   report('45 san pham',   nProducts === 45, `co ${nProducts}`);
-  report('20 set do',     nOutfits === 20,  `co ${nOutfits}`);
-  report('80 dong outfit_items (20 set x 4 mon)', nItems === 80, `co ${nItems}`);
+  // 36 = 9 phong cach x 4 set. Migration 0024 can lai cho deu: xoa 2 set thua
+  // cua toi-gian va tao 18 set con thieu, ghep tu chinh 47 san pham mau da co.
+  report('36 set do (9 phong cach x 4)', nOutfits === 36, `co ${nOutfits}`);
+  report('144 dong outfit_items (36 set x 4 mon)', nItems === 144, `co ${nItems}`);
   report('45 link affiliate', nLinks === 45, `co ${nLinks}`);
 
   // Moi set do phai co dung 4 mon, va phai co ca bottom + shoes
@@ -67,7 +69,7 @@ async function main() {
      where o.is_seed group by o.slug having count(*) <> 4
         or not bool_or(oi.role = 'bottom') or not bool_or(oi.role = 'shoes')`);
   report('moi set du 4 mon va co quan + giay', bad.length === 0,
-         bad.length ? JSON.stringify(bad) : 'tat ca 20 set hop le');
+         bad.length ? JSON.stringify(bad) : `tat ca ${nOutfits} set hop le`);
 
   // Khong duoc con dong nao thieu link affiliate
   const noLink = await q(`select count(*)::int n from outfit_items where affiliate_link_id is null`);
@@ -379,7 +381,7 @@ async function main() {
 
   await db.exec(`reset test.uid;`);
 
-  console.log('\n=== 7. Bang gia 20 set do ===');
+  console.log('\n=== 7. Bang gia cac set do ===');
   const table = await q(`
     select o.slug, s.label style, oc.label dip, o.total_price_vnd gia
       from outfits o

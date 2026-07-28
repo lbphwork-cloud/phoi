@@ -32,6 +32,7 @@ import { checkAffiliateUrl } from '@/lib/affiliate';
 import {
   fetchProductFromUrl, guessCategory, guessColorSlug, platformFromUrl, roleFromCategory,
 } from '@/lib/fetchProduct';
+import { guessColorSlugs } from '@/lib/guessColor';
 import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
 import { UploadButton } from '@/components/UploadButton';
@@ -53,10 +54,23 @@ const PROVIDER_LABEL: Record<AiProviderId, string> = {
 };
 
 /** Lay key o dau, va tra tien hay khong. */
+/*
+  DONG NAY TUNG NOI SAI, VA CAI SAI DO TON THOI GIAN THAT.
+
+  Ban cu ghi "Lay key mien phi... Khong can the tin dung" ngay duoi nut tao
+  anh. Doc xong thi hieu la key mien phi tao duoc anh. Khong phai: goi mien
+  phi cua Gemini cho TAO CHU, con han muc TAO ANH bang 0. Bam nut se an mot
+  loi 429 kem chu "limit: 0" — mot cau khong noi len duoc rang van de nam o
+  goi cuoc chu khong nam o key.
+
+  Chu website da mat thoi gian di lay key roi moi phat hien. Nguoi dung cung
+  se mat y het neu dong nay khong noi thang.
+*/
 const PROVIDER_KEY_NOTE: Record<AiProviderId, string> = {
   gemini:
-    'Lấy key miễn phí ở aistudio.google.com/apikey — bấm "Create API key". ' +
-    'Không cần thẻ tín dụng.',
+    'Lấy key ở aistudio.google.com/apikey — bấm "Create API key". Key miễn phí ' +
+    'VIẾT CHỮ được nhưng KHÔNG DỰNG ẢNH được: hạn mức ảnh của gói miễn phí bằng 0. ' +
+    'Muốn dựng ảnh thì phải bật thanh toán cho project trên Google Cloud.',
   openai:
     'Lấy key ở platform.openai.com/api-keys. Tạo ảnh là dịch vụ trả tiền, ' +
     'tính theo từng ảnh.',
@@ -465,6 +479,27 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
       role: it.name ? it.role : (roleFromCategory(guessedCat) as ItemRole),
       platform: d.platform ?? check.platform,
     });
+
+    /*
+      TICH SAN MAU CHU DAO CUA CA SET tu ten mon vua lay ve.
+
+      Truoc day chi o mau CUA TUNG MON duoc doan, con "Mau chu dao" cua ca set
+      thi van phai tich tay tu dau — ma do moi la o bat buoc: khong chon it
+      nhat mot mau thi khong luu duoc bai. Nguoi dang bon mon phai doc lai ca
+      bon cai ten roi tu tich lai dung nhung mau vua hien ngay tren man hinh.
+
+      CHI THEM, KHONG BAO GIO BO. Neu nguoi dung da tich tay mau nao thi mau do
+      giu nguyen; doan ra mau moi thi them vao. Bo mot lua chon cua nguoi dung
+      vi mot phep doan la kieu lam ho mat long tin vao ca cai form.
+
+      `allowed` la danh sach 17 mau that trong database chu khong phai danh
+      sach viet cung: neu sau nay co nguoi them hoac doi mau trong bang colors
+      thi ham doan tu bam theo, khong sinh ra mot slug khong ton tai.
+    */
+    const doan = guessColorSlugs(d.name ?? '', tax.colors.map((c) => c.slug));
+    if (doan.length > 0) {
+      setColorSlugs((xs) => [...xs, ...doan.filter((x) => !xs.includes(x))]);
+    }
   };
 
   // -------------------------------------------------------------------------
@@ -818,21 +853,12 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           placeholder="Ví dụ: Tối giản trắng đen ngày thường"
         />
 
-        {/* NHAN VA NUT TREN CUNG MOT DONG.
-            Truoc day nut nay nam duoi o nhap va de kieu chu xam nhat khong
-            vien — chu website bao thang la "chua co nut tao mo ta bang AI".
-            Nut ma phai doc ky moi nhan ra thi coi nhu khong co. */}
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
-          <label className="label mb-0" htmlFor="desc">Mô tả</label>
-          <button
-            type="button"
-            className="btn btn-sm"
-            disabled={descBusy || !descReady.ok}
-            onClick={() => void generateDescription()}
-          >
-            {descBusy ? 'Đang viết…' : 'Viết mô tả bằng AI'}
-          </button>
-        </div>
+        {/* NUT "Viet mo ta bang AI" DA CHUYEN XUONG KHOI AI O CUOI TRANG.
+            Ly do: AI viet mo ta dua tren cac mon, phong cach va mau — tuc la
+            no chi chay duoc khi moi thu khac da dien xong. Dat nut ngay canh o
+            nhap nay la moi nguoi bam vao no dau tien, va nhan mot danh sach
+            "chua viet duoc vi...". */}
+        <label className="label" htmlFor="desc">Mô tả</label>
 
         <textarea
           id="desc"
@@ -844,25 +870,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           placeholder="Vì sao cách phối này hợp lý. Một hai câu là đủ."
         />
 
-        {/* Noi RO con thieu gi thay vi chi khoa nut roi de nguoi dung tu doan. */}
-        {!descReady.ok && (
-          <div className="notice mt-2">
-            <p className="text-sm">Chưa viết được vì:</p>
-            <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
-              {descReady.missing.map((m) => <li key={m}>{m}</li>)}
-            </ul>
-          </div>
-        )}
-
-        {descMessage && (
-          <div className={`mt-2 notice ${descMessage.ok ? '' : 'notice-danger'}`}>
-            <p className="text-sm">{descMessage.text}</p>
-          </div>
-        )}
-
         <p className="hint mb-5">
-          AI viết dựa trên các món và phong cách bạn đã nhập. Kết quả là{' '}
-          <strong>bản nháp</strong> — đọc lại và sửa cho đúng ý bạn trước khi đăng.
+          Một hai câu là đủ. Cuối trang có nút để AI viết giúp bản nháp.
         </p>
 
         <div className="mb-5 grid gap-4 sm:grid-cols-2">
@@ -922,6 +931,72 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           </div>
         )}
 
+      </Block>
+
+      {/* ------------------------------------------------------------------ */}
+      {/*
+        KHOI AI NAM CUOI CUNG, sau moi o nhap khac.
+
+        VI SAO
+          Ca hai cong cu o day deu DOC tu nhung gi ban da nhap: AI viet mo ta
+          dua tren cac mon, phong cach va mau; AI dung anh lay chinh anh cua
+          tung mon lam mau. Dat chung o giua trang la moi nguoi bam vao chung
+          truoc, roi nhan mot danh sach "chua lam duoc vi con thieu...".
+
+          Thu tu tren man hinh la mot loi huong dan. Cai gi phai lam sau thi
+          phai nam duoi.
+
+        HAI NHOM TACH BACH: CHU MIEN PHI, ANH MAT TIEN
+          Key Gemini mien phi tao duoc CHU nhung KHONG tao duoc ANH — han muc
+          anh cua goi mien phi bang 0. Do la mot su that ve san pham cua Google
+          ma khong the doan ra tu giao dien, va phai mat mot lan bam va mot loi
+          429 moi biet. Chu website da mat thoi gian vi dieu nay; nguoi dung
+          cung se mat y het neu khong co ai noi truoc.
+      */}
+      <Block
+        title="Công cụ AI"
+        note="Tuỳ chọn. Không dùng cũng đăng bài được — mọi thứ ở đây chỉ để đỡ mất công."
+      >
+        {/* --- Nhom 1: viet chu, mien phi ------------------------------- */}
+        <div>
+          <p className="eyebrow mb-3">Viết mô tả — miễn phí</p>
+          <p className="hint mb-4">
+            Key Gemini miễn phí <strong>viết chữ được</strong>. AI viết dựa trên các
+            món, phong cách và màu bạn đã nhập ở trên. Kết quả là{' '}
+            <strong>bản nháp</strong> — đọc lại và sửa cho đúng ý bạn trước khi đăng.
+          </p>
+
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={descBusy || !descReady.ok}
+            onClick={() => void generateDescription()}
+          >
+            {descBusy ? 'Đang viết…' : 'Viết mô tả bằng AI'}
+          </button>
+
+          {/* Noi RO con thieu gi thay vi chi khoa nut roi de nguoi dung tu doan. */}
+          {!descReady.ok && (
+            <div className="notice mt-3">
+              <p className="text-sm">Chưa viết được vì:</p>
+              <ul className="muted mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
+                {descReady.missing.map((m) => <li key={m}>{m}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {descMessage && (
+            <div className={`mt-3 notice ${descMessage.ok ? '' : 'notice-danger'}`}>
+              <p className="text-sm">{descMessage.text}</p>
+            </div>
+          )}
+
+          <p className="hint mt-3">
+            Viết xong, chữ được điền vào ô <strong>Mô tả</strong> ở khối
+            &ldquo;Thông tin set đồ&rdquo; phía trên.
+          </p>
+        </div>
+
         {/* ---------------------------------------------------------------- */}
         {/* Tao anh set do bang AI                                            */}
         {/*                                                                   */}
@@ -929,8 +1004,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
         {/* len o tren, hoac de trong — bai van dang duoc. Khong bao gio bat  */}
         {/* buoc phai co key AI moi dung duoc website.                        */}
         {/* ---------------------------------------------------------------- */}
-        <div className="mt-8 border-t pt-6" style={{ borderColor: 'var(--line)' }}>
-          <p className="eyebrow mb-3">Hoặc để AI dựng ảnh set đồ</p>
+        <div className="mt-12 border-t pt-8" style={{ borderColor: 'var(--line)' }}>
+          <p className="eyebrow mb-3">Dựng ảnh set đồ — tốn tiền</p>
           <p className="hint mb-4">
             AI dựng một ảnh minh hoạ theo phong cách, màu và các món bạn đã nhập.
             Ảnh sinh ra là <strong>ảnh minh hoạ</strong>, không phải ảnh sản phẩm thật:
@@ -987,8 +1062,9 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                 ) : (
                   <p className="mb-3 text-sm">
                     Tài khoản bạn <strong>chưa có key {PROVIDER_LABEL[aiProvider]}</strong>.
-                    Mỗi người dùng key của chính mình, nên tiền dùng AI tính vào tài khoản
-                    bạn chứ không phải của ai khác.
+                    PHỐI <strong>không kèm sẵn key nào</strong> — mỗi người dùng key của
+                    chính mình, nên tiền dùng AI tính vào tài khoản bạn chứ không phải
+                    của ai khác. Dán key vào ô bên dưới để bắt đầu.
                   </p>
                 )}
 
@@ -1007,7 +1083,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                         className="field"
                         value={keyInput.rawKey}
                         onChange={(e) => keyInput.setRawKey(e.target.value)}
-                        placeholder="Dán API key vào đây"
+                        placeholder="Dán API key của bạn vào đây"
                         autoComplete="off"
                         aria-label={`API key ${PROVIDER_LABEL[aiProvider]}`}
                       />

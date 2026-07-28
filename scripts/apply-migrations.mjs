@@ -165,9 +165,11 @@ async function runChecks(db) {
                 join outfits o on o.id = oi.outfit_id
                where o.is_seed)::int as items
     `);
+    // 36 set = 9 phong cach x 4, sau migration 0024. Truoc do la 20 set chia
+    // khong deu (workwear khong co bai nao, toi-gian co sau).
     report(
-      '0006 — 45 san pham / 20 set do / 45 link / 80 mon (chi dem du lieu mau)',
-      r.products === 45 && r.outfits === 20 && r.links === 45 && r.items === 80,
+      '0006+0024 — 45 san pham / 36 set do / 45 link / 144 mon (chi dem du lieu mau)',
+      r.products === 45 && r.outfits === 36 && r.links === 45 && r.items === 144,
       `${r.products} / ${r.outfits} / ${r.links} / ${r.items}`,
     );
   }
