@@ -9,7 +9,18 @@ import { rankOutfits, type UserContext, type ColorElementMap } from './scoring';
 export interface OutfitFilters {
   styleSlug?: string | null;
   occasionSlug?: string | null;
-  colorSlug?: string | null;
+  /**
+   * Cac mau duoc chon. Rong = khong loc theo mau.
+   *
+   * NHIEU MAU, KHONG PHAI MOT. Truoc day chi chon duoc mot mau, va do la mot
+   * gioi han khong co ly do: nguoi ta tim "do den" hay "be nau" nhu mot tong
+   * mau, khong phai tung mau roi.
+   *
+   * Loc theo kieu HOAC (co bat ky mau nao trong danh sach), khong phai VA.
+   * Loc VA se tra ve gan nhu khong bai nao — mot set do chi co hai ba mau chu
+   * dao, doi no chua ca bon mau da chon la doi mot thu khong ton tai.
+   */
+  colorSlugs?: string[] | null;
   priceMin?: number | null;
   priceMax?: number | null;
 }
@@ -65,7 +76,10 @@ export function useOutfits(
     if (filters.styleSlug) q = q.eq('style_slug', filters.styleSlug);
     if (filters.occasionSlug) q = q.eq('occasion_slug', filters.occasionSlug);
     // contains dung toan tu @> cua Postgres, co index GIN tren color_slugs
-    if (filters.colorSlug) q = q.contains('color_slugs', [filters.colorSlug]);
+    if (filters.colorSlugs?.length) {
+      // `overlaps` = giao nhau khac rong, dung nghia "co bat ky mau nao".
+      q = q.overlaps('color_slugs', filters.colorSlugs);
+    }
     if (filters.priceMin != null) q = q.gte('total_price_vnd', filters.priceMin);
     if (filters.priceMax != null) q = q.lte('total_price_vnd', filters.priceMax);
 

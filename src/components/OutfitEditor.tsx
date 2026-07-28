@@ -127,6 +127,7 @@ function readExtensionPayload(): { item: DraftItem | null; error: string | null 
       name?: string;
       price_vnd?: number | null;
       image_url?: string | null;
+      image_urls?: string[];
       url?: string;
       platform?: Platform | null;
     };
@@ -150,6 +151,11 @@ function readExtensionPayload(): { item: DraftItem | null; error: string | null 
         role: roleFromCategory(cat) as ItemRole,
         priceVnd: d.price_vnd ? String(d.price_vnd) : '',
         imageUrl: d.image_url ?? '',
+        // Tien ich chay trong trang that nen no thay ca thu vien anh — thu ma
+        // may chu doc HTML tho khong bao gio thay.
+        imageChoices: d.image_urls?.length
+          ? d.image_urls
+          : (d.image_url ? [d.image_url] : []),
         affiliateUrl: d.url,
         platform: d.platform ?? check.platform,
         source: 'extension',

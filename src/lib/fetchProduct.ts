@@ -217,6 +217,10 @@ export async function fetchProductFromUrl(
         name: trongLink.name ?? '',
         price_vnd: null,
         image_url: trongLink.imageUrl,
+        // Duong dan chia se cua TikTok chi mang MOT anh. Van dua vao mang de
+        // giao dien chon anh hien ra dong nhat voi Shopee — mot o thay vi
+        // khong co gi, kem cau "link nay chi cong bo mot anh".
+        image_urls: trongLink.imageUrl ? [trongLink.imageUrl] : [],
         platform: linkCheck.platform,
       },
       message:

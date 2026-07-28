@@ -80,14 +80,40 @@ function readProductPage() {
     if (price) break;
   }
 
-  let image = meta('og:image') || meta('twitter:image');
-  if (!image) {
-    // Chon anh lon nhat trong trang lam anh san pham
-    const imgs = [...document.images]
-      .filter((i) => i.naturalWidth >= 200 && i.naturalHeight >= 200)
-      .sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight);
-    image = imgs[0]?.src || null;
-  }
+  /*
+    LAY NHIEU ANH, khong chi mot.
+
+    Anh og:image la anh BIA do nguoi ban chon — hay la anh ghep co chu quang
+    cao dan len, tuc la anh te nhat de lam mau cho AI. Tien ich chay TRONG
+    trang that nen no thay ca thu vien anh da tai xong, thu ma may chu khong
+    bao gio thay.
+
+    Gom trung theo ma file (bo duoi va bo phan kich thuoc) — Shopee tro cung
+    mot tam anh bang nhieu duong dan khac nhau.
+  */
+  const maAnh = (u) => (u.split('/').pop() || u).split('@')[0].replace(/\.(webp|jpe?g|png|avif)$/i, '');
+
+  const images = [];
+  const daCo = new Set();
+  const themAnh = (u) => {
+    if (!u || !/^https?:/.test(u)) return;
+    const ma = maAnh(u);
+    if (!ma || daCo.has(ma) || images.length >= 6) return;
+    daCo.add(ma);
+    images.push(u.split('@')[0]);
+  };
+
+  themAnh(meta('og:image'));
+  themAnh(meta('twitter:image'));
+
+  // Anh trong trang, xep theo dien tich giam dan: anh san pham luon to hon
+  // icon, banner nho va anh dai dien shop.
+  [...document.images]
+    .filter((i) => i.naturalWidth >= 300 && i.naturalHeight >= 300)
+    .sort((a, b) => b.naturalWidth * b.naturalHeight - a.naturalWidth * a.naturalHeight)
+    .forEach((i) => themAnh(i.currentSrc || i.src));
+
+  let image = images[0] || null;
   if (image && !/^https?:/.test(image)) {
     image = new URL(image, location.href).toString();
   }
@@ -98,6 +124,8 @@ function readProductPage() {
     name: name.slice(0, 200) || null,
     price_vnd: price,
     image_url: image,
+    // Ca danh sach, de website hien khoi chon anh giong het khi lay tu may chu.
+    image_urls: images,
     // location.href la URL THAT sau moi chuyen huong — khong phai link rut gon
     url: location.href.split('#')[0],
     platform: host.includes('shopee') ? 'shopee' : host.includes('tiktok') ? 'tiktok' : null,

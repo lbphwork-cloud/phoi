@@ -236,6 +236,25 @@ export const viewport = {
  *   Chi con hai gia tri. Bat ky gia tri nao khong phai 'light' deu ve 'dark' —
  *   ke ca 'system' con sot lai trong may nhung nguoi da dung tu truoc.
  */
+/*
+  DUA CON LAN VE DAU TRANG MOI LAN TAI LAI.
+
+  Trinh duyet tu nho vi tri cuon va khoi phuc no khi tai lai — hop ly cho mot
+  trang tai lieu dai, nhung sai voi trang nay: noi dung do JavaScript tai ve
+  SAU khi trinh duyet da khoi phuc vi tri. Luc khoi phuc thi trang con ngan,
+  nen no cuon toi mot cho gan cuoi; vai tram mili giay sau noi dung day len va
+  nguoi dung thay minh dang dung lo lung o giua mot khoi nao do.
+
+  `history.scrollRestoration = 'manual'` bao trinh duyet dung tu khoi phuc.
+  Cuon ve 0 ngay tai day de khong co ca mot khung hinh o sai cho.
+
+  KHONG anh huong nut back/forward: Next.js tu quan ly vi tri cuon khi chuyen
+  trang trong ung dung, va no khong dua vao co nay.
+*/
+const SCROLL_SCRIPT =
+  "(function(){try{if('scrollRestoration' in history)" +
+  "history.scrollRestoration='manual';window.scrollTo(0,0)}catch(e){}})()";
+
 const THEME_SCRIPT =
   "(function(){try{var t=localStorage.getItem('phoi.theme');" +
   "if(t!=='light')t='dark';" +
@@ -258,6 +277,7 @@ export default function RootLayout({
           mot meo. Muc dich chong loe trang van dat duoc.
         */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: SCROLL_SCRIPT }} />
         {/* Kieu chu do quan tri vien chon, do vao bien CSS o goc tai luc chay.
             Dat TRUOC moi thu khac de chu khong nhay kieu sau khi tai xong. */}
         <TypographyStyle />

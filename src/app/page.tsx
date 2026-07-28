@@ -402,8 +402,11 @@ function StyleBlock({
           {style.desc && (
             <p className="muted mb-8 max-w-md text-base leading-relaxed">{style.desc}</p>
           )}
+          {/* Chu cu ghep ten phong cach vao: "Xem set do smart casual". Chin
+              khoi thi thanh chin cau khac nhau cho cung mot hanh dong, va mat
+              phai doc lai tung cai. Mot chu duy nhat thi liec la biet. */}
           <Link href={href} className="btn">
-            Xem set đồ {style.label.toLowerCase()}
+            Khám phá
           </Link>
         </div>
       </div>

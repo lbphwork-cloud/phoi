@@ -1170,10 +1170,49 @@ def main() -> None:
                     help="Xu ly het job dang cho roi thoat.")
     ap.add_argument("--interval", type=float, default=3.0,
                     help="So giay giua hai lan hoi database (mac dinh 3).")
+    ap.add_argument("--login", action="store_true",
+                    help="Mo trinh duyet de ban tu dang nhap Shopee/TikTok mot lan. "
+                         "Cookie duoc luu lai, cac lan chay sau khong phai dang nhap nua.")
     ap.add_argument("--test-url", metavar="URL",
                     help="Doc thu mot URL roi in ket qua. Khong can Supabase, "
                          "khong ghi gi vao database.")
     args = ap.parse_args()
+
+    # ------------------------------------------------------------------------
+    # CHE DO DANG NHAP MOT LAN
+    #
+    # Do thuc te: Shopee day trinh duyet moi sang trang dang nhap khi mo trang
+    # san pham. Khong phai chi vi phat hien tu dong hoa — no doi CO PHIEN DANG
+    # NHAP. Nen mot lan dang nhap bang tay la du cho moi lan chay sau, vi hoi
+    # so trinh duyet duoc luu lai trong PROFILE_DIR.
+    #
+    # KHONG BAO GIO HOI MAT KHAU. Nguoi dung tu go vao trang cua chinh Shopee,
+    # trong cua so cua chinh ho. Helper khong doc gi tu do ngoai cookie ma
+    # trinh duyet tu luu.
+    # ------------------------------------------------------------------------
+    if args.login:
+        from playwright.sync_api import sync_playwright as _spw
+        print()
+        print("=" * 72)
+        print("  DANG NHAP MOT LAN CHO LOCAL HELPER")
+        print("=" * 72)
+        print("  Mot cua so trinh duyet se mo ra. Trong do:")
+        print("    1. Dang nhap Shopee (va TikTok neu ban dung link TikTok).")
+        print("    2. Mo thu mot trang san pham bat ky de chac la vao duoc.")
+        print("    3. Quay lai day va bam Enter.")
+        print()
+        print("  Mat khau ban go vao la go tren trang cua chinh san, trong cua")
+        print("  so cua chinh ban. Helper khong doc gi ngoai cookie trinh duyet")
+        print("  tu luu lai.")
+        print("=" * 72)
+        with _spw() as pw:
+            b = LazyBrowser(pw, headless=False)
+            page = b.page()
+            page.goto("https://shopee.vn/buyer/login", wait_until="domcontentloaded")
+            input("\n  Dang nhap xong thi bam Enter o day… ")
+            b.close()
+        print("  Da luu phien dang nhap. Chay lai --test-url de thu.")
+        return
 
     # Che do chay thu phai xu ly TRUOC load_env(): no khong can database, nen
     # khong duoc bat nguoi dung tao .env chi de thu mot link.

@@ -77,7 +77,8 @@ export function ColorPicker({
   max?: number;
 }) {
   /** Cac nhom dang mo de xem sac do. */
-  const [moRong, setMoRong] = useState<string[]>([]);
+  /** Nhom dang mo. Mot nhom tai mot thoi diem — xem chu thich duoi. */
+  const [moRong, setMoRong] = useState<string | null>(null);
   const nhom = nhomMau(colors);
 
   const bam = (slug: string) => {
@@ -96,16 +97,24 @@ export function ColorPicker({
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      {nhom.map(({ chinh, sacDo }) => {
-        const dangMo = moRong.includes(chinh.slug);
-        // Mot sac do ben trong dang duoc chon — phai bao cho mat biet, neu
-        // khong nguoi dung nhin hang mau chinh va tuong minh chua chon gi.
-        const conDuocChon = sacDo.filter((c) => selected.includes(c.slug));
+    <div>
+      {/*
+        HANG NGANG, cuon duoc khi hep.
 
-        return (
-          <div key={chinh.slug}>
-            <div className="flex flex-wrap items-center gap-1">
+        Ban truoc xep MOI MAU MOT DONG de con cho xo sac do — 18 dong chip la
+        mot cot dai ngoang, va mat phai doc tung dong thay vi liec mot cai.
+
+        Gio: tat ca mau chinh nam tren MOT hang ngang tu xuong dong; bam mot
+        mau thi sac do cua no xo XUONG DUOI, ngay ben duoi hang. Mot khoi mo
+        tai mot thoi diem — mo hai nhom cung luc thi lai thanh cai cot dai cu.
+      */}
+      <div className="flex flex-wrap gap-1.5">
+        {nhom.map(({ chinh, sacDo }) => {
+          const dangMo = moRong === chinh.slug;
+          const conChon = sacDo.filter((c) => selected.includes(c.slug));
+
+          return (
+            <span key={chinh.slug} className="inline-flex items-center">
               <ChipMau color={chinh} chon={selected.includes(chinh.slug)}
                        onBam={() => bam(chinh.slug)} />
 
@@ -114,35 +123,63 @@ export function ColorPicker({
                   type="button"
                   className="btn btn-quiet btn-sm"
                   aria-expanded={dangMo}
-                  onClick={() =>
-                    setMoRong((x) => (x.includes(chinh.slug)
-                      ? x.filter((y) => y !== chinh.slug)
-                      : [...x, chinh.slug]))
-                  }
-                  title={`${sacDo.length} sắc độ của ${chinh.label.toLowerCase()}`}
-                  style={{ padding: '0.25rem 0.5rem' }}
+                  onClick={() => setMoRong(dangMo ? null : chinh.slug)}
+                  title={`${sacDo.length} sắc độ khác của ${chinh.label.toLowerCase()}`}
+                  style={{
+                    padding: '0.25rem 0.45rem',
+                    marginLeft: '-0.25rem',
+                    // Cham xanh nho khi ben trong dang co mau duoc chon: khong
+                    // co no thi nguoi dung nhin hang ngoai va tuong minh chua
+                    // chon gi, trong khi mot sac do dang duoc chon o ben trong.
+                    color: conChon.length ? 'var(--fg)' : undefined,
+                    fontWeight: conChon.length ? 700 : undefined,
+                  }}
                 >
-                  {dangMo ? '▴' : '▾'} {sacDo.length}
+                  {dangMo ? '▴' : '▾'}{conChon.length ? ` ${conChon.length}` : ''}
                 </button>
               )}
+            </span>
+          );
+        })}
+      </div>
 
-              {/* Sac do dang chon van hien o hang ngoai du nhom dang dong. */}
-              {!dangMo && conDuocChon.map((c) => (
-                <ChipMau key={c.slug} color={c} chon nho onBam={() => bam(c.slug)} />
+      {/* Khoi sac do — xo XUONG DUOI hang ngang, khong chen vao giua no. */}
+      {moRong && (() => {
+        const g = nhom.find((x) => x.chinh.slug === moRong);
+        if (!g || g.sacDo.length === 0) return null;
+        return (
+          <div
+            className="mt-2 border-l-2 pl-3"
+            style={{ borderColor: 'var(--fg)' }}
+          >
+            <p className="muted-2 mb-1 text-xs">
+              Sắc độ khác của {g.chinh.label.toLowerCase()}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {g.sacDo.map((c) => (
+                <ChipMau key={c.slug} color={c} nho
+                         chon={selected.includes(c.slug)} onBam={() => bam(c.slug)} />
               ))}
             </div>
-
-            {dangMo && sacDo.length > 0 && (
-              <div className="mt-1 flex flex-wrap gap-1 pl-4">
-                {sacDo.map((c) => (
-                  <ChipMau key={c.slug} color={c} nho
-                           chon={selected.includes(c.slug)} onBam={() => bam(c.slug)} />
-                ))}
-              </div>
-            )}
           </div>
         );
-      })}
+      })()}
+
+      {/* Sac do dang duoc chon nhung nhom cua no dang dong — van phai thay. */}
+      {(() => {
+        const anChon = colors.filter(
+          (c) => c.parent_slug && selected.includes(c.slug) && c.parent_slug !== moRong,
+        );
+        if (anChon.length === 0) return null;
+        return (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="muted-2 text-xs">Đang chọn:</span>
+            {anChon.map((c) => (
+              <ChipMau key={c.slug} color={c} nho chon onBam={() => bam(c.slug)} />
+            ))}
+          </div>
+        );
+      })()}
 
       {multiple && max && selected.length >= max && (
         <p className="hint">Đã chọn tối đa {max} màu. Bỏ bớt một màu để chọn màu khác.</p>

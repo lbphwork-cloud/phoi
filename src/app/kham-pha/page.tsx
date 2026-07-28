@@ -98,6 +98,16 @@ function Discover() {
         )
       : outfits;
 
+  /** Bao nhieu bai co mau hop menh — dung cho con so ngay tren nut. */
+  const soHopMenh = guidance
+    ? outfits.filter((o) =>
+        o.color_slugs.some((cs) => {
+          const el = tax.colorElements[cs];
+          return el === guidance.tuongSinh || el === guidance.banMenh;
+        }),
+      ).length
+    : 0;
+
   /*
     TAI THEO TUNG DOT, khong bay het mot luc.
 
@@ -141,7 +151,7 @@ function Discover() {
   const activeCount =
     (filters.styleSlug ? 1 : 0) +
     (filters.occasionSlug ? 1 : 0) +
-    (filters.colorSlug ? 1 : 0) +
+    (filters.colorSlugs?.length ? 1 : 0) +
     (priceStep > 0 ? 1 : 0) +
     (menhOnly ? 1 : 0);
 
@@ -161,8 +171,8 @@ function Discover() {
       filters.occasionSlug
         ? tax.occasions.find((o) => o.slug === filters.occasionSlug)?.label
         : null,
-      filters.colorSlug
-        ? tax.colors.find((x) => x.slug === filters.colorSlug)?.label
+      filters.colorSlugs?.length
+        ? filters.colorSlugs.map((cs) => tax.colors.find((x) => x.slug === cs)?.label).join(', ')
         : null,
       priceStep > 0 ? PRICE_STEPS[priceStep].label : null,
     ]
@@ -238,8 +248,9 @@ function Discover() {
             <Group label="Màu">
               <ColorPicker
                 colors={tax.colors}
-                selected={filters.colorSlug ? [filters.colorSlug] : []}
-                onChange={(xs) => toggle('colorSlug', xs[0] ?? filters.colorSlug ?? '')}
+                selected={filters.colorSlugs ?? []}
+                onChange={(xs) => setFilters((f) => ({ ...f, colorSlugs: xs.length ? xs : null }))}
+                multiple
               />
             </Group>
 
@@ -271,8 +282,16 @@ function Discover() {
             >
               Chỉ hiện outfit có màu hợp mệnh
             </button>
+            {/*
+              NOI SO BAI HOP MENH NGAY TAI NUT.
+
+              Truoc day bam nut xong chi thay danh sach doi — khong biet no bo
+              bao nhieu bai, va neu danh sach ngan san thi khong biet nut co
+              chay khong. Mot con so tra loi ca hai cau hoi truoc khi bam.
+            */}
             <span className="muted-2 self-center text-xs">
-              Tương sinh: {NGU_HANH_LABEL[guidance.tuongSinh]} · Bản mệnh:{' '}
+              {soHopMenh}/{outfits.length} bài có màu hợp mệnh ·
+              {' '}Tương sinh: {NGU_HANH_LABEL[guidance.tuongSinh]} · Bản mệnh:{' '}
               {NGU_HANH_LABEL[guidance.banMenh]} · Hạn chế: {NGU_HANH_LABEL[guidance.hanChe]}
             </span>
           </Group>
@@ -323,6 +342,14 @@ function Discover() {
                 key={o.id}
                 outfit={o}
                 score={o.score}
+                hopMenh={
+                  guidance
+                    ? o.color_slugs.filter((cs) => {
+                        const el = tax.colorElements[cs];
+                        return el === guidance.tuongSinh || el === guidance.banMenh;
+                      })
+                    : undefined
+                }
                 // Sau khi ghi phan hoi, tai lai danh sach de bo cham diem
                 // xep lai thu tu ngay — set vua bam se tut xuong cuoi.
                 onDislike={reload}

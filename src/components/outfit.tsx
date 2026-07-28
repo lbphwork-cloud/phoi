@@ -48,6 +48,7 @@ export function AiTag() {
 export function OutfitCard({
   outfit,
   score,
+  hopMenh,
   href,
   onDislike,
 }: {
@@ -57,6 +58,13 @@ export function OutfitCard({
     | 'color_slugs' | 'total_price_vnd' | 'ai_generated' | 'is_seed' | 'status'
   >;
   score?: ScoreBreakdown;
+  /**
+   * Cac slug mau cua CHINH bai nay ma hop menh nguoi dang xem.
+   *
+   * Trang goi truyen vao thay vi the tu tinh: chi trang do moi biet nien menh
+   * cua nguoi dung, va tinh mot lan cho ca luoi re hon tinh lai o tung the.
+   */
+  hopMenh?: string[];
   href?: string;
   /**
    * Bat nut "khong thich" ngay tren the.
@@ -219,15 +227,35 @@ export function OutfitCard({
           {outfit.total_price_vnd !== null && ` · ${formatVndShort(outfit.total_price_vnd)}`}
         </p>
 
+        {/*
+          DANH DAU MAU HOP MENH NGAY TREN THE.
+
+          Truoc day bam nut "uu tien mau hop menh" chi lam thu tu doi — nguoi
+          dung khong biet BAI NAO duoc uu tien hay VI SAO. Mot vong tron quanh
+          o mau tra loi ca hai, va tra loi ngay o cho mat dang nhin.
+
+          Chi danh dau khi nguoi dung DA nhap ngay sinh va CHUA tat goi y theo
+          menh — `hopMenh` rong thi khong ve gi. Khong quang cao mot tinh nang
+          ho khong dung.
+        */}
         <div className="mt-2 flex items-center gap-1">
-          {outfit.color_slugs.slice(0, 5).map((c) => (
-            <span
-              key={c}
-              className="swatch"
-              style={{ background: tax.colorHex(c) }}
-              title={tax.colorLabel(c)}
-            />
-          ))}
+          {outfit.color_slugs.slice(0, 5).map((c) => {
+            const hop = hopMenh?.includes(c);
+            return (
+              <span
+                key={c}
+                className="swatch"
+                style={{
+                  background: tax.colorHex(c),
+                  ...(hop ? { outline: '2px solid var(--fg)', outlineOffset: '2px' } : {}),
+                }}
+                title={hop ? `${tax.colorLabel(c)} — hợp mệnh của bạn` : tax.colorLabel(c)}
+              />
+            );
+          })}
+          {hopMenh && hopMenh.length > 0 && (
+            <span className="muted-2 ml-1 text-xs">hợp mệnh</span>
+          )}
         </div>
       </Link>
 

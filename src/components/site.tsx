@@ -450,7 +450,15 @@ export function SiteFooter() {
           tinh canh chu khong dieu khien duoc no. Nho vay tren dien thoai logo
           van dung giua trong khi cau chu ben duoi sat le trai.
         */}
-        <div className="md:text-center">
+        {/*
+          CAN GIUA O CA HAI KHUNG.
+
+          Truoc day chi `md:text-center` — tren dien thoai logo dung giua (nho
+          `mx-auto` dat rieng tren the anh) con cau chu ben duoi sat le trai.
+          Hai thu thuoc cung mot khoi ma le khac nhau thi nhin ra la mot loi
+          bo cuc, khong ra mot lua chon.
+        */}
+        <div className="text-center">
           {/* Sat len voi logo: chi con mot nhip 4px. File logo con vien trong
               o hai canh nen khoang cach nhin ra van rong hon con so nay. */}
           <div className="mb-1">
