@@ -63,3 +63,7 @@ local-helper/.browser-profile/
 # Thu muc tam cua Supabase CLI
 supabase/.branches/
 supabase/.temp/
+
+# Ban ghi hoi thoai xuat ra tu Claude Code — chua khoa API chua che.
+# Ban DA CHE nam trong tai-lieu/ va duoc theo doi binh thuong.
+2026-*-this-session-*.txt
