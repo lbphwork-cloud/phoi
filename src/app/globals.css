@@ -272,12 +272,47 @@ body {
 .btn-save:hover:not(:disabled) { background: #14120f; transform: scale(1.08); }
 .btn-save[aria-pressed="true"] { background: #fff; color: #14120f; border-color: #fff; }
 
-.btn-save-card {
+/* --- Cap nut y kien tren the outfit --------------------------------------
+
+   TRANG DEN THUAN, KHONG MAU. Truoc day nut "khong thich" chuyen sang do khi
+   di chuot qua. Mau do tren mot the anh thoi trang tranh cho voi chinh buc
+   anh — ma buc anh moi la thu nguoi ta vao day de xem. Phan hoi khi bam duoc
+   the hien bang chinh trai tim to len va do day, du de biet minh vua bam gi.
+
+   Nen toi mo va vien trang: hai nut nay nam DE LEN anh, ma anh thi sang toi
+   khac nhau tung tam. Mot nut chi co mau chu se tang hinh tren anh sang. */
+.card-actions {
   position: absolute;
   top: 0.5rem;
-  left: 0.5rem;
+  right: 0.5rem;
   z-index: 2;
+  display: flex;
+  gap: 0.375rem;
 }
+.btn-react {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #fff;
+  background: rgba(12, 11, 9, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.btn-react:hover:not(:disabled) {
+  background: rgba(12, 11, 9, 0.85);
+  transform: scale(1.08);
+}
+.btn-react[aria-pressed="true"] {
+  background: #fff;
+  color: #14120f;
+  border-color: #fff;
+}
+.btn-react:disabled { opacity: 0.6; cursor: default; }
 
 /* --- Logo hai phien ban --------------------------------------------------
 
@@ -447,7 +482,7 @@ body {
 }
 /* DUNG THUOC TINH `scale` CHO HIEU UNG DI CHUOT QUA, KHONG DUNG `transform`.
 
-   Anh trong khung nay co the dang chay hieu ung `drift-sm` — mot animation ghi
+   Anh trong khung nay co the dang chay hieu ung `drift` — mot animation ghi
    len `transform`. Animation luon thang khai bao thuong, nen mot quy tac hover
    dung `transform` se bi nuot hoan toan: di chuot qua khong co gi xay ra.
 
@@ -516,20 +551,35 @@ img { max-width: 100%; height: auto; }
    1.06 -> 1 trong 1,8 giay. Bat dau tu lon hon roi thu nho lai chu khong nguoc
    lai: phong to dan lam anh nhu bi keo vao mat nguoi xem, con thu nho lai tao
    cam giac anh dang lang xuong dung cho. */
-/* 1.2 -> 1 trong 4 giay, KHONG phai 1.12 trong 2.1 giay nhu truoc.
+/* Anh mo dau: phong to dan khi trang vua mo.
 
-   Ban cu chay xong truoc khi mat kip nhan ra co gi dang chuyen dong: bien do
-   nho cong thoi gian ngan thi ket qua la mot cu chinh anh, khong phai mot
-   chuyen dong. Chu website noi dung y do — "hinh anh khong co hieu ung gi".
+   DUNG THUOC TINH `scale`, KHONG DUNG `transform` — va day la ca nguyen nhan
+   cua mot loi im lang.
 
-   Keo dai gap doi va tang bien do la cach dung: cham thi mat theo kip, va vi
-   no cham nen bien do lon van khong bi coi la mau me. */
-@keyframes hero-settle {
-  from { transform: scale(1.2) translateY(-2.2%); }
-  to   { transform: scale(1) translateY(0); }
+   Ban truoc viet `transform: scale(...)`. Anh mo dau con mot hieu ung thu hai
+   (`hero-leave`, phong to khi cuon qua) cung ghi len `transform`, va hieu ung
+   do co `both` nen no GIU gia tri cua minh tu khoanh khac dau tien. Trong hai
+   animation cung ghi mot thuoc tinh thi cai dung sau trong danh sach thang.
+   Ket qua: hieu ung phong to luc mo trang bi de len hoan toan, khong bao gio
+   chay mot ly nao.
+
+   Da do bang trinh duyet that: lay mau ty le phong moi 0.4 giay trong 4 giay
+   dau, tat ca deu la 1.0000 — dung nghia den la khong co gi xay ra. Chu
+   website noi "khong co hieu ung gi luon", va do la mo ta chinh xac.
+
+   `scale` la mot thuoc tinh rieng, trinh duyet ghep no vao cung transform chu
+   khong tranh cho. Hai hieu ung gio chay song song.
+
+   5 GIAY VA DUONG CONG GAN THANG. Ban truoc dung cubic-bezier(0.16,1,0.3,1) —
+   duong cong do don gan het quang duong vao 0,8 giay dau roi bo ra 3 giay
+   nhich. Mat khong doc duoc mot chuyen dong nhu vay la chuyen dong; no doc ra
+   mot cu chinh anh. Gan thang thi toc do deu, va deu thi thay duoc. */
+@keyframes hero-zoom-in {
+  from { scale: 1.18; }
+  to   { scale: 1; }
 }
 .hero-media > img {
-  animation: hero-settle 4s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: hero-zoom-in 5s cubic-bezier(0.2, 0.2, 0.2, 1) both;
 }
 
 /* Chu trong anh mo dau hien sau anh mot nhip. Do tre 0.25s la co y: mat nguoi
@@ -575,9 +625,32 @@ img { max-width: 100%; height: auto; }
        cuon qua. Anh bi khung cat (`overflow: hidden`) nen phan tran ra khong ai
        thay — cai nguoi ta thay la NOI DUNG anh truot cham hon khung, dung cam
        giac chieu sau ma bien do nho khong tao ra duoc.                        */
+    /*
+      BIEN DO PHAI TRA BANG PHAN ANH BI CAT — khong co cach nao khac.
+
+      Anh troi nguoc chieu cuon duoc bang cach phong to len roi dich len xuong
+      trong khung. Phong bao nhieu thi mat bay nhieu: phong to la cat deu bon
+      phia. Rang buoc toan hoc la scale >= 1 + 2 x (bien do dich), neu khong se
+      ho ra mep trong o hai dau.
+
+      Ban dau: scale 1.28, dich +-11% -> cat 14% mep tren o giua duong chay,
+      tuc la 104px tren mot khoi cao 742px. Do la cho khuon mat bi cat.
+
+      Gio: scale 1.10, dich +-4%. Mep tren bi cat con 5%, tuc 37px — giam 64%.
+      Giu 83% dien tich anh thay vi 61%.
+
+      DAY LA MOT DANH DOI KHONG THE TRANH. Anh nay cao 1400px va nguoi mau
+      dung tran khung tu dinh dau den chan, nen moi phan tram phong to deu an
+      vao dau hoac chan. Muon troi nhieu hon thi bat buoc phai cat nhieu hon —
+      khong co cach nao lay ca hai. Chon giu buc anh, vi mot khuon mat bi cat
+      la loi ai cung thay, con 40px troi thi khong ai dem.
+
+      Phan chuyen dong mat di duoc bu lai bang `drift-zoom` ngay ben duoi —
+      hieu ung do KHONG cat gi vinh vien vi no ket thuc o ty le 1.
+    */
     @keyframes drift {
-      from { transform: translateY(-11%) scale(1.28); }
-      to   { transform: translateY(11%) scale(1.28); }
+      from { transform: translateY(-4%) scale(1.1); }
+      to   { transform: translateY(4%) scale(1.1); }
     }
 
     /*
@@ -617,8 +690,7 @@ img { max-width: 100%; height: auto; }
       luong cuon cua ca trang — roi bao anh dung timeline mang ten do. Phan tu
       con duoc phep goi ten timeline cua to tien no.
     */
-    .drift,
-    .drift-sm { view-timeline-name: --khung-anh; }
+    .drift { view-timeline-name: --khung-anh; }
 
     .drift > img {
       animation: drift linear both;
@@ -627,22 +699,55 @@ img { max-width: 100%; height: auto; }
     }
 
     /*
-      Ban nhe cho anh nam trong khung `.frame` — the o trang kham pha, anh dai
-      dien trang chi tiet set do.
+      ANH LON O TRANG CHU: KHONG TROI NGUOC CHIEU CUON NUA. CHI PHONG TO DAN.
 
-      Bien do nho hon han ban lon: khung 3/4 da cat anh san roi, phong them
-      1.28 nua thi nhan vat trong anh bi cat mat dau hoac mat chan. 1.12 va 5%
-      la muc con thay duoc chuyen dong ma khong an mat noi dung.
+      HINH HOC KHONG CHO PHEP LAM CA HAI. Toi da tinh va do lai: voi mot anh
+      duoc phong len ty le s roi dich len xuong, phan bi cat o mep tren la
+      (s-1)/2 - y. Vi anh phai phu kin khung o ca hai dau nen y bi chan trong
+      khoang +-(s-1)/2. Thay vao thi o GIUA DUONG CHAY — dung cho nguoi ta
+      dung lai de nhin — y luon bang 0, va phan cat luon bang dung (s-1)/2.
+      Doi chieu phong to, doi goc phong, doi huong chay: khong cai nao doi duoc
+      con so do. Muon khong cat mot ly nao thi s phai bang 1, tuc la khong troi.
+
+      Anh o day cao 1400px va nguoi mau dung tran khung tu dinh dau den chan,
+      nen (s-1)/2 an thang vao dinh dau. Chu website bao "bi cat mat" — do la
+      ket qua tat yeu chu khong phai mot con so dat sai.
+
+      Nen doi kieu chuyen dong: PHONG TO DAN VE 1 khi anh vao khung nhin. Hieu
+      ung nay ket thuc o ty le 1, tuc la luc anh nam yen thi buc anh NGUYEN VEN
+      100%. Phan cat chi ton tai trong luc anh dang di vao — luc mat con dang
+      bat lay chuyen dong chu chua nhin chi tiet.
+
+      Dung thuoc tinh `scale` chu khong phai `transform`: cung ky thuat da dung
+      o anh mo dau va o hieu ung di chuot qua.
+
+      The nho trong `.frame` VAN GIU kieu troi nguoc chieu cuon: chung nho hon
+      nhieu nen (s-1)/2 quy ra pixel chi con vai chuc, va chung khong dung
+      duoc cach nay — `scale` da danh cho hieu ung di chuot qua.
     */
-    .drift-sm > img {
-      animation: drift-sm linear both;
+    @keyframes drift-zoom {
+      from { scale: 1.12; }
+      to   { scale: 1; }
+    }
+    .hero-media.drift > img {
+      animation: drift-zoom linear both;
       animation-timeline: --khung-anh;
-      animation-range: cover 0% cover 100%;
+      animation-range: entry 0% entry 100%;
     }
-    @keyframes drift-sm {
-      from { transform: translateY(-5%) scale(1.12); }
-      to   { transform: translateY(5%) scale(1.12); }
-    }
+
+    /*
+      MOT BIEN DO DUY NHAT CHO MOI ANH, khong con ban "nho" rieng.
+
+      Ban nho cu la scale 1.12 / +-5%. Do duoc tren the o trang kham pha: ca
+      mot luot cuon qua chi dich 28px. 28px trai deu tren mot man hinh cuon la
+      duoi nguong nhan biet — chu website bao "anh cho khac phai re chuot vao
+      moi co hieu ung", tuc la khong ai thay 28px do.
+
+      Bien do tinh theo PHAN TRAM chieu cao chu khong theo pixel, nen mot con
+      so dung cho ca anh lon lan anh nho: khoi phong cach cao 640px di 90px,
+      the o trang kham pha cao 405px di 57px. Ty le cam nhan giong nhau.
+    */
+
 
     /* --- Khoi noi dung vao va roi khung nhin --------------------------------
        HAI HIEU UNG TRONG MOT KHAI BAO, khong phai hai quy tac `.reveal` roi
@@ -695,7 +800,7 @@ img { max-width: 100%; height: auto; }
     .hero-parallax { view-timeline-name: --khung-mo-dau; }
 
     .hero-parallax > img {
-      animation: hero-settle 4s cubic-bezier(0.16, 1, 0.3, 1) both,
+      animation: hero-zoom-in 5s cubic-bezier(0.2, 0.2, 0.2, 1) both,
                  hero-leave linear both;
       animation-timeline: auto, --khung-mo-dau;
       animation-range: normal, exit 0% exit 100%;
@@ -737,8 +842,7 @@ img { max-width: 100%; height: auto; }
   .hero-body > * > * > *,
   .reveal,
   .page-in,
-  .drift > img,
-  .drift-sm > img {
+  .drift > img {
     animation: none !important;
     transform: none !important;
     scale: none !important;
@@ -819,6 +923,28 @@ table.data th {
   height: 100%;
   object-fit: cover;
 }
+/* KHUNG TU CO THEO TY LE ANH THAT.
+
+   `.hero-media` binh thuong ep anh vao mot ty le co dinh roi cat bot bang
+   `object-fit: cover`. Voi anh nen tran man hinh thi dung, vi o do ty le khung
+   la mot quyet dinh thiet ke.
+
+   Nhung voi anh dai dien cua tung phong cach thi khong: moi buc mot ty le, va
+   ep tat ca vao 4/5 nghia la buc nao khong dung 4/5 se bi cat — thuong la cat
+   dau hoac cat chan, vi anh thoi trang deu chup nguoi dung.
+
+   O day anh tu quyet dinh chieu cao (`height: auto`), khung co theo. Khong cat
+   mot ly nao, va ty le nao cung dung.
+
+   Phai dat SAU `.hero-media > img` de thang duoc `position: absolute` cua quy
+   tac do — hai quy tac cung do manh thi cai viet sau thang. */
+.media-auto > img {
+  position: static;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
 .hero-body {
   position: relative;
   z-index: 1;
@@ -849,32 +975,3 @@ table.data th {
 }
 .btn-ghost-onmedia:hover { background: rgba(255, 255, 255, 0.14); }
 
-/* Nut "khong thich" o goc the outfit.
-   Mo dan khi tro chuot vao the, nhung tren thiet bi cam ung thi luon hien —
-   khong co su kien hover nao de kich hoat no, va mot nut vo hinh la mot nut
-   khong ton tai. */
-.btn-dismiss {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  font-size: 1rem;
-  line-height: 1;
-  color: #fff;
-  background: rgba(12, 11, 9, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  backdrop-filter: blur(6px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-  transition: background 0.2s ease, transform 0.2s ease;
-}
-.btn-dismiss:hover {
-  background: var(--color-danger);
-  border-color: var(--color-danger);
-  transform: scale(1.08);
-}

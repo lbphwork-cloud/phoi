@@ -375,10 +375,11 @@ function StyleBlock({
         }`}
       >
         <Link href={href} className="group block">
-          <div
-            className="hero-media drift"
-            style={{ aspectRatio: '4 / 5', maxHeight: '40rem' }}
-          >
+          {/* KHONG ep ty le nua — xem chu thich `.media-auto` trong globals.css.
+              Truoc day khung bi ep 4/5 va anh bi `object-fit: cover` cat cho
+              vua, nen mau nao chup xa hay chup doc hon 4/5 deu bi cat mat dau.
+              Gio anh tu quyet dinh chieu cao. */}
+          <div className="hero-media media-auto drift">
             {style.image && (
               // eslint-disable-next-line @next/next/no-img-element
               <img

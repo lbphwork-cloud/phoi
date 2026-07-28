@@ -106,10 +106,43 @@ export function SiteHeader() {
     return () => window.removeEventListener('popstate', close);
   }, []);
 
+  /*
+    NUT DOI CHE DO: BIEU TUONG, KHONG PHAI CHU.
+
+    Truoc day no hien chu "Auto" / "Light" / "Dark". Hai van de that:
+
+    1. Chu do noi TRANG THAI HIEN TAI, ma mot cai nut thi nguoi ta doc thanh
+       HANH DONG. Nut ghi "Dark" trong khi trang dang toi doc ra "bam vao de
+       sang toi" — nguoc han y nghia.
+    2. Ba trang thai nen di tu Tu dong sang Toi phai bam hai lan.
+
+    Gio hai trang thai va mot bieu tuong VE VIEC SE XAY RA: dang toi thi hien
+    mat troi (bam vao se sang), dang sang thi hien mat trang. Ve bang SVG chu
+    khong dung ky tu bieu tuong — ky tu hien khac nhau tren tung he dieu hanh
+    va mot so may khong co no nen ra o vuong rong.
+  */
   const themeLabel =
-    theme === 'system' ? c.t('nav.theme_auto', 'Auto')
-    : theme === 'light' ? c.t('nav.theme_light', 'Light')
-    : c.t('nav.theme_dark', 'Dark');
+    theme === 'light' ? c.t('nav.theme_dark', 'Dark') : c.t('nav.theme_light', 'Light');
+
+  const themeIcon =
+    theme === 'light' ? (
+      // Mat trang — dang sang, bam vao se chuyen sang toi
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"
+          stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"
+        />
+      </svg>
+    ) : (
+      // Mat troi — dang toi, bam vao se chuyen sang sang
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.6" />
+        <path
+          d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4"
+          stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
+        />
+      </svg>
+    );
 
   /**
    * Logo. Hai o anh rieng cho nen sang va nen toi.
@@ -248,9 +281,10 @@ export function SiteHeader() {
             type="button"
             onClick={cycle}
             className="navlink"
-            title="Đổi chế độ sáng / tối"
+            title={`Chuyển sang chế độ ${themeLabel}`}
+            aria-label={`Chuyển sang chế độ ${themeLabel}`}
           >
-            {themeLabel}
+            {themeIcon}
           </button>
 
           {loading ? (
@@ -304,7 +338,12 @@ export function SiteHeader() {
                 {c.t('nav.sign_in', 'Sign in')}
               </Link>
             )}
-            <button type="button" onClick={cycle} className="navlink justify-start">
+            <button
+              type="button"
+              onClick={cycle}
+              className="navlink justify-start gap-2"
+            >
+              {themeIcon}
               {themeLabel}
             </button>
           </div>

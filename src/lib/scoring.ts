@@ -39,6 +39,23 @@ const W_DISLIKED_COLOR = -35;
 const W_DISLIKED_STYLE = -50;
 const W_DISLIKED_PAIRING = -100;
 
+/**
+ * Phan hoi TICH CUC cho mot set do cu the.
+ *
+ * +40 chu khong phai +100 doi xung voi ban tieu cuc. Hai huong nay khong can
+ * doi xung, va co y khong doi xung:
+ *
+ *   "Khong thich" la mot loi tu choi ro rang — nguoi dung dang noi dung cho
+ *   toi thay cai nay nua, va he thong phai nghe ngay.
+ *
+ *   "Thich" la mot loi khen. Neu no manh bang, mot set duoc thich se dinh cung
+ *   tren dau danh sach va che mat moi thu khac, ke ca thu nguoi dung chua tung
+ *   thay. Danh sach goi y se dong bang lai quanh vai bai da thich.
+ *
+ * +40 du de day mot set len tren nhung khong du de no doc chiem cho.
+ */
+const W_LIKED_PAIRING = 40;
+
 // Uu tien nhe noi dung moi de catalog khong bi dong bang
 const W_FRESHNESS_MAX = 6;
 
@@ -57,6 +74,7 @@ export interface UserContext {
   hiddenOutfitIds: string[];
   /** Outfit bi danh dau "khong thich cach phoi" */
   dislikedPairingOutfitIds: string[];
+  likedPairingOutfitIds: string[];
 }
 
 export interface ScorableOutfit {
@@ -89,6 +107,7 @@ export function emptyUserContext(): UserContext {
     dislikedStyles: [],
     hiddenOutfitIds: [],
     dislikedPairingOutfitIds: [],
+    likedPairingOutfitIds: [],
   };
 }
 
@@ -175,6 +194,10 @@ export function scoreOutfit(
     add('Bạn không thích cách phối này', W_DISLIKED_PAIRING);
   }
 
+  if (ctx.likedPairingOutfitIds.includes(outfit.id)) {
+    add('Bạn đã thích cách phối này', W_LIKED_PAIRING);
+  }
+
   // --- Do moi ------------------------------------------------------------
   if (now > 0 && outfit.publishedAt) {
     const ageDays = (now - Date.parse(outfit.publishedAt)) / 86400000;
@@ -221,11 +244,13 @@ export function derivePreferencesFromFeedback(
 ): Pick<
   UserContext,
   'dislikedColors' | 'dislikedStyles' | 'hiddenOutfitIds' | 'dislikedPairingOutfitIds'
+  | 'likedPairingOutfitIds'
 > {
   const colorCount = new Map<string, number>();
   const styleCount = new Map<string, number>();
   const hidden: string[] = [];
   const pairing: string[] = [];
+  const liked: string[] = [];
 
   for (const e of events) {
     switch (e.kind) {
@@ -245,6 +270,9 @@ export function derivePreferencesFromFeedback(
       case 'dislike_pairing':
         if (e.outfit_id) pairing.push(e.outfit_id);
         break;
+      case 'like_pairing':
+        if (e.outfit_id) liked.push(e.outfit_id);
+        break;
     }
   }
 
@@ -256,5 +284,6 @@ export function derivePreferencesFromFeedback(
     dislikedStyles: atLeast(styleCount),
     hiddenOutfitIds: [...new Set(hidden)],
     dislikedPairingOutfitIds: [...new Set(pairing)],
+    likedPairingOutfitIds: [...new Set(liked)],
   };
 }

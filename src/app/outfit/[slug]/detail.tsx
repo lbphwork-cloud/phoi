@@ -65,7 +65,7 @@ function Detail({ slug }: { slug: string }) {
         </Link>
 
         <div className="grid gap-10 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
-          <div className="frame drift-sm">
+          <div className="frame drift">
             {outfit.hero_image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={outfit.hero_image_url} alt={outfit.title} />

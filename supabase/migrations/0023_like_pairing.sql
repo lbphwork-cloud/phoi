@@ -1,0 +1,23 @@
+-- =============================================================================
+-- Them phan hoi TICH CUC: 'like_pairing'
+--
+-- VI SAO CAN
+--   Tu truoc den gio he thong chi nghe duoc mot chieu: khong thich mau, khong
+--   thich phong cach, khong thich cach phoi, an bai. Bon nut, ca bon deu la
+--   phu dinh.
+--
+--   Mot he thong chi nhan tin hieu am chi hoc duoc "dung goi y cai nay nua".
+--   No khong bao gio hoc duoc "goi y THEM cai giong cai nay". Ket qua la cang
+--   dung lau thi danh sach cang co lai, chu khong sat gu hon.
+--
+--   Nut thich bo sung chieu con thieu. Cung mot cu bam, nhung day len thay vi
+--   day xuong.
+--
+-- VI SAO KHONG DUNG LAI BANG saved_outfits (gio hang)
+--   Luu vao gio la mot y dinh MUA. Thich la mot y kien ve THAM MY. Nguoi ta
+--   thich mot set do va van khong dinh mua no — gop hai thu lam mot se lam
+--   ban ca hai: gio hang day thu khong ai dinh mua, va tin hieu goi y chi hoc
+--   duoc tu nhung nguoi dang co tien trong tui.
+-- =============================================================================
+
+alter type feedback_kind add value if not exists 'like_pairing';

@@ -65,6 +65,16 @@ export function OutfitCard({
   const tax = useTaxonomy();
   const [dismissing, setDismissing] = useState(false);
   const [dismissError, setDismissError] = useState<string | null>(null);
+  /**
+   * Y kien da bam trong phien nay.
+   *
+   * CHI LA TRANG THAI CUC BO, khong doc lai tu database. Doc trang thai thich
+   * cua tung the nghia la mot luot goi mang cho moi the tren luoi — hai muoi
+   * the la hai muoi luot, de lay ve mot dau tich. Cai bam vao van duoc ghi va
+   * van doi thu tu goi y o lan tai sau; chi rieng dau tich tren man hinh la
+   * khong song qua mot lan tai lai trang.
+   */
+  const [opinion, setOpinion] = useState<'like' | 'dislike' | null>(null);
 
   /**
    * Ghi mot phan hoi 'dislike_pairing' cho ca set.
@@ -74,7 +84,7 @@ export function OutfitCard({
    * den vay. dislike_pairing chi day bai xuong duoi (trong so -100 trong
    * src/lib/scoring.ts) — van tim lai duoc neu bam nham.
    */
-  const dislike = async (e: React.MouseEvent) => {
+  const react = (kind: 'like' | 'dislike') => async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -93,40 +103,83 @@ export function OutfitCard({
     const { error } = await sb.from('feedback_events').insert({
       user_id: s.session.user.id,
       outfit_id: outfit.id,
-      kind: 'dislike_pairing',
+      kind: kind === 'like' ? 'like_pairing' : 'dislike_pairing',
       target_value: null,
     });
 
     setDismissing(false);
     if (error) { setDismissError(error.message); return; }
-    onDislike?.();
+    setOpinion(kind);
+
+    // CHI bao ra ngoai khi KHONG thich. Trang kham pha dung tin hieu do de bo
+    // the khoi danh sach — con mot the vua duoc thich thi phai o nguyen cho,
+    // neu khong thi bam thich lai lam no bien mat, dung nguoc y nguoi bam.
+    if (kind === 'dislike') onDislike?.();
   };
 
   return (
     <div ref={ref} className="reveal group/card relative">
-      {/* Nut luu nam canh nut khong thich, cung goc tren ben phai. Hai nut
-          nay la hai huong cua cung mot quyet dinh — thich hay khong — nen dat
-          canh nhau de mat khong phai di tim. */}
-      <SaveButton outfitId={outfit.id} className="btn-save-card" />
+      {/*
+        HAI NUT Y KIEN, dat canh nhau o goc tren ben phai.
 
+        Truoc day o day la dau "+" (them vao gio) va dau "x" (khong thich).
+        Hai van de: dau "+" lap lai chinh nut "Thêm vào giỏ" day du ngay ben
+        duoi the, con mot dau "x" o goc anh thi ai cung doc thanh "dong lai"
+        hoac "xoa" chu khong doc thanh "khong thich".
+
+        Gio la mot cap doi xung — trai tim va trai tim gach cheo. Hai huong cua
+        cung mot cau hoi thi phai nhin nhu mot cap, khong phai hai bieu tuong
+        vay muon tu hai y nghia khac nhau.
+
+        TRANG DEN, khong mau. Mau tren mot the anh thoi trang se tranh cho voi
+        chinh buc anh — ma buc anh moi la thu nguoi ta vao day de xem.
+      */}
       {onDislike && (
-        <button
-          type="button"
-          onClick={dislike}
-          disabled={dismissing}
-          title="Không thích set này — đẩy xuống cuối danh sách"
-          aria-label={`Không thích ${outfit.title}`}
-          className="btn-dismiss"
-        >
-          {dismissing ? '…' : '✕'}
-        </button>
+        <div className="card-actions">
+          <button
+            type="button"
+            onClick={react('like')}
+            disabled={dismissing}
+            title="Thích cách phối này — ưu tiên gợi ý set tương tự"
+            aria-label={`Thích ${outfit.title}`}
+            aria-pressed={opinion === 'like'}
+            className="btn-react"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"
+                 fill={opinion === 'like' ? 'currentColor' : 'none'}>
+              <path
+                d="M12 20s-7-4.35-7-9.15A4.85 4.85 0 0 1 12 7a4.85 4.85 0 0 1 7 3.85C19 15.65 12 20 12 20Z"
+                stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+
+          <button
+            type="button"
+            onClick={react('dislike')}
+            disabled={dismissing}
+            title="Không thích cách phối này — đẩy xuống cuối danh sách"
+            aria-label={`Không thích ${outfit.title}`}
+            aria-pressed={opinion === 'dislike'}
+            className="btn-react"
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 20s-7-4.35-7-9.15A4.85 4.85 0 0 1 12 7a4.85 4.85 0 0 1 7 3.85C19 15.65 12 20 12 20Z"
+                stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"
+              />
+              <path d="M4.5 4.5 19.5 19.5" stroke="currentColor" strokeWidth="1.7"
+                    strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
       )}
 
       <Link href={href ?? `/outfit/${outfit.slug}`} className="group block">
-        {/* `drift-sm`: anh troi nhe nguoc chieu cuon. Hieu ung phong to khi di
+        {/* `drift`: anh troi nhe nguoc chieu cuon. Hieu ung phong to khi di
             chuot qua van chay song song — no dung thuoc tinh `scale` rieng chu
             khong tranh cho tren `transform`. Xem chu thich .frame > img. */}
-        <div className="frame drift-sm mb-3">
+        <div className="frame drift mb-3">
           {outfit.hero_image_url ? (
             // Dung <img> thay vi next/image: voi output static export thi
             // toi uu anh cua Next bi tat, nen next/image chi them phuc tap.
@@ -180,21 +233,12 @@ export function OutfitCard({
 
       {dismissError && <p className="hint-error">{dismissError}</p>}
 
-      {/* Giai thich vi sao outfit nay duoc goi y. Minh bach quan trong hon
-          cam giac "he thong thong minh": nguoi dung sua duoc so thich khi
-          thay ly do sai.                                                   */}
-      {score && score.parts.length > 0 && (
-        <details className="mt-2">
-          <summary className="eyebrow cursor-pointer">Vì sao gợi ý này</summary>
-          <ul className="muted-2 mt-1.5 flex flex-col gap-0.5 text-xs">
-            {score.parts.map((p, i) => (
-              <li key={i}>
-                {p.points > 0 ? '+' : ''}{p.points} · {p.label}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {/* KHOI "Vi sao goi y nay" DA BO theo yeu cau cua chu website.
+          No hien tren MOI the trong luoi, va noi dung la diem so noi bo — thu
+          co ich khi kiem tra thuat toan nhung khong giup nguoi mua quyet dinh
+          gi. Diem so van duoc tinh va van quyet dinh thu tu; chi bo phan hien
+          ra. Tham so `score` giu nguyen trong giao dien de cac trang goi khong
+          phai sua, va de bat lai duoc khi can do thuat toan. */}
     </div>
   );
 }

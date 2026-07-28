@@ -233,13 +233,13 @@ export const viewport = {
  *   so trinh duyet: doc no se nem loi, va mot loi trong <head> se lam trang
  *   trang hoan toan. Chan duoc thi ve toi — dung mac dinh, khong loe.
  *
- *   'system' thi CO Y khong dat thuoc tinh nao: khong co `data-theme` thi CSS
- *   tu chay theo `prefers-color-scheme` cua may.
+ *   Chi con hai gia tri. Bat ky gia tri nao khong phai 'light' deu ve 'dark' —
+ *   ke ca 'system' con sot lai trong may nhung nguoi da dung tu truoc.
  */
 const THEME_SCRIPT =
   "(function(){try{var t=localStorage.getItem('phoi.theme');" +
-  "if(t!=='light'&&t!=='dark'&&t!=='system')t='dark';" +
-  "if(t!=='system')document.documentElement.setAttribute('data-theme',t)}" +
+  "if(t!=='light')t='dark';" +
+  "document.documentElement.setAttribute('data-theme',t)}" +
   "catch(e){document.documentElement.setAttribute('data-theme','dark')}})()";
 
 export default function RootLayout({

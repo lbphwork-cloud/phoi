@@ -8,7 +8,9 @@
  * khong ro rang hon.
  */
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import {
+  useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore,
+} from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { getSupabase, isSupabaseConfigured } from './supabase/client';
 import type {
@@ -64,12 +66,23 @@ export function useReveal<T extends HTMLElement = HTMLDivElement>() {
 // Che do sang / toi
 // ---------------------------------------------------------------------------
 
-export type Theme = 'system' | 'light' | 'dark';
+/**
+ * HAI TRANG THAI, KHONG CON 'system'.
+ *
+ * Truoc day co ba: Tu dong / Sang / Toi. Ba trang thai tren MOT cai nut nghia
+ * la di tu trang thai nay sang trang thai kia co khi phai bam hai lan — chu
+ * website dem duoc dieu do va goi no la "thao tac nao cung phai click 2 lan".
+ * Mot cai nut hai trang thai thi mot lan bam luon ra dung thu minh muon.
+ *
+ * DIEU MAT DI, noi ro de khong ai tuong la khong mat: nguoi de may tu doi sang
+ * toi theo gio se khong con duoc theo may nua. Day la danh doi duoc chon co y,
+ * khong phai so sot.
+ */
+export type Theme = 'light' | 'dark';
 
 const THEME_KEY = 'phoi.theme';
 
-const isTheme = (v: unknown): v is Theme =>
-  v === 'system' || v === 'light' || v === 'dark';
+const isTheme = (v: unknown): v is Theme => v === 'light' || v === 'dark';
 
 /**
  * useTheme dung useSyncExternalStore de doc localStorage.
@@ -102,12 +115,10 @@ function subscribeTheme(onChange: () => void): () => void {
 }
 
 /**
- * CHE DO MAC DINH LA TOI, khong phai "theo he thong".
+ * CHE DO MAC DINH LA TOI.
  *
  * Do la lua chon cua chu website: anh thoi trang tren nen toi trong dam hon,
- * va phan lon nguoi xem se khong bao gio dong vao cai nut doi che do. Nguoi
- * nao muon sang hoac muon theo he thong thi van bat duoc — ca ba lua chon deu
- * con nguyen, chi doi cai nao la mac dinh.
+ * va phan lon nguoi xem se khong bao gio dong vao cai nut doi che do.
  *
  * Doi mot dong nay la CHUA DU: xem chu thich ThemeScript trong layout.tsx.
  * Doc localStorage chi chay duoc sau khi JavaScript tai xong, ma luc do trang
@@ -146,13 +157,13 @@ export function useTheme() {
   // Gan thuoc tinh data-theme len <html>. Day la tac dong ra ngoai React
   // (thao tac DOM), dung cho hop voi effect — khong phai setState.
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'system') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Mot lan bam la doi han sang trang thai kia. Ten van la `cycle` de khong
+  // phai sua moi noi goi no, nhung gio no dung nghia la mot cong tac.
   const cycle = useCallback(() => {
-    apply(readTheme() === 'system' ? 'light' : readTheme() === 'light' ? 'dark' : 'system');
+    apply(readTheme() === 'dark' ? 'light' : 'dark');
   }, [apply]);
 
   return { theme, setTheme: apply, cycle };
@@ -257,35 +268,41 @@ export interface Taxonomy {
   occasionLabel: (slug: string | null) => string;
 }
 
+/**
+ * Ba bang danh muc, tai MOT LAN cho ca phien.
+ *
+ * Truoc day moi component goi useTaxonomy deu tu tai lai ca ba bang, va tai lai
+ * lan nua moi khi chuyen trang. Ba bang nay cong lai chua 34 dong va gan nhu
+ * khong bao gio doi — tai lai chung o moi trang la ba luot cho mang de lay ve
+ * dung thu vua co.
+ *
+ * Di qua useAsyncData nen ket qua nam trong bo nho dung chung: ai hoi truoc thi
+ * goi, ai hoi sau dung lai, va chuyen trang khong goi lai.
+ */
 export function useTaxonomy(): Taxonomy {
-  const [styles, setStyles] = useState<Style[]>([]);
-  const [colors, setColors] = useState<Color[]>([]);
-  const [occasions, setOccasions] = useState<Occasion[]>([]);
-  // Cung ly do nhu useAuth: chua cau hinh thi khong co gi de tai.
-  const [loading, setLoading] = useState(isSupabaseConfigured);
-
-  useEffect(() => {
-    const sb = getSupabase();
-    if (!sb) return;
-
-    let alive = true;
-    Promise.all([
+  const { data, loading } = useAsyncData('taxonomy', async (sb) => {
+    const [s, c, o] = await Promise.all([
       sb.from('styles').select('*').order('sort_order'),
       sb.from('colors').select('*').order('sort_order'),
       sb.from('occasions').select('*').order('sort_order'),
-    ]).then(([s, c, o]) => {
-      if (!alive) return;
-      setStyles((s.data as Style[]) ?? []);
-      setColors((c.data as Color[]) ?? []);
-      setOccasions((o.data as Occasion[]) ?? []);
-      setLoading(false);
-    });
+    ]);
+    const err = s.error ?? c.error ?? o.error;
+    return {
+      data: {
+        styles: (s.data as Style[]) ?? [],
+        colors: (c.data as Color[]) ?? [],
+        occasions: (o.data as Occasion[]) ?? [],
+      },
+      error: err ? { message: err.message } : null,
+    };
+  });
 
-    return () => { alive = false; };
-  }, []);
+  const styles = useMemo(() => data?.styles ?? [], [data]);
+  const colors = useMemo(() => data?.colors ?? [], [data]);
+  const occasions = useMemo(() => data?.occasions ?? [], [data]);
 
   const colorElements: ColorElementMap = Object.fromEntries(
-    colors.map((c) => [c.slug, c.element]),
+    colors.map((c: Color) => [c.slug, c.element]),
   );
 
   const find = <T extends { slug: string; label: string }>(arr: T[], slug: string | null) =>
@@ -295,7 +312,7 @@ export function useTaxonomy(): Taxonomy {
     loading, styles, colors, occasions, colorElements,
     styleLabel: (s) => find(styles, s)?.label ?? '—',
     colorLabel: (s) => find(colors, s)?.label ?? '—',
-    colorHex: (s) => colors.find((c) => c.slug === s)?.hex ?? 'transparent',
+    colorHex: (s) => colors.find((c: Color) => c.slug === s)?.hex ?? 'transparent',
     occasionLabel: (s) => find(occasions, s)?.label ?? '—',
   };
 }
@@ -418,6 +435,73 @@ export function useUserContext(): {
  *                chua biet user id). Khi false thi loading = false va data =
  *                null — tranh gui mot truy van chac chan loi.
  */
+/**
+ * BO NHO DUNG CHUNG CHO CA TRANG.
+ *
+ * VI SAO PHAI CO
+ *   Truoc day moi component goi useAsyncData deu tu chay truy van cua rieng no.
+ *   Bang site_content duoc SAU component doc — TypographyStyle, Favicon, thanh
+ *   menu, chan trang, than trang — nen mot lan mo trang chu la SAU luot goi
+ *   database cho dung mot bang, cung mot cau truy van, cung mot ket qua.
+ *
+ *   Da do bang trinh duyet that: trang chu 29 luot goi, trang kham pha 91 luot,
+ *   trong do site_content chiem 5-6 luot moi trang. Do la lang phi thuan tuy —
+ *   khong doi mot pixel nao tren man hinh.
+ *
+ *   Gio ket qua nam trong mot Map cap module. Ai hoi truoc thi chay truy van,
+ *   ai hoi sau thi cho chinh loi hua do. Ket qua giu lai ca khi chuyen trang,
+ *   nen sang trang thu hai la chu hien ngay khong phai cho mang.
+ *
+ * VI SAO KHONG DAT HAN THOI GIAN SONG
+ *   Du lieu o day la noi dung trang va danh muc — thu doi vai thang mot lan.
+ *   Ai sua thi goi reload(), va reload() xoa o nho roi bao TAT CA nguoi dang
+ *   nghe tai lai. Mot bo dem tu het han sau N giay chi tao ra nhung lan tai
+ *   khong ai yeu cau.
+ */
+type Snapshot = { data: unknown; error: string | null };
+
+const CACHE = new Map<string, Snapshot>();
+const INFLIGHT = new Map<string, Promise<void>>();
+const LISTENERS = new Map<string, Set<() => void>>();
+
+function notify(key: string) {
+  for (const fn of LISTENERS.get(key) ?? []) fn();
+}
+
+function runQuery(
+  key: string,
+  query: (sb: NonNullable<ReturnType<typeof getSupabase>>) => PromiseLike<{
+    data: unknown; error: { message: string } | null;
+  }>,
+): void {
+  // Da co nguoi goi cung khoa dang chay thi khong goi them. Day chinh la cho
+  // bo di 5 luot goi thua moi trang.
+  if (INFLIGHT.has(key)) return;
+
+  const sb = getSupabase();
+  if (!sb) return;
+
+  const p = Promise.resolve(query(sb))
+    .then(({ data, error }) => {
+      CACHE.set(key, { data: data ?? null, error: error?.message ?? null });
+    })
+    .catch((e: unknown) => {
+      CACHE.set(key, { data: null, error: (e as Error).message });
+    })
+    .finally(() => {
+      INFLIGHT.delete(key);
+      notify(key);
+    });
+
+  INFLIGHT.set(key, p);
+}
+
+/** Xoa mot khoa khoi bo nho dung chung. Dung khi du lieu vua bi sua o noi khac. */
+export function invalidateAsyncData(key: string) {
+  CACHE.delete(key);
+  notify(key);
+}
+
 export function useAsyncData<T>(
   key: string,
   query: (sb: NonNullable<ReturnType<typeof getSupabase>>) => PromiseLike<{
@@ -426,43 +510,40 @@ export function useAsyncData<T>(
   }>,
   enabled = true,
 ): { data: T | null; loading: boolean; error: string | null; reload: () => void } {
-  const [loaded, setLoaded] = useState<{
-    key: string; data: T | null; error: string | null;
-  } | null>(null);
-  const [nonce, setNonce] = useState(0);
-
-  const fullKey = `${key}#${nonce}`;
-
   // Giu ham truy van trong ref de effect chi phu thuoc vao KHOA, khong phu
   // thuoc vao danh tinh cua ham (danh tinh doi moi lan render).
-  // Gan trong effect rieng, khai bao TRUOC effect tai du lieu — effect chay
-  // theo thu tu khai bao nen ref luon moi khi effect duoi doc no.
   const queryRef = useRef(query);
   useEffect(() => { queryRef.current = query; });
 
+  const subscribe = useCallback((onChange: () => void) => {
+    let set = LISTENERS.get(key);
+    if (!set) { set = new Set(); LISTENERS.set(key, set); }
+    set.add(onChange);
+    return () => { set!.delete(onChange); };
+  }, [key]);
+
+  // Tra ve CHINH doi tuong trong Map, khong tao doi tuong moi: React so sanh
+  // bang danh tinh, nen tao moi moi lan doc se thanh vong lap render vo tan.
+  const getSnapshot = useCallback(() => CACHE.get(key), [key]);
+  const snap = useSyncExternalStore(subscribe, getSnapshot, () => undefined);
+
   useEffect(() => {
     if (!enabled) return;
+    if (CACHE.has(key)) return;
+    runQuery(key, queryRef.current as never);
+  }, [key, enabled]);
 
-    const sb = getSupabase();
-    if (!sb) return;
-
-    let alive = true;
-
-    Promise.resolve(queryRef.current(sb)).then(({ data, error }) => {
-      if (!alive) return;
-      setLoaded({ key: fullKey, data: data ?? null, error: error?.message ?? null });
-    });
-
-    return () => { alive = false; };
-  }, [fullKey, enabled]);
-
-  const fresh = loaded?.key === fullKey ? loaded : null;
+  const reload = useCallback(() => {
+    CACHE.delete(key);
+    runQuery(key, queryRef.current as never);
+    notify(key);
+  }, [key]);
 
   return {
-    data: fresh?.data ?? null,
-    loading: enabled && isSupabaseConfigured && fresh === null,
-    error: fresh?.error ?? null,
-    reload: useCallback(() => setNonce((n) => n + 1), []),
+    data: (snap?.data as T | null) ?? null,
+    loading: enabled && isSupabaseConfigured && snap === undefined,
+    error: snap?.error ?? null,
+    reload,
   };
 }
 
