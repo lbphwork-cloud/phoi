@@ -62,8 +62,9 @@ nhận không phải tự dò ra.
 - **Giá sẽ cũ dần.** Không có cách cập nhật tự động, mà giá sàn đổi liên tục.
 - **Chưa có tài khoản affiliate** Shopee/TikTok nên chưa có link kiếm tiền thật.
 - **Chưa có tên miền riêng** — đang dùng `phoi.pages.dev`.
-- **Tạo ảnh AI gần như không dùng được.** Gemini hạn mức ảnh bằng 0; Grok tính
-  khoảng 0,2 đô mỗi ảnh.
+- **Tạo ảnh AI đang chạy bằng Grok nên hơi đắt** — khoảng 0,2 đô mỗi ảnh. Chưa
+  mua API của model khác, nên giao diện để sẵn ô nhập key cho OpenAI, Gemini và
+  Grok: có key rẻ hơn thì dán vào là dùng được ngay, không phải sửa mã.
 - **Hạn mức miễn phí Supabase:** 5GB băng thông/tháng, database ngủ khi không
   dùng nên lần vào đầu tiên sau khi ngủ sẽ chậm.
 - **Ảnh chưa tối ưu** — bản xuất tĩnh tắt phần tối ưu ảnh của Next.
