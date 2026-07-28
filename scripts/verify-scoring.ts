@@ -391,17 +391,48 @@ check('tat uu tien  ->  so thich phong cach van thang',
 
 // --- Bai nguoi that xep tren bai dung san (muc 4) --------------------------
 //
-// Bac nay nam TREN bac menh: mot bai dung san hop ca bo van khong duoc dung
-// tren bai nguoi that. Kiem ca truong hop bat uu tien menh, vi do la luc de
-// vo nhat.
+// Day la mac dinh chay nen, nen kiem o che do BINH THUONG (nut uu tien menh
+// TAT). Khi nut duoc bat thi menh len truoc — xem cac phep kiem ngay ben duoi.
 const dsThat = rankOutfits(
   [{ ...outfit('dung-san', 'toi-gian', ['trang', 'kem']), isSeed: true },
    { ...outfit('nguoi-that', 'streetwear', ['do', 'cam']), isSeed: false }],
-  kimUser, COLOR_ELEMENTS, 0, true,
+  kimUser, COLOR_ELEMENTS, 0, false,
 );
 check('bai nguoi that len tren bai dung san',
       dsThat[0].id === 'nguoi-that', `dau danh sach: ${dsThat[0].id}`);
 check('bai dung san xuong duoi', dsThat[1].id === 'dung-san');
+
+/*
+  BAM NUT THI NUT PHAI THANG.
+
+  Loi that: bai nguoi that bi ghim o dau nen bam "uu tien hop menh" khong day
+  duoc gi len — bon o dau y nguyen, va nut nhin nhu khong chay. Phep kiem nay
+  dung lai dung canh do: bai nguoi that KHONG hop menh, bai dung san hop ca bo.
+*/
+const dsGianh = rankOutfits(
+  [{ ...outfit('that-khong-hop', null, ['do', 'cam']), isSeed: false },
+   { ...outfit('san-hop-ca-bo', null, ['trang', 'kem']), isSeed: true }],
+  kimUser, COLOR_ELEMENTS, 0, true,
+);
+check('bat uu tien menh  ->  bai hop menh len tren ca bai nguoi that',
+      dsGianh[0].id === 'san-hop-ca-bo', `dau danh sach: ${dsGianh[0].id}`);
+
+const dsGianhTat = rankOutfits(
+  [{ ...outfit('that-khong-hop', null, ['do', 'cam']), isSeed: false },
+   { ...outfit('san-hop-ca-bo', null, ['trang', 'kem']), isSeed: true }],
+  kimUser, COLOR_ELEMENTS, 0, false,
+);
+check('tat uu tien menh  ->  bai nguoi that lai len tren',
+      dsGianhTat[0].id === 'that-khong-hop', `dau danh sach: ${dsGianhTat[0].id}`);
+
+// Cung mot bac hop menh thi bai nguoi that van phai dung tren.
+const dsCungBac = rankOutfits(
+  [{ ...outfit('san-hop', null, ['trang', 'kem']), isSeed: true },
+   { ...outfit('that-hop', null, ['trang', 'kem']), isSeed: false }],
+  kimUser, COLOR_ELEMENTS, 0, true,
+);
+check('cung bac hop menh  ->  bai nguoi that van tren',
+      dsCungBac[0].id === 'that-hop', `dau danh sach: ${dsCungBac[0].id}`);
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 7. Vi du giai thich diem cho nguoi dung ===');

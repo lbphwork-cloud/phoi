@@ -329,18 +329,33 @@ export function rankOutfits<T extends ScorableOutfit>(
     chi co mot bac (menh) va no nam thang trong `sort`; them bac thu hai kieu do
     la bat dau co ba bien `ba`, `bb`, `ba2`, `bb2` va khong ai doc ra duoc thu
     tu uu tien nua.
-
-    Bac dau danh sach = bac quan trong nhat. Doi thu tu hai dong duoi la doi
-    han cach xep trang, nen chung nam canh nhau de thay ngay.
   */
-  const cacBac: Array<(o: ScorableOutfit) => number> = [
-    // 1. BAI CUA NGUOI THAT TRUOC BAI DUNG SAN.
-    //    Bai do toi dung de lam day catalog khong duoc dung tren bai ma nguoi
-    //    that bo cong dang — du no co hop menh hay dung phong cach den dau.
-    (o) => (o.isSeed ? 0 : 1),
-    // 2. Hop menh, chi khi nguoi dung dang bat nut uu tien.
-    (o) => (menh ? bacHopMenh(o.colorSlugs, colorElements, menh) : 0),
-  ];
+  /** Bai cua nguoi that xep tren bai he thong dung san de lam day catalog. */
+  const bacNguoiThat = (o: ScorableOutfit) => (o.isSeed ? 0 : 1);
+  /** 2 = ca ao lan quan hop menh, 1 = mot mon, 0 = khong. */
+  const bacMenh = (o: ScorableOutfit) =>
+    menh ? bacHopMenh(o.colorSlugs, colorElements, menh) : 0;
+
+  /*
+    BAM NUT THI NUT PHAI THANG — day la loi vua duoc sua.
+
+    Truoc day bac "nguoi that" luon dung dau. Hau qua do duoc tren ban that:
+    bon bai nguoi that bi ghim o bon o dau, va khong bai hop menh nao chen len
+    duoc. Bam nut "Ưu tiên hợp mệnh lên đầu" xong, bon o dau van y nguyen —
+    nguoi dung ket luan nut khong chay, va ket luan do dung voi cai ho nhin
+    thay.
+
+    Nguyen tac: MOT HANH DONG CO Y cua nguoi dung thang mot chinh sach ngam
+    cua he thong. "Bai nguoi that len truoc" la mac dinh chay nen; con bam nut
+    la nguoi dung dang noi ro luc nay ho muon xem gi. Nen khi nut duoc bat, bac
+    menh len truoc; nut tat thi tro lai nhu cu.
+
+    Bac "nguoi that" KHONG bi bo — no chi lui xuong lam bac thu hai, tuc la
+    trong cung mot muc do hop menh thi bai nguoi that van dung tren.
+  */
+  const cacBac: Array<(o: ScorableOutfit) => number> = menh
+    ? [bacMenh, bacNguoiThat]
+    : [bacNguoiThat];
 
   return outfits
     .filter((o) => !hidden.has(o.id))
