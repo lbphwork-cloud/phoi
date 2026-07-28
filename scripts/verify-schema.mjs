@@ -82,6 +82,94 @@ async function main() {
   report('trigger tinh tong gia da chay', nullPrice.length === 0,
          nullPrice.length ? `${nullPrice.length} set thieu gia` : `tu ${prices[0].total_price_vnd} den ${prices.at(-1).total_price_vnd} VND`);
 
+  /*
+    XOA MOT MON KHOI SET — hai trigger phai chay theo.
+
+    Trang quan tri co nut "Go khoi set", va no CHI xoa mot dong outfit_items.
+    Moi thu con lai — tinh lai tong gia, dua bai da dang ve cho duyet — deu do
+    trigger lam. Neu mot trong hai trigger khong chay tren DELETE thi hau qua
+    im lang va nang: mot bai cong khai hien gia cua bon mon trong khi chi con
+    ba, hoac mot bai bi go mat mot mon ma van dang hien cho nguoi doc.
+
+    Chay tren ban sao PGlite nen khong dung den du lieu that.
+  */
+  {
+    const [setDo] = await q(`
+      select id, slug, status, total_price_vnd,
+             (select count(*)::int from outfit_items oi where oi.outfit_id = o.id) as so_mon
+        from outfits o where is_seed and status = 'published' limit 1`);
+
+    const [mon] = await q(`
+      select oi.id, p.price_vnd
+        from outfit_items oi join products p on p.id = oi.product_id
+       where oi.outfit_id = '${setDo.id}' limit 1`);
+
+    await q(`delete from outfit_items where id = '${mon.id}'`);
+
+    const [sau] = await q(`
+      select status, total_price_vnd,
+             (select count(*)::int from outfit_items oi where oi.outfit_id = o.id) as so_mon
+        from outfits o where id = '${setDo.id}'`);
+
+    report('xoa mon: so mon giam dung 1',
+           sau.so_mon === setDo.so_mon - 1, `${setDo.so_mon} -> ${sau.so_mon}`);
+
+    report('xoa mon: trigger tinh lai tong gia',
+           sau.total_price_vnd === setDo.total_price_vnd - mon.price_vnd,
+           `${setDo.total_price_vnd} -> ${sau.total_price_vnd} (bot ${mon.price_vnd})`);
+
+    /*
+      ADMIN XOA THI BAI KHONG BI DUA VE CHO DUYET — va do la CO Y.
+
+      Toi da doan nguoc va viet nham vao hop xac nhan cua trang quan tri. Phep
+      kiem nay bat duoc cai sai do.
+
+      Ly do that: outfit_items_require_rereview() thoat som khi
+      is_trusted_context(), ma ham do dung voi admin. Admin sua bai thi chinh
+      viec sua do DA LA kiem duyet — day bai cua chinh minh ve hang doi cua
+      chinh minh la mot vong lap vo nghia.
+
+      Nguoi dang thuong thi VAN bi day ve cho duyet — kiem ngay ben duoi.
+    */
+    report('xoa mon (admin): bai giu nguyen trang thai',
+           sau.status === 'published', `published -> ${sau.status}`);
+
+    /*
+      NGUOI DANG THUONG xoa mot mon khoi bai DA DANG -> bai phai quay lai cho
+      duyet. Day moi la nhanh bao ve nguoi doc: mot bai cong khai khong duoc
+      phep doi danh sach san pham ma khong ai xem lai.
+
+      Gia lap bang cach dat test.uid thanh mot nguoi KHONG phai admin, nen
+      is_trusted_context() tra ve false.
+    */
+    const [nguoiThuong] = await q(
+      `select id from auth.users where id not in (select id from profiles where role = 'admin') limit 1`,
+    ).catch(() => [null]);
+
+    if (nguoiThuong) {
+      const [mon2] = await q(
+        `select id from outfit_items where outfit_id = '${setDo.id}' limit 1`);
+      await q(`select set_config('test.uid', '${nguoiThuong.id}', false)`);
+      await q(`delete from outfit_items where id = '${mon2.id}'`);
+      await q(`select set_config('test.uid', '', false)`);
+
+      const [sau2] = await q(`select status from outfits where id = '${setDo.id}'`);
+      report('xoa mon (nguoi dang thuong): bai quay lai cho duyet',
+             sau2.status === 'pending', `published -> ${sau2.status}`);
+    } else {
+      report('xoa mon (nguoi dang thuong): bai quay lai cho duyet', true,
+             'bo qua — du lieu mau khong co tai khoan nguoi dung thuong');
+    }
+
+    // Tra lai trang thai ban dau de cac phep kiem sau khong bi lech so lieu.
+    await q(`insert into outfit_items (outfit_id, product_id, affiliate_link_id, role, position)
+             select '${setDo.id}', p.id, al.id, 'accessory', 90
+               from products p left join affiliate_links al on al.product_id = p.id
+              where p.id = (select product_id from outfit_items where outfit_id = '${setDo.id}' limit 1)
+              limit 1`);
+    await q(`update outfits set status = 'published' where id = '${setDo.id}'`);
+  }
+
   // Slug phai duoc sinh dung, khong dau
   const slugTest = await q(`select slugify_vi('Áo Sơ Mi Trắng Đẹp Lắm Đấy!') s`);
   report('slugify_vi bo dau tieng Viet', slugTest[0].s === 'ao-so-mi-trang-dep-lam-day',

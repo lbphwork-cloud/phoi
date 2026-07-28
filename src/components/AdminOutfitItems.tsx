@@ -25,6 +25,7 @@ import { getSupabase } from '@/lib/supabase/client';
 import { useAsyncData, useAuth } from '@/lib/hooks';
 import { uploadImage } from '@/lib/storage';
 import { checkAffiliateUrl } from '@/lib/affiliate';
+import { fetchProductFromUrl } from '@/lib/fetchProduct';
 import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
 import { UploadButton } from '@/components/UploadButton';
@@ -57,6 +58,10 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  /** Mon dang lay thong tin tu link, va cau bao trang thai cua no. */
+  const [fetchingId, setFetchingId] = useState<string | null>(null);
+  const [fetchNote, setFetchNote] = useState<Record<string, string>>({});
 
   // Anh dai dien cua ca set. Giu rieng khoi `draft` vi no thuoc bang outfits,
   // khong thuoc mon nao.
@@ -120,6 +125,118 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
     if (!r.ok || !r.url) { setSaveError(r.message); return; }
     set(itemId, { imageUrl: r.url });
+  };
+
+  /**
+   * Go mot mon ra khoi set do.
+   *
+   * XOA DONG outfit_items, KHONG XOA SAN PHAM.
+   *   San pham va link tiep thi cua no van con trong database. Ly do: link do
+   *   thuoc ve NGUOI DANG — no mang ma gioi thieu cua ho — va mot quan tri vien
+   *   go mot mon khoi mot set khong co nghia la xoa cong suc cua nguoi khac.
+   *
+   *   San pham khong con set nao dung se hien trong khoi "San pham mo coi" ngay
+   *   duoi danh sach outfit, va o do moi co lua chon xoa han. Hai buoc cho hai
+   *   quyet dinh khac nhau.
+   *
+   * TONG GIA TU TINH LAI, khong phai ma o day: trigger trg_outfit_items_total.
+   *
+   * BAI KHONG BI DUA VE CHO DUYET KHI ADMIN GO — VA DO LA CO Y.
+   *   Ban dau toi doan nguoc va viet nham vao hop xac nhan. Phep kiem trong
+   *   scripts/verify-schema.mjs bat duoc: trigger outfit_items_require_rereview
+   *   thoat som khi is_trusted_context(), ma ham do dung voi admin.
+   *
+   *   Ly do that hop ly: admin sua bai thi chinh viec sua do DA LA kiem duyet.
+   *   Day bai cua chinh minh ve hang doi cua chinh minh la mot vong lap vo
+   *   nghia. Nguoi dang thuong go mot mon thi VAN bi day ve cho duyet.
+   *
+   * GHI NHAT KY TRUOC KHI XOA, khong phai sau. Xoa xong moi ghi ma ghi that
+   * bai thi con lai mot lan xoa khong ai truy duoc.
+   */
+  const removeItem = async (item: OutfitWithItems['outfit_items'][number]) => {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    const ten = item.products?.name ?? 'món này';
+    if (!window.confirm(
+      `Gỡ "${ten}" khỏi set đồ?\n\n`
+      + 'Sản phẩm và link tiếp thị vẫn được giữ lại — chúng sẽ hiện trong mục '
+      + '"Sản phẩm mồ côi" nếu không còn set nào dùng.\n\n'
+      + 'Tổng giá của set được tính lại ngay. Bài vẫn giữ nguyên trạng thái '
+      + 'hiển thị — bạn là quản trị viên nên không phải chờ duyệt lại.',
+    )) return;
+
+    setBusyId(item.id);
+    setSaveError(null);
+
+    const { error: eLog } = await sb.rpc('log_admin_action', {
+      p_action: 'outfit_item.delete',
+      p_entity_type: 'outfit_item',
+      p_entity_id: item.id,
+      p_detail: { outfit_id: outfitId, product_name: ten, role: item.role },
+    });
+    if (eLog) {
+      setBusyId(null);
+      setSaveError(`Không ghi được nhật ký nên chưa xoá: ${eLog.message}`);
+      return;
+    }
+
+    const { error } = await sb.from('outfit_items').delete().eq('id', item.id);
+    setBusyId(null);
+    if (error) { setSaveError(`Không gỡ được món: ${error.message}`); return; }
+    reload();
+  };
+
+  /**
+   * Lay lai thong tin mon tu link, ngay trong trang quan tri.
+   *
+   * VI SAO CAN O DAY chu khong chi o trang tao bai
+   *   Gia tren san doi lien tuc, va anh san pham cung bi nguoi ban thay. Bai da
+   *   dang mot thang truoc gan nhu chac chan dang hien gia sai. Truoc day muon
+   *   cap nhat thi phai mo link, doc gia, roi go tay vao — bon mon la bon lan.
+   *
+   * CHI DIEN VAO BAN NHAP, KHONG LUU NGAY. Nguoi duyet nhin thay thay doi roi
+   * moi bam Luu. Tu ghi de du lieu dang cong khai bang mot thu vua doc ve tu
+   * mot trang ben ngoai la viec khong duoc phep lam khong hoi.
+   */
+  const fetchFromLink = async (item: OutfitWithItems['outfit_items'][number]) => {
+    const url = draft[item.id]?.affiliateUrl ?? item.affiliate_links?.url ?? '';
+    if (!url.trim()) {
+      setFetchNote((x) => ({ ...x, [item.id]: 'Chưa có link để lấy.' }));
+      return;
+    }
+
+    setFetchingId(item.id);
+    setFetchNote((x) => ({ ...x, [item.id]: 'Bắt đầu…' }));
+
+    const out = await fetchProductFromUrl(url, session?.user.id ?? null, {
+      onProgress: (m) => setFetchNote((x) => ({ ...x, [item.id]: m })),
+    });
+
+    setFetchingId(null);
+
+    if (!out.ok || !out.data) {
+      setFetchNote((x) => ({ ...x, [item.id]: out.message }));
+      return;
+    }
+
+    const d = out.data;
+    const moi: ItemDraft = {};
+    if (d.name) moi.name = d.name;
+    if (d.price_vnd) moi.price = String(d.price_vnd);
+    if (d.image_url) moi.imageUrl = d.image_url;
+
+    if (Object.keys(moi).length === 0) {
+      setFetchNote((x) => ({ ...x, [item.id]: 'Đọc được link nhưng không có dữ liệu mới.' }));
+      return;
+    }
+
+    set(item.id, moi);
+    setFetchNote((x) => ({
+      ...x,
+      [item.id]: `Đã điền vào ô bên dưới: ${Object.keys(moi).length} trường. `
+        + 'Xem lại rồi bấm "Lưu món này".',
+    }));
   };
 
   const save = async (item: OutfitWithItems['outfit_items'][number]) => {
@@ -312,12 +429,28 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
               <div className="sm:col-span-2">
                 <label className="label">Link affiliate</label>
-                <input
-                  className="field"
-                  value={affiliateUrl}
-                  inputMode="url"
-                  onChange={(e) => set(it.id, { affiliateUrl: e.target.value })}
-                />
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    className="field"
+                    value={affiliateUrl}
+                    inputMode="url"
+                    onChange={(e) => set(it.id, { affiliateUrl: e.target.value })}
+                  />
+                  {/* Doc lai gia va anh tu san, ngay tai day. Gia tren san doi
+                      lien tuc va nguoi ban cung thay anh — mot bai dang mot
+                      thang truoc gan nhu chac chan dang hien gia sai. */}
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-quiet shrink-0"
+                    disabled={fetchingId === it.id || busy || !affiliateUrl.trim()}
+                    onClick={() => void fetchFromLink(it)}
+                  >
+                    {fetchingId === it.id ? 'Đang lấy…' : 'Lấy lại thông tin'}
+                  </button>
+                </div>
+                {fetchNote[it.id] && (
+                  <p className="hint">{fetchNote[it.id]}</p>
+                )}
                 <p className="hint">
                   Chỉ nhận Shopee hoặc TikTok. Đổi link của bài đã đăng sẽ đưa bài quay lại
                   chờ duyệt — quy tắc nằm ở tầng database.
@@ -347,6 +480,18 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                 {savedId === it.id && (
                   <span className="text-xs" style={{ color: 'var(--color-ok)' }}>Đã lưu</span>
                 )}
+
+                {/* Nut go dat CUOI HANG va tach ra bang ml-auto: no la thao tac
+                    khong hoan lai duoc, nen no khong duoc nam canh nut Luu de
+                    bam nham. */}
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet btn-danger ml-auto"
+                  disabled={busy}
+                  onClick={() => void removeItem(it)}
+                >
+                  Gỡ khỏi set
+                </button>
               </div>
             </div>
           </div>
