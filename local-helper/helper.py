@@ -852,6 +852,41 @@ def read_product_page(page: Any, url: str, interactive: bool) -> PageData:
 # duoc giu lai cho cac job sau.
 # ==============================================================================
 
+# ==============================================================================
+# XOA CAC DAU VET CUA TRINH DUYET BI DIEU KHIEN
+#
+# VI SAO CAN
+#   Playwright mo Chromium that, nhung no de lai vai dau hieu ma trang web doc
+#   duoc bang mot dong JavaScript: `navigator.webdriver` bang true, danh sach
+#   plugin rong, danh sach ngon ngu trong. Shopee kiem ba thu do va day sang
+#   trang /verify/traffic/error — da do: ca che do co cua so lan khong cua so
+#   deu bi chan.
+#
+# DAY LA DOC DU LIEU CONG KHAI CUA CHINH SAN PHAM MA NGUOI DUNG DANG GIOI
+# THIEU, tren may cua chinh ho, bang tai khoan cua chinh ho. Khong vuot tuong
+# dang nhap, khong doc gi rieng tu, khong gui hang loat — mot link mot lan, do
+# nguoi dung tu bam.
+#
+# Script chay TRUOC ma cua trang, nen cac gia tri nay da dung san khi trang bat
+# dau kiem tra.
+# ==============================================================================
+SCRIPT_AN_DAU_VET = """
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+Object.defineProperty(navigator, 'languages', { get: () => ['vi-VN', 'vi', 'en-US', 'en'] });
+Object.defineProperty(navigator, 'plugins', {
+  get: () => [1, 2, 3, 4, 5].map((i) => ({ name: 'Plugin ' + i })),
+});
+window.chrome = window.chrome || { runtime: {} };
+const _query = navigator.permissions && navigator.permissions.query;
+if (_query) {
+  navigator.permissions.query = (p) =>
+    p && p.name === 'notifications'
+      ? Promise.resolve({ state: Notification.permission })
+      : _query.call(navigator.permissions, p);
+}
+"""
+
+
 class LazyBrowser:
     def __init__(self, pw: Any, headless: bool) -> None:
         self._pw = pw
@@ -873,9 +908,23 @@ class LazyBrowser:
                 locale="vi-VN",
                 timezone_id="Asia/Ho_Chi_Minh",
                 viewport={"width": 1280, "height": 900},
-                args=["--disable-blink-features=AutomationControlled"],
+                # UA cua Chromium ban dieu khien co chuoi "HeadlessChrome" va
+                # thieu phan thuong hieu — hai dau hieu Shopee doc duoc ngay.
+                user_agent=(
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/126.0.0.0 Safari/537.36"
+                ),
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-features=IsolateOrigins,site-per-process",
+                    "--no-default-browser-check",
+                    "--no-first-run",
+                ],
             )
             self._page = self._ctx.pages[0] if self._ctx.pages else self._ctx.new_page()
+
+            self._ctx.add_init_script(SCRIPT_AN_DAU_VET)
         return self._page
 
     def close(self) -> None:
@@ -919,8 +968,36 @@ def process_job(
     # xem chu thich cua read_via_http() de biet vi sao.
     data = read_via_http(url)
 
+    # ------------------------------------------------------------------------
+    # DUONG 1 DOC DUOC TEN NHUNG KHONG CO GIA -> VAN PHAI MO TRINH DUYET.
+    #
+    #   Da do tren link that: HTML ma Shopee tra ve cho bot xem truoc link
+    #   KHONG HE CHUA GIA. Trong do chi co ten, mot anh, va mot cau quang cao
+    #   chung. API san pham cua Shopee thi tu choi may chu (403).
+    #
+    #   Nen neu dung o day, o gia se LUON trong voi moi link Shopee — va do
+    #   chinh la ly do Local Helper ton tai. Mot trinh duyet that chay
+    #   JavaScript cua san, va gia hien ra trong DOM.
+    #
+    #   Doi lai la 10-20 giay thay vi 2 giay. Doi mot lan de khoi phai go tay
+    #   gia cho tung mon la mot doi rat dang.
+    # ------------------------------------------------------------------------
+    if data and data.price_vnd is None:
+        log("Doc bang HTTP duoc ten nhung khong co gia — mo trinh duyet de lay gia…", "info")
+        try:
+            day_du = read_product_page(browser.page(), url, interactive)
+            # Chi thay khi ban trinh duyet THAT SU tot hon: co gia, hoac doc
+            # duoc them nhan bien the. Trinh duyet co the vap trang chan bot va
+            # tra ve mot ban rong hon — luc do giu ban HTTP.
+            if day_du and day_du.name and (day_du.price_vnd or day_du.variant_labels):
+                data = day_du
+        except (PlaywrightTimeout, PlaywrightError) as e:
+            log(f"Trinh duyet khong mo duoc ({e}) — giu ket qua doc bang HTTP.", "warn")
+        except RuntimeError as e:
+            log(f"{e} — giu ket qua doc bang HTTP.", "warn")
+
     if data:
-        log("Doc bang HTTP thuan, khong can mo trinh duyet.", "ok")
+        log("Doc xong.", "ok")
     else:
         # --- Duong 2: trinh duyet that --------------------------------------
         # Chi tori day khi HTTP khong xu ly duoc: trang can chay JavaScript moi
@@ -1018,10 +1095,16 @@ def run_test_url(url: str, headless: bool) -> int:
     data = read_via_http(url)
     elapsed = time.monotonic() - started
 
+    # Doc duoc ten nhung khong co gia thi VAN mo trinh duyet — xem chu thich
+    # cung noi dung o vong xu ly job.
+    if data and data.price_vnd is None:
+        log(f"Duong 1 doc duoc ten trong {elapsed:.1f} giay nhung khong co gia.", "warn")
+        data = None
+
     if data:
         log(f"Duong 1 (HTTP thuan) doc duoc trong {elapsed:.1f} giay.", "ok")
     else:
-        log("Duong 1 (HTTP thuan) khong doc duoc, chuyen sang trinh duyet…", "warn")
+        log("Chuyen sang trinh duyet that de lay gia…", "info")
 
         # --- Duong 2: trinh duyet that ---------------------------------------
         with sync_playwright() as pw:

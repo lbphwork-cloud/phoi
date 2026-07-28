@@ -33,13 +33,32 @@ function readProductPage() {
 
   // Doc gia. CO Y than trong: tu choi khoang gia thay vi doan lay so dau,
   // vi hien sai gia con te hon la de trong cho nguoi dung tu dien.
+  /*
+    KHOANG GIA THI LAY SO NHO NHAT, khong tu choi nua.
+
+    Ban truoc gap "100.000₫ - 200.000₫" la tra ve null voi ly do "khong doan
+    bua". Dung ve nguyen tac nhung sai ve ket qua: gan nhu moi trang san pham
+    tren san deu hien mot khoang (nhieu size, nhieu mau), nen o gia luon trong
+    va nguoi dung phai go tay tung mon.
+
+    So NHO NHAT la con so nguoi mua nhin thay dau tien tren san va la con so ho
+    so sanh. Giao dien ghi ro day la "gia tu".
+
+    Phai giong het parsePriceVnd trong supabase/functions/fetch-product — hai
+    duong doc cung mot trang ma ra hai con so khac nhau la loi kho tim nhat.
+  */
   const parsePrice = (s) => {
     if (!s) return null;
-    if (/\d[\d.,]*\s*(?:₫|đ|vnd)?\s*[-–—~]\s*\d/i.test(s)) return null;
-    const m = /(\d[\d.,]{2,})\s*(?:₫|đ\b|vnd\b)/i.exec(s);
-    if (!m) return null;
-    const n = Number(m[1].replace(/[.,]/g, ''));
-    return Number.isFinite(n) && n >= 10000 && n <= 100000000 ? n : null;
+    const ds = [...String(s).matchAll(/(\d[\d.,]{2,})\s*(?:₫|đ\b|vnd\b)/gi)]
+      .map((m) => Number(m[1].replace(/[.,]/g, '')))
+      .filter((n) => Number.isFinite(n) && n >= 10000 && n <= 100000000);
+    if (ds.length) return Math.min(...ds);
+
+    // Con so tran khong kem ky hieu: chi nhan khi ca chuoi la mot so, vi day
+    // la truong hop the product:price:amount tra ve "320000".
+    const tron = String(s).trim().replace(/[.,]/g, '');
+    const n = Number(tron);
+    return /^\d+$/.test(tron) && n >= 10000 && n <= 100000000 ? n : null;
   };
 
   let name = meta('og:title') || document.title || '';

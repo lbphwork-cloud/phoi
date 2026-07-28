@@ -41,7 +41,19 @@ console.log('\n=== 1. Co anh dinh kem ===');
     (en.match(/^\* .*attached image$/gm) ?? []).length === 2);
   check('nen trang', /pure white seamless background/.test(en));
   check('khung doc 3:4', /vertical 3:4 frame/.test(en));
-  check('bu giay vi set chua co', /complete the look with simple low-profile sneakers/.test(en));
+  check('bu giay vi set chua co — de AI tu chon',
+    /\* footwear: your choice/.test(en));
+  /*
+    RANG BUOC MOI, VA LA CAI QUAN TRONG NHAT O DAY:
+    TEN SAN PHAM KHONG DUOC XUAT HIEN TRONG CAU LENH.
+
+    Ten hang tren san la mot chuoi tu khoa quang cao. Dua no vao cau lenh thi
+    mo hinh doc chuoi do roi ve theo tri tuong tuong — ra mot mon do KHONG
+    giong hang that nhung trong nhu that. Voi mot trang gan link mua hang, do
+    la kieu sai nguy hiem nhat.
+  */
+  check('KHONG co ten san pham trong cau lenh',
+    !en.includes('Áo polo trắng') && !en.includes('Quần chinos đen'), en.slice(0, 0));
   check('danh sach cam la danh sach, khong phai mot cau',
     (en.match(/^\* /gm) ?? []).length >= 10);
   for (const cam of ['text, lettering', 'watermark', 'brand logo', 'identifiable person',
@@ -53,9 +65,11 @@ console.log('\n=== 1. Co anh dinh kem ===');
 console.log('\n=== 2. Khong co anh dinh kem ===');
 {
   const en = buildImagePrompt({ ...base, hasReferences: false });
-  check('noi thang la chi ta bang chu', /described in words only/.test(en));
+  check('noi thang la khong co anh mau', /No reference images were supplied/.test(en));
   check('khong con cau CRITICAL', !/CRITICAL/.test(en));
-  check('van ta ten mon that', /Áo polo trắng/.test(en));
+  // Khong anh thi de AI tu chon, KHONG ta ten mon — xem chu thich o muc 1.
+  check('de AI tu chon thay vi ta ten', (en.match(/your choice/g) ?? []).length >= 2);
+  check('van khong lo ten san pham', !en.includes('Áo polo trắng'));
 }
 
 console.log('\n=== 3. Goc nguoi mau doi theo tung lan tao ===');
@@ -89,7 +103,7 @@ console.log('\n=== 4. Ban tieng Viet phai khop ban tieng Anh ===');
 
   const vi = explainPromptVi(base).join('\n');
   check('ban tieng Viet noi ro co anh dinh kem', /ĐÍNH KÈM/.test(vi));
-  check('ban tieng Viet liet ke tung mon', /\* áo: theo hình đính kèm/.test(vi));
+  check('ban tieng Viet liet ke tung mon', /\* áo: đúng như ảnh đính kèm/.test(vi));
   check('ban tieng Viet khong lan tieng Anh',
     !/(sneakers|trousers|t-shirt|neutral tone)/i.test(vi), vi.slice(0, 0));
 }
@@ -115,11 +129,11 @@ console.log('\n=== 5. Set nua co anh nua khong ===');
   const vi = explainPromptVi(tron).join('\n');
 
   check('mon co anh: ghi theo anh dinh kem', /\* áo: exactly as shown in the attached image/.test(en));
-  check('mon khong anh: ta bang chu', /\* quần: Quần chinos đen \(Đen\)/.test(en));
+  check('mon khong anh: de AI tu chon', /\* quần: your choice/.test(en));
   check('canh bao khong duoc chep anh sang mon khong co anh',
     /must NOT be copied from\s+the attached images/.test(en));
-  check('ban tieng Viet noi ro ty le', /Chỉ 1\/2 món có ảnh đính kèm/.test(vi));
-  check('ban tieng Viet danh dau mon phai ta chay', /tả bằng chữ, chưa có ảnh/.test(vi));
+  check('ban tieng Viet noi ro ty le', /1\/2 món có ảnh đính kèm/.test(vi));
+  check('ban tieng Viet danh dau mon chua co anh', /để AI tự chọn cho hợp bộ đồ/.test(vi));
 
   check('mon chua co anh liet ke dung', monChuaCoAnh(tron).join(',') === 'quần');
   check('tat ca co anh thi danh sach rong',

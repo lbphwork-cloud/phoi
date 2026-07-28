@@ -38,6 +38,16 @@ function MyData() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  /*
+    HAI TRANG THAI NAY PHAI KHAI BAO O DAY, cung cho voi cac useState khac.
+
+    Ban truoc dat chung o giua than ham, SAU dong `if (loading) return`. React
+    goi hook theo thu tu, nen mot lan render co early-return se goi it hook hon
+    lan sau — va React nem loi #310 lam trang do trang. Loi khong hien khi
+    dang go ma chi hien tren ban da dung, vi ban dung nen thong bao lai.
+  */
+  const [xoaTaiKhoan, setXoaTaiKhoan] = useState(false);
+  const [goEmail, setGoEmail] = useState('');
 
   if (loading) return <Spinner label="Đang tải" />;
 
@@ -115,6 +125,46 @@ function MyData() {
     setMsg('Đã xoá dữ liệu cá nhân.');
   };
 
+  /*
+    XOA HAN TAI KHOAN.
+
+    Khac han nut o tren: nut kia xoa DU LIEU, tai khoan van con dang nhap duoc.
+    Nut nay xoa ca tai khoan — sau do khong dang nhap lai duoc bang dia chi do
+    nua, tru khi dang ky moi.
+
+    Phai di qua Edge Function: xoa mot dong trong auth.users chi lam duoc bang
+    service role, ma khoa do khong bao gio duoc cam vao trinh duyet.
+
+    BAT GO LAI EMAIL, khong dung window.confirm. Mot hop thoai hien ra duoi con
+    tro chuot thi ai cung bam Dong y; go lai dia chi cua chinh minh la mot hanh
+    dong co y thuc.
+  */
+  const deleteAccount = async () => {
+    const sb = getSupabase();
+    if (!sb) return;
+
+    setBusy(true);
+    setErr(null);
+
+    const { data, error } = await sb.functions.invoke('delete-account', {
+      body: { confirm: goEmail.trim() },
+    });
+
+    setBusy(false);
+
+    const r = data as { ok?: boolean; error?: string; message?: string } | null;
+    if (error || !r?.ok) {
+      setErr(r?.error ?? 'Không xoá được tài khoản. Thử lại hoặc liên hệ quản trị viên.');
+      return;
+    }
+
+    // Da xoa xong thi phien dang nhap khong con y nghia gi. Dang xuat va ve
+    // trang chu — de lai man hinh cu se hien mot giao dien cua mot tai khoan
+    // khong con ton tai.
+    await sb.auth.signOut();
+    window.location.href = '/';
+  };
+
   return (
     <div className="shell-narrow py-12 md:py-16">
       <p className="eyebrow mb-4">Quyền của bạn</p>
@@ -156,6 +206,65 @@ function MyData() {
         )}
         </span>
       </p>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* XOA HAN TAI KHOAN                                                   */}
+      {/*                                                                     */}
+      {/* Dat CUOI CUNG va tach bang mot duong ke: day la thao tac khong hoan */}
+      {/* lai duoc, va no khong duoc nam canh nhung nut binh thuong.          */}
+      {/* ------------------------------------------------------------------ */}
+      <div className="mt-12 border-t pt-8" style={{ borderColor: 'var(--line)' }}>
+        <p className="eyebrow mb-3">Xoá hẳn tài khoản</p>
+
+        {!xoaTaiKhoan ? (
+          <>
+            <p className="muted text-sm leading-relaxed">
+              Khác với nút ở trên: nút đó xoá <strong>dữ liệu</strong>, tài khoản vẫn đăng
+              nhập được. Nút này xoá cả tài khoản — sau đó bạn không đăng nhập lại bằng địa
+              chỉ này được nữa. Các bài đã đăng vẫn được giữ nhưng chuyển sang khuyết danh.
+            </p>
+            <button
+              type="button"
+              className="btn btn-sm btn-danger mt-4"
+              onClick={() => setXoaTaiKhoan(true)}
+            >
+              Tôi muốn xoá tài khoản
+            </button>
+          </>
+        ) : (
+          <div className="notice notice-danger">
+            <p className="text-sm">
+              Không có đường quay lại. Gõ đúng địa chỉ email của bạn để xác nhận:
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                className="field"
+                value={goEmail}
+                onChange={(e) => setGoEmail(e.target.value)}
+                placeholder="email của bạn"
+                autoComplete="off"
+                inputMode="email"
+              />
+              <button
+                type="button"
+                className="btn btn-sm btn-danger shrink-0"
+                disabled={busy || !goEmail.trim()}
+                onClick={() => void deleteAccount()}
+              >
+                {busy ? 'Đang xoá…' : 'Xoá vĩnh viễn'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-quiet shrink-0"
+                disabled={busy}
+                onClick={() => { setXoaTaiKhoan(false); setGoEmail(''); }}
+              >
+                Thôi
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <p className="muted-2 mt-12 border-t pt-8 text-xs" style={{ borderColor: 'var(--line)' }}>
         <Link href="/ho-so" className="underline">Về trang hồ sơ</Link>

@@ -8,6 +8,7 @@ import { useTaxonomy, useUserContext } from '@/lib/hooks';
 import { useOutfits, type OutfitFilters } from '@/lib/useOutfits';
 import { useContent } from '@/lib/content';
 import { OutfitCard } from '@/components/outfit';
+import { ColorPicker } from '@/components/ColorPicker';
 import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
 import { formatVnd } from '@/lib/format';
@@ -96,6 +97,32 @@ function Discover() {
           }),
         )
       : outfits;
+
+  /*
+    TAI THEO TUNG DOT, khong bay het mot luc.
+
+    Hien tai co 19 bai nen bay het van muot. Nhung moi the mang mot buc anh, va
+    o vai tram bai thi trinh duyet phai giai ma vai tram tam anh cung luc —
+    dien thoai tam trung se giat, va nguoi dung tren mang 3G tai ve hang chuc
+    megabyte cho mot man hinh ho chi luot qua.
+
+    24 bai mot dot: du day sau man hinh o moi khung, va vua mot lan cuon.
+
+    DEM LAI TU DAU KHI DOI BO LOC — `key` cua danh sach doi thi so dot ve 1.
+    Khong lam vay thi doi bo loc xong van dang o "dot 4" cua mot danh sach chi
+    con 5 bai, va man hinh trong tron.
+  */
+  const MOI_DOT = 24;
+  const [soDot, setSoDot] = useState(1);
+  const khoaDanhSach = JSON.stringify(filters) + `|${menhOnly}|${visible.length}`;
+  const [khoaCu, setKhoaCu] = useState(khoaDanhSach);
+  if (khoaCu !== khoaDanhSach) {
+    setKhoaCu(khoaDanhSach);
+    setSoDot(1);
+  }
+
+  const dangHien = visible.slice(0, soDot * MOI_DOT);
+  const conNua = visible.length - dangHien.length;
 
   const toggle = (k: keyof OutfitFilters, v: string) =>
     setFilters((f) => ({ ...f, [k]: f[k] === v ? null : v }));
@@ -206,20 +233,14 @@ function Discover() {
               ))}
             </Group>
 
+            {/* Loc theo mau: gom nhom, xem chu thich trong ColorPicker.
+                29 cai chip trong mot khoi loc lam nguoi ta khong loc nua. */}
             <Group label="Màu">
-              {tax.colors.map((x) => (
-                <button
-                  key={x.slug}
-                  type="button"
-                  className="chip"
-                  aria-pressed={filters.colorSlug === x.slug}
-                  onClick={() => toggle('colorSlug', x.slug)}
-                  title={x.element ? `Thuộc hành ${NGU_HANH_LABEL[x.element]}` : undefined}
-                >
-                  <span className="swatch" style={{ background: x.hex }} />
-                  {x.label}
-                </button>
-              ))}
+              <ColorPicker
+                colors={tax.colors}
+                selected={filters.colorSlug ? [filters.colorSlug] : []}
+                onChange={(xs) => toggle('colorSlug', xs[0] ?? filters.colorSlug ?? '')}
+              />
             </Group>
 
             <Group label="Khoảng giá cả set">
@@ -297,7 +318,7 @@ function Discover() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-x-4 gap-y-10 md:grid-cols-3 md:gap-x-6 lg:grid-cols-4">
-            {visible.map((o) => (
+            {dangHien.map((o) => (
               <OutfitCard
                 key={o.id}
                 outfit={o}
@@ -308,6 +329,17 @@ function Discover() {
               />
             ))}
           </div>
+
+          {conNua > 0 && (
+            <div className="mt-12 text-center">
+              <button type="button" className="btn" onClick={() => setSoDot((n) => n + 1)}>
+                Xem thêm {Math.min(conNua, MOI_DOT)} bài
+              </button>
+              <p className="muted-2 mt-3 text-xs">
+                Đang hiện {dangHien.length} trong {visible.length} bài.
+              </p>
+            </div>
+          )}
 
           <p className="muted-2 mt-12 text-center text-xs">
             <span style={c.s('discover.price_note')}>

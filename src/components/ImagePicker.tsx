@@ -22,6 +22,8 @@
  * tuong minh bo lo cai gi.
  */
 
+import { useState } from 'react';
+
 /** Anh nen do script tao du lieu mau sinh ra: mot o vuong xam, khong phai anh that. */
 export function laAnhMauTrong(url: string | null | undefined): boolean {
   if (!url) return false;
@@ -41,25 +43,44 @@ export function ImagePicker({
   selected,
   onPick,
   label = 'Ảnh lấy từ link',
+  nutXacNhan,
 }: {
   urls: string[];
   selected: string;
   onPick: (url: string) => void;
   label?: string;
+  /**
+   * Chu tren nut xac nhan. Co chu nay thi bam vao anh chi la XEM TRUOC — phai
+   * bam nut moi dat that.
+   *
+   * VI SAO CO CHE DO HAI BUOC
+   *   O nhung cho ma bam nhanh la ghi de len thu dang co (anh cua mot mon da
+   *   luu chang han), mot cu bam nham la mat anh cu ma khong biet. Xem truoc
+   *   roi moi xac nhan cho nguoi ta doi y truoc khi thay doi gi.
+   *
+   *   Khong dat thi giu nguyen kieu mot buoc: bam la chon. Do la dung cho
+   *   nhung cho dang tao moi, chua co gi de mat.
+   */
+  nutXacNhan?: string;
 }) {
+  // Anh dang xem truoc. null = chua bam vao anh nao trong lan nay.
+  const [dangXem, setDangXem] = useState<string | null>(null);
+
   if (urls.length === 0) return null;
+
+  const hienTai = nutXacNhan ? (dangXem ?? selected) : selected;
 
   return (
     <div>
       <label className="label">{label}</label>
       <div className="flex flex-wrap gap-2">
         {urls.map((u) => {
-          const dangChon = u === selected;
+          const dangChon = u === hienTai;
           return (
             <button
               key={u}
               type="button"
-              onClick={() => onPick(u)}
+              onClick={() => (nutXacNhan ? setDangXem(u) : onPick(u))}
               aria-pressed={dangChon}
               title={dangChon ? 'Đang dùng ảnh này' : 'Chọn ảnh này'}
               className="frame frame-square w-20 shrink-0"
@@ -77,6 +98,22 @@ export function ImagePicker({
           );
         })}
       </div>
+      {nutXacNhan && (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className="btn btn-sm"
+            disabled={!hienTai || hienTai === selected}
+            onClick={() => hienTai && onPick(hienTai)}
+          >
+            {nutXacNhan}
+          </button>
+          {hienTai === selected && selected && (
+            <span className="muted-2 text-xs">Ảnh này đang được dùng.</span>
+          )}
+        </div>
+      )}
+
       <p className="hint">
         {urls.length === 1
           ? 'Link này chỉ công bố một ảnh. Muốn ảnh khác thì mở link rồi tự tải lên.'

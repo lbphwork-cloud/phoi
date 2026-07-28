@@ -31,6 +31,7 @@ import { formatVnd, IMAGE_LIMITS } from '@/lib/format';
 import { Spinner } from '@/components/site';
 import { UploadButton } from '@/components/UploadButton';
 import { ImagePicker, laAnhMauTrong } from '@/components/ImagePicker';
+import { ColorPicker } from '@/components/ColorPicker';
 import { CATEGORY_LABEL, ITEM_ROLE_LABEL } from '@/lib/supabase/types';
 import {
   datTenTheoQuyTac, vietMoTaTheoQuyTac, thieuGiDeDatTen, thieuGiDeVietMoTa, bangMau,
@@ -138,7 +139,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
   const [daChep, setDaChep] = useState(false);
   /** Boi canh va dang nguoi mau. Truoc day khoa cung nen trang + dang can doi. */
   const [sceneId, setSceneId] = useState<string>('trang');
-  const [modelTypeId, setModelTypeId] = useState<string>('can-doi');
+  const [modelTypeId, setModelTypeId] = useState<string>('ngau-nhien');
   /*
     CAU LENH DA SUA TAY.
 
@@ -916,26 +917,13 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
               Lấy màu từ các món
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {tax.colors.map((c) => (
-              <button
-                key={c.slug}
-                type="button"
-                className="chip"
-                aria-pressed={oColors.includes(c.slug)}
-                onClick={() =>
-                  patchOutfit({
-                    colorSlugs: oColors.includes(c.slug)
-                      ? oColors.filter((x) => x !== c.slug)
-                      : [...oColors, c.slug],
-                  })
-                }
-              >
-                <span className="swatch" style={{ background: c.hex }} />
-                {c.label}
-              </button>
-            ))}
-          </div>
+          <ColorPicker
+            colors={tax.colors}
+            selected={oColors}
+            onChange={(xs) => patchOutfit({ colorSlugs: xs })}
+            multiple
+            max={3}
+          />
           <p className="hint">
             Bộ lọc ở trang khám phá và phép tính hợp mệnh dùng đúng các màu chọn ở đây.
           </p>
@@ -960,136 +948,6 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
             <span className="text-xs" style={{ color: 'var(--color-ok)' }}>Đã lưu</span>
           )}
         </div>
-      </div>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Cau lenh tao anh                                                    */}
-      {/*                                                                     */}
-      {/* HOP RIENG, khong con nhet cuoi khoi thong tin set. O do no nam duoi */}
-      {/* mot hang 17 chip mau va khong co tieu de, nen gan nhu khong ai thay */}
-      {/* — chu website bao la "chua co" trong khi no da chay duoc.           */}
-      {/*                                                                     */}
-      {/* KHONG GOI AI o day: chi DUNG cau lenh roi cho chep, mien phi va      */}
-      {/* khong can key. Phan lon nguoi dung se khong bao gio co API key.      */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="flex flex-col gap-3 border p-4" style={{ borderColor: 'var(--line)' }}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="eyebrow">Câu lệnh tạo ảnh</p>
-          <button
-            type="button"
-            className="btn btn-sm btn-quiet"
-            onClick={() => { setHienPrompt((v) => !v); setDaChep(false); }}
-          >
-            {hienPrompt ? 'Ẩn câu lệnh' : 'Tạo câu lệnh'}
-          </button>
-        </div>
-
-        {!hienPrompt && (
-          <p className="muted-2 text-sm">
-            Dựng câu lệnh từ chính các trường ở trên — phong cách, dịp, màu, và từng
-            món trong set. Chạy bằng quy tắc, không gọi AI nên không cần API key.
-          </p>
-        )}
-
-        {hienPrompt && (
-          <>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div>
-                <label className="label">Bối cảnh</label>
-                <select
-                  className="field"
-                  value={sceneId}
-                  onChange={(e) => setSceneId(e.target.value)}
-                >
-                  {SCENES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="label">Dáng người mẫu</label>
-                <select
-                  className="field"
-                  value={modelTypeId}
-                  onChange={(e) => setModelTypeId(e.target.value)}
-                >
-                  {MODEL_TYPES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <p className="eyebrow mb-2">Đang yêu cầu AI những gì</p>
-              <ul className="muted flex flex-col gap-1 text-sm">
-                {explainPromptVi(promptInput).map((d, i) => <li key={i}>{d}</li>)}
-              </ul>
-              {thieuAnh.length > 0 && (
-                <p className="hint-error mt-2">
-                  {thieuAnh.length === items.length
-                    ? 'Chưa món nào có ảnh, nên câu lệnh chỉ tả bằng chữ — ảnh sinh ra sẽ không giống sản phẩm thật.'
-                    : `Chưa có ảnh: ${thieuAnh.join(', ')}. Những món này chỉ được tả bằng chữ.`}
-                  {' '}Thêm ảnh cho từng món ở dưới rồi bấm lại.
-                </p>
-              )}
-            </div>
-
-            {/*
-              SUA TAY DUOC. O nay tung la <pre> chi doc, nen muon them mot cau
-              la phai chep ra ngoai roi sua o cho khac — va sua o cho khac thi
-              lan sau quay lai khong con.
-
-              Sua roi thi cau lenh KHONG tu dung lai nua, ke ca khi doi phong
-              cach hay doi mau: tu ghi de len chu nguoi ta vua go la mat trang.
-              Muon quay ve ban may sinh thi co nut "Dung lai theo du lieu".
-            */}
-            <div>
-              <label className="label">Câu lệnh (tiếng Anh, sửa được)</label>
-              <textarea
-                className="field font-mono text-xs"
-                rows={14}
-                value={cauLenh}
-                onChange={(e) => { setPromptSua(e.target.value); setDaChep(false); }}
-              />
-              <p className="hint">
-                Viết bằng tiếng Anh vì các mô hình tạo ảnh hiểu tiếng Anh tốt hơn hẳn —
-                lý do kỹ thuật, không phải thẩm mỹ. Phần tiếng Việt ở trên là bản dịch
-                để đọc.
-                {promptSua !== null && ' Bạn đã sửa tay nên câu lệnh không tự dựng lại nữa.'}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => {
-                  // navigator.clipboard bi tu choi khi khong chay tren HTTPS.
-                  // O chu ben tren van boi den chep tay duoc nen day khong phai
-                  // ngo cut — nhung phai bao that thay vi bao "Da chep".
-                  void navigator.clipboard?.writeText(cauLenh)
-                    .then(() => setDaChep(true))
-                    .catch(() => setSaveError('Trình duyệt không cho chép tự động. Bôi đen ô câu lệnh rồi chép tay.'));
-                }}
-              >
-                {daChep ? 'Đã chép' : 'Chép câu lệnh'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-quiet"
-                onClick={() => { setPromptLan((n) => n + 1); setPromptSua(null); setDaChep(false); }}
-              >
-                Đổi cách diễn đạt
-              </button>
-              {promptSua !== null && (
-                <button
-                  type="button"
-                  className="btn btn-sm btn-quiet"
-                  onClick={() => { setPromptSua(null); setDaChep(false); }}
-                >
-                  Dựng lại theo dữ liệu
-                </button>
-              )}
-            </div>
-          </>
-        )}
       </div>
 
       {/* ------------------------------------------------------------------ */}
@@ -1204,6 +1062,136 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
               <ImagePicker urls={aiUrls} selected={heroUrl} onPick={chonAnhAi} label="" />
             </div>
           )}
+
+        {/* ------------------------------------------------------------------ */}
+        {/* Cau lenh tao anh                                                    */}
+        {/*                                                                     */}
+        {/* HOP RIENG, khong con nhet cuoi khoi thong tin set. O do no nam duoi */}
+        {/* mot hang 17 chip mau va khong co tieu de, nen gan nhu khong ai thay */}
+        {/* — chu website bao la "chua co" trong khi no da chay duoc.           */}
+        {/*                                                                     */}
+        {/* KHONG GOI AI o day: chi DUNG cau lenh roi cho chep, mien phi va      */}
+        {/* khong can key. Phan lon nguoi dung se khong bao gio co API key.      */}
+        {/* ------------------------------------------------------------------ */}
+        <div className="flex flex-col gap-3 border p-4" style={{ borderColor: 'var(--line)' }}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="eyebrow">Câu lệnh tạo ảnh</p>
+            <button
+              type="button"
+              className="btn btn-sm btn-quiet"
+              onClick={() => { setHienPrompt((v) => !v); setDaChep(false); }}
+            >
+              {hienPrompt ? 'Ẩn câu lệnh' : 'Tạo câu lệnh'}
+            </button>
+          </div>
+
+          {!hienPrompt && (
+            <p className="muted-2 text-sm">
+              Dựng câu lệnh từ chính các trường ở trên — phong cách, dịp, màu, và từng
+              món trong set. Chạy bằng quy tắc, không gọi AI nên không cần API key.
+            </p>
+          )}
+
+          {hienPrompt && (
+            <>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="label">Bối cảnh</label>
+                  <select
+                    className="field"
+                    value={sceneId}
+                    onChange={(e) => setSceneId(e.target.value)}
+                  >
+                    {SCENES.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Dáng người mẫu</label>
+                  <select
+                    className="field"
+                    value={modelTypeId}
+                    onChange={(e) => setModelTypeId(e.target.value)}
+                  >
+                    {MODEL_TYPES.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <p className="eyebrow mb-2">Đang yêu cầu AI những gì</p>
+                <ul className="muted flex flex-col gap-1 text-sm">
+                  {explainPromptVi(promptInput).map((d, i) => <li key={i}>{d}</li>)}
+                </ul>
+                {thieuAnh.length > 0 && (
+                  <p className="hint-error mt-2">
+                    {thieuAnh.length === items.length
+                      ? 'Chưa món nào có ảnh, nên câu lệnh chỉ tả bằng chữ — ảnh sinh ra sẽ không giống sản phẩm thật.'
+                      : `Chưa có ảnh: ${thieuAnh.join(', ')}. Những món này chỉ được tả bằng chữ.`}
+                    {' '}Thêm ảnh cho từng món ở dưới rồi bấm lại.
+                  </p>
+                )}
+              </div>
+
+              {/*
+                SUA TAY DUOC. O nay tung la <pre> chi doc, nen muon them mot cau
+                la phai chep ra ngoai roi sua o cho khac — va sua o cho khac thi
+                lan sau quay lai khong con.
+
+                Sua roi thi cau lenh KHONG tu dung lai nua, ke ca khi doi phong
+                cach hay doi mau: tu ghi de len chu nguoi ta vua go la mat trang.
+                Muon quay ve ban may sinh thi co nut "Dung lai theo du lieu".
+              */}
+              <div>
+                <label className="label">Câu lệnh (tiếng Anh, sửa được)</label>
+                <textarea
+                  className="field font-mono text-xs"
+                  rows={14}
+                  value={cauLenh}
+                  onChange={(e) => { setPromptSua(e.target.value); setDaChep(false); }}
+                />
+                <p className="hint">
+                  Viết bằng tiếng Anh vì các mô hình tạo ảnh hiểu tiếng Anh tốt hơn hẳn —
+                  lý do kỹ thuật, không phải thẩm mỹ. Phần tiếng Việt ở trên là bản dịch
+                  để đọc.
+                  {promptSua !== null && ' Bạn đã sửa tay nên câu lệnh không tự dựng lại nữa.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => {
+                    // navigator.clipboard bi tu choi khi khong chay tren HTTPS.
+                    // O chu ben tren van boi den chep tay duoc nen day khong phai
+                    // ngo cut — nhung phai bao that thay vi bao "Da chep".
+                    void navigator.clipboard?.writeText(cauLenh)
+                      .then(() => setDaChep(true))
+                      .catch(() => setSaveError('Trình duyệt không cho chép tự động. Bôi đen ô câu lệnh rồi chép tay.'));
+                  }}
+                >
+                  {daChep ? 'Đã chép' : 'Chép câu lệnh'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-quiet"
+                  onClick={() => { setPromptLan((n) => n + 1); setPromptSua(null); setDaChep(false); }}
+                >
+                  Đổi cách diễn đạt
+                </button>
+                {promptSua !== null && (
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-quiet"
+                    onClick={() => { setPromptSua(null); setDaChep(false); }}
+                  >
+                    Dựng lại theo dữ liệu
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
           <div className="mt-3 flex items-center gap-3">
             <button
@@ -1348,14 +1336,11 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
               */}
               <div>
                 <label className="label">Màu dùng trong set</label>
-                <select
-                  className="field"
-                  value={colorSlug}
-                  onChange={(e) => set(it.id, { colorSlug: e.target.value })}
-                >
-                  <option value="">— Không rõ —</option>
-                  {tax.colors.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
-                </select>
+                <ColorPicker
+                  colors={tax.colors}
+                  selected={colorSlug ? [colorSlug] : []}
+                  onChange={(xs) => set(it.id, { colorSlug: xs[0] ?? '' })}
+                />
                 <p className="hint">
                   Màu thật sự có trong bộ đồ này. Nút &ldquo;Lấy màu từ các món&rdquo; ở
                   khối trên gom đúng các màu này thành màu chủ đạo của set.
@@ -1364,26 +1349,12 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
               <div className="sm:col-span-2">
                 <label className="label">Các màu còn bán trên sàn</label>
-                <div className="flex flex-wrap gap-2">
-                  {tax.colors.map((c) => (
-                    <button
-                      key={c.slug}
-                      type="button"
-                      className="chip"
-                      aria-pressed={banMau.includes(c.slug)}
-                      onClick={() =>
-                        set(it.id, {
-                          availableColorSlugs: banMau.includes(c.slug)
-                            ? banMau.filter((x) => x !== c.slug)
-                            : [...banMau, c.slug],
-                        })
-                      }
-                    >
-                      <span className="swatch" style={{ background: c.hex }} />
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
+                <ColorPicker
+                  colors={tax.colors}
+                  selected={banMau}
+                  onChange={(xs) => set(it.id, { availableColorSlugs: xs })}
+                  multiple
+                />
                 <p className="hint">
                   Chỉ để người xem biết link đó còn lựa chọn nào. Không ảnh hưởng tới bộ
                   lọc hay gợi ý theo mệnh.
@@ -1421,6 +1392,7 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                     urls={d.imageChoices!}
                     selected={imageUrl}
                     onPick={(u) => set(it.id, { imageUrl: u })}
+                    nutXacNhan="Đặt làm ảnh món"
                   />
                 </div>
               )}
@@ -1639,39 +1611,21 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
 
             <div>
               <label className="label">Màu dùng trong set</label>
-              <select
-                className="field"
-                value={moi.colorSlug}
-                onChange={(e) => setMoi((x) => ({ ...x, colorSlug: e.target.value }))}
-              >
-                <option value="">— Không rõ —</option>
-                {tax.colors.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
-              </select>
+              <ColorPicker
+                colors={tax.colors}
+                selected={moi.colorSlug ? [moi.colorSlug] : []}
+                onChange={(xs) => setMoi((x) => ({ ...x, colorSlug: xs[0] ?? '' }))}
+              />
             </div>
 
             <div className="sm:col-span-2">
               <label className="label">Các màu còn bán trên sàn</label>
-              <div className="flex flex-wrap gap-2">
-                {tax.colors.map((c) => (
-                  <button
-                    key={c.slug}
-                    type="button"
-                    className="chip"
-                    aria-pressed={moi.availableColorSlugs.includes(c.slug)}
-                    onClick={() =>
-                      setMoi((x) => ({
-                        ...x,
-                        availableColorSlugs: x.availableColorSlugs.includes(c.slug)
-                          ? x.availableColorSlugs.filter((y) => y !== c.slug)
-                          : [...x.availableColorSlugs, c.slug],
-                      }))
-                    }
-                  >
-                    <span className="swatch" style={{ background: c.hex }} />
-                    {c.label}
-                  </button>
-                ))}
-              </div>
+              <ColorPicker
+                colors={tax.colors}
+                selected={moi.availableColorSlugs}
+                onChange={(xs) => setMoi((x) => ({ ...x, availableColorSlugs: xs }))}
+                multiple
+              />
             </div>
 
             <div>

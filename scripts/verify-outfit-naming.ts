@@ -106,11 +106,56 @@ console.log('\n=== 4. Bang mau gom tu cac mon ===');
     bangMau({ ...nen, colorLabels: [], items: items.map((i) => ({ ...i, colorLabel: undefined })) })
       .length === 0);
 
-  const ten = datTenTheoQuyTac({ ...nen, colorLabels: [] });
-  check('ten lay mau tu cac mon', ten === 'Smart casual trắng đen — đi làm', ten ?? 'null');
+  // Ten gio dat theo MON CHU DAO (xem muc 5), nen mau cua mon do phai co mat.
+  const ten = datTenTheoQuyTac({ ...nen, colorLabels: [] })!;
+  check('ten mang mau cua mon chu dao', /trắng/i.test(ten), ten);
 
   const moTa = vietMoTaTheoQuyTac({ ...nen, colorLabels: [] })!;
   check('mo ta cung lay bang mau do', moTa.includes('Bảng màu: trắng, đen.'), moTa);
+}
+
+/*
+  TEN PHAI NOI DUOC BO DO DO LA BO DO NAO.
+
+  Ban cu chi ghep "phong cach + mau + dip", nen ba bo do khac han nhau van co
+  the ra ba cai ten giong het. Chu website noi thang: "ten qua ngan".
+*/
+console.log('\n=== 5. Ten dat theo mon chu dao ===');
+{
+  const nen = { styleLabel: 'Smart casual', occasionLabel: 'Đi làm', colorLabels: [] };
+
+  const t1 = datTenTheoQuyTac({ ...nen, items: [
+    { roleLabel: 'Áo', name: 'Áo sơ mi oxford trắng dài tay', colorLabel: 'Trắng' },
+    { roleLabel: 'Quần', name: 'Quần tây xám nhạt slim', colorLabel: 'Xám nhạt' },
+  ] })!;
+  console.log('       ' + t1);
+  check('ten mang ten mon chu dao', /sơ mi oxford/i.test(t1), t1);
+  check('co ghep them quan', /phối quần/i.test(t1), t1);
+  check('co dip o cuoi', /— đi làm$/.test(t1), t1);
+  check('viet hoa chu dau', /^[A-ZĐÁÀẢÃẠÂĂ]/.test(t1), t1);
+
+  // Ten hang tren san bi nhoi tu khoa — ten set do khong duoc mang ca cum do.
+  const t2 = datTenTheoQuyTac({ ...nen, items: [
+    { roleLabel: 'Áo', name: 'Áo Polo Len Xếp Ly COOLCREW Tay Ngắn Form Regular Fit Cao Cấp', colorLabel: 'Xám nhạt' },
+    { roleLabel: 'Quần', name: 'Quần Âu Nam Đai Chun Ẩn HAPPYORSAD Cạp Cao Ống Đứng Be', colorLabel: 'Be' },
+  ] })!;
+  console.log('       ' + t2);
+  check('cat bo phan nhoi tu khoa', !/COOLCREW|HAPPYORSAD|Regular Fit/i.test(t2), t2);
+  check('khong de lai tu cut o cuoi cum', !/\bXếp\s+(xám|be|phối)/i.test(t2), t2);
+  check('ten khong qua dai', t2.length <= 80, `${t2.length} ky tu`);
+
+  // Chi mot mon: khong ghep bua mot mon thu hai khong ton tai.
+  const t3 = datTenTheoQuyTac({ ...nen, occasionLabel: '', items: [
+    { roleLabel: 'Áo', name: 'Áo hoodie nỉ bông xám đậm', colorLabel: 'Xám đậm' },
+  ] })!;
+  check('mot mon thi khong ghep', !/phối/.test(t3), t3);
+
+  // Chua co mon nao: lui ve mau ten cu, van co ten chu khong bo trong.
+  const t4 = datTenTheoQuyTac({ ...nen, colorLabels: ['Đen'], items: [] })!;
+  check('chua co mon thi lui ve mau cu', /^Smart casual đen/.test(t4), t4);
+
+  check('chua chon phong cach thi khong dat ten',
+    datTenTheoQuyTac({ ...nen, styleLabel: '', items: [] }) === null);
 }
 
 console.log(`\n>>> ${pass} PASS, ${fail} FAIL`);

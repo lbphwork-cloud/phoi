@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase/client';
 import { useContent } from '@/lib/content';
 import { SetupNotice, Spinner } from '@/components/site';
+import { ColorPicker } from '@/components/ColorPicker';
 import { useAuth, useTaxonomy, useUserContext } from '@/lib/hooks';
 import { analyzeBirthDate, explainMenh, NGU_HANH_LABEL } from '@/lib/nguhanh';
 
@@ -209,20 +210,12 @@ function ProfileForm({
 
       {/* ------------------------------------------------------------------ */}
       <Section title="Màu bạn thích">
-        <div className="flex flex-wrap gap-2">
-          {tax.colors.map((c) => (
-            <button
-              key={c.slug}
-              type="button"
-              className="chip"
-              aria-pressed={colors.includes(c.slug)}
-              onClick={() => toggle(colors, c.slug, setColors)}
-            >
-              <span className="swatch" style={{ background: c.hex }} />
-              {c.label}
-            </button>
-          ))}
-        </div>
+        <ColorPicker
+          colors={tax.colors}
+          selected={colors}
+          onChange={setColors}
+          multiple
+        />
       </Section>
 
       {/* Khoi "Khoang gia" da bo khoi trang nay theo yeu cau: nguoi dung loc gia

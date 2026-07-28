@@ -74,7 +74,12 @@ export function cotLoiTenHang(raw: string): string {
     Day la nhung tu MO DAU mot cum bo nghia — chung luon phai co tu dung sau.
     Dung o cuoi thi bo di.
   */
-  const treo = new Set(['de', 'co', 'tay', 'form', 'chat', 'vai', 'kieu', 'loai', 'phoi', 'voi']);
+  const treo = new Set([
+    'de', 'co', 'tay', 'form', 'chat', 'vai', 'kieu', 'loai', 'phoi', 'voi',
+    // Them tu thuc te: "Ao Polo Len Xep Ly" cat con 4 tu ra "Ao Polo Len Xep"
+    // — chu "xep" mot minh khong noi len gi. Tuong tu "cap cao", "ong suong".
+    'xep', 'cap', 'ong', 'dai', 'ngan', 'om', 'dang', 'ban', 'set',
+  ]);
   while (cat.length > 2 && treo.has(thuong(cat[cat.length - 1]))) cat.pop();
 
   return cat.join(' ');
@@ -119,17 +124,81 @@ export function bangMau(input: NamingInput): string[] {
  * Khong nhoi ten mon vao: mot cai ten co bon mon liet ke ra la mot danh sach,
  * khong phai mot cai ten. Cac mon da hien ngay ben duoi trong chinh bai.
  */
+/**
+ * Mon DE NHAN RA NHAT trong set, de dat lam chu chinh cua cai ten.
+ *
+ * Uu tien ao, roi den quan. Do la thu mat nhin thay dau tien trong mot buc anh
+ * thoi trang, va cung la thu nguoi ta nho khi ke lai mot bo do.
+ */
+function monChuDao(input: NamingInput): { loi: string; mau?: string } | null {
+  const uuTien = ['áo', 'quần'];
+  for (const vai of uuTien) {
+    const it = input.items.find(
+      (x) => x.name.trim() && thuong(x.roleLabel).includes(thuong(vai)),
+    );
+    if (it) return { loi: cotLoiTenHang(it.name), mau: it.colorLabel };
+  }
+  return null;
+}
+
+/**
+ * Dat ten set do bang quy tac.
+ *
+ * MAU TEN CU QUA NGAN, va chu website noi thang: "ten qua ngan".
+ *   "Smart casual trắng đen — đi làm"
+ *   "Streetwear olive — đi chơi cuối tuần"
+ *   Ba cai ten cua ba bo do khac han nhau van co the giong het nhau, vi chung
+ *   chi mang phong cach va mau. Doc mot danh sach nhu vay khong phan biet duoc
+ *   bai nao voi bai nao.
+ *
+ * MAU TEN MOI dat MON CHU DAO len truoc, roi den mau, roi den dip:
+ *   "Sơ mi oxford trắng phối quần tây — đi làm"
+ *   "Áo polo len xám phối quần âu be — đi làm"
+ *   "Hoodie nỉ xám — đi chơi cuối tuần"
+ *
+ *   Ten mon lay tu cot loi cua ten hang tren san (bo tu khoa quang cao), nen
+ *   no la chu THAT ve bo do chu khong phai chu trang tri.
+ *
+ * VAN LUI VE MAU CU khi chua co mon nao co ten — luc do phong cach va mau la
+ * tat ca nhung gi biet, va mot cai ten ngan van hon mot o trong.
+ */
 export function datTenTheoQuyTac(input: NamingInput): string | null {
   const style = input.styleLabel.trim();
   if (!style) return null;
 
-  // Toi da hai mau. Ba mau tro len thi cai ten dai hon phan noi dung cua no.
-  const mau = bangMau(input).slice(0, 2).map((c) => c.toLowerCase());
   const dip = input.occasionLabel.trim().toLowerCase();
+  const dinhKem = (dau: string) => (dip ? `${dau} — ${dip}` : dau);
 
-  const dau = mau.length ? `${style} ${mau.join(' ')}` : style;
-  return dip ? `${dau} — ${dip}` : dau;
+  const chinh = monChuDao(input);
+  if (!chinh || !chinh.loi) {
+    // Chua co mon nao: quay ve mau ten cu.
+    const mau = bangMau(input).slice(0, 2).map((c) => c.toLowerCase());
+    return dinhKem(mau.length ? `${style} ${mau.join(' ')}` : style);
+  }
+
+  // Mau cua chinh mon do neu ten mon chua noi ra. Khong noi mau hai lan.
+  const mauChinh = chinh.mau && !thuong(chinh.loi).includes(thuong(chinh.mau))
+    ? chinh.mau.toLowerCase()
+    : '';
+
+  // Mon thu hai chi de ghep, khong can mau — hai mau trong mot cai ten la du.
+  const phu = input.items.find(
+    (x) => x.name.trim() && thuong(x.roleLabel).includes('quan')
+      && cotLoiTenHang(x.name) !== chinh.loi,
+  );
+
+  const dau = hoaDau([chinh.loi, mauChinh].filter(Boolean).join(' '));
+  const ghep = phu && chinh.loi !== cotLoiTenHang(phu.name)
+    ? `${dau} phối ${cotLoiTenHang(phu.name).toLowerCase()}`
+    : dau;
+
+  // Cat cho ten khong dai qua o nhap (120 ky tu) va khong dai qua mot dong.
+  const ten = dinhKem(ghep);
+  return ten.length <= 80 ? ten : dinhKem(dau);
 }
+
+/** Viet hoa chu cai dau. Ten set do la mot cai ten, khong phai mot cau. */
+const hoaDau = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s);
 
 /**
  * Viet mo ta bang quy tac. Tra ve null khi con qua it thong tin de noi duoc

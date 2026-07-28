@@ -104,6 +104,14 @@ export interface Color {
   hex: string;
   element: NguHanhDb | null;
   sort_order: number;
+  /**
+   * Mau chinh cua sac do nay. null = day la mot mau chinh.
+   *
+   * Bang mau co 29 mau. Bay ra ca 29 cai chip cung luc la mot buc tuong khong
+   * ai doc het; gom thanh 11 mau chinh, bam vao moi xo ra sac do. Xem
+   * migration 0035.
+   */
+  parent_slug: string | null;
 }
 
 export interface Occasion {

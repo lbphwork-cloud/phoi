@@ -75,14 +75,16 @@ create table if not exists phoi_meta.applied_migrations (
 async function runChecks(db) {
   console.log('\n=== Kiem tra ket qua ===');
 
-  // 20 bang: 18 tu 0001, site_content tu 0008, saved_outfits tu 0017. Bang theo
+  // Toi thieu 20 bang: 18 tu 0001, site_content tu 0008, saved_outfits tu 0017,
+  // roi ai_usage tu 0036 — va con them nua. Dem theo NGUONG DUOI: cai can bao
+  // ve la "khong bang nao bien mat", chu mot bang moi khong phai loi. Bang theo
   // doi migration nam o schema phoi_meta nen khong tinh vao day.
   {
     const [r] = await db.rows(
       `select count(*)::int as n from information_schema.tables
         where table_schema = 'public' and table_type = 'BASE TABLE'`,
     );
-    report('0001+0008+0017 — 20 bang trong schema public', r.n === 20, `co ${r.n}`);
+    report('0001+0008+0017 — cac bang trong schema public', r.n >= 20, `co ${r.n}`);
   }
 
   // 0002 — RLS. Day la phep kiem tra quan trong nhat ve bao mat: thieu no thi
@@ -141,9 +143,17 @@ async function runChecks(db) {
              (select count(*) from colors)::int    as colors,
              (select count(*) from occasions)::int as occasions
     `);
+    /*
+      DEM THEO NGUONG, KHONG DEM CHINH XAC.
+
+      Bang mau lon len theo thoi gian — 0035 them 12 sac do, va se con them.
+      Mot phep kiem doi dung 17 se FAIL moi lan bang mau duoc bo sung, tuc la
+      no bao dong vao dung luc du lieu duoc lam tot hon. Cai can bao ve la
+      "ba bang danh muc khong bi rong", khong phai mot con so cu the.
+    */
     report(
-      '0005+0010 — 9 phong cach / 17 mau / 8 dip',
-      r.styles === 9 && r.colors === 17 && r.occasions === 8,
+      '0005+0010 — phong cach / mau / dip deu co du lieu',
+      r.styles >= 9 && r.colors >= 17 && r.occasions >= 8,
       `${r.styles} / ${r.colors} / ${r.occasions}`,
     );
   }
@@ -186,9 +196,14 @@ async function runChecks(db) {
                 from outfit_items oi join outfits o on o.id = oi.outfit_id
                where o.is_seed group by oi.outfit_id) t
     `);
+    /*
+      Set do mau GIAM di la binh thuong: 0034 xoa 17 bai khong co anh, va chu
+      website se con xoa tiep khi thay bang bai that. Nguong duoi la thu can
+      bao ve — het sach du lieu mau nghia la mot migration da xoa nham.
+    */
     report(
-      '0006+0024 — 45 san pham / 36 set do / 45 link (chi dem du lieu mau)',
-      r.products === 45 && r.outfits === 36 && r.links === 45,
+      '0006+0024 — san pham / set do / link mau (chi dem du lieu mau)',
+      r.products >= 40 && r.outfits >= 1 && r.links >= 40,
       `${r.products} / ${r.outfits} / ${r.links}`,
     );
     report(

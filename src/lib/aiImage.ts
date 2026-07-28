@@ -41,6 +41,13 @@ export const SCENES = [
   { id: 'trang', label: 'Nền trắng (mặc định)',
     en: 'pure white seamless background, soft even studio lighting, subject fully separated from background, no props, no shadows on the backdrop' },
   { id: 'studio', label: 'Phông studio trơn', en: 'seamless neutral studio backdrop, soft even lighting' },
+  // Nen mau tron: van la nen studio nhung doi duoc tong, cho ai muon anh khong
+  // trang toat. Van giu "khong dao cu, khong hoa tiet" de mon do van la thu
+  // duoc nhin truoc tien.
+  { id: 'nen-be', label: 'Nền be', en: 'seamless warm beige background, soft even studio lighting, no props' },
+  { id: 'nen-xam', label: 'Nền xám', en: 'seamless light grey background, soft even studio lighting, no props' },
+  { id: 'nen-xanh', label: 'Nền xanh nhạt', en: 'seamless pale blue-grey background, soft even studio lighting, no props' },
+  { id: 'nen-den', label: 'Nền tối', en: 'seamless charcoal background, soft directional studio lighting, no props' },
   { id: 'pho', label: 'Phố Việt Nam', en: 'quiet Vietnamese city street, morning light, shallow depth of field' },
   { id: 'cafe', label: 'Quán cà phê', en: 'minimal cafe interior, warm window light' },
   { id: 'kien-truc', label: 'Kiến trúc tối giản', en: 'minimal concrete architecture, overcast daylight' },
@@ -64,12 +71,34 @@ export const MODEL_ORIGINS = [
   'Latin American', 'West African', 'Middle Eastern',
 ] as const;
 
-/** Kieu nguoi mau. Giu it lua chon de anh giua cac bai nhin lien mach. */
+/**
+ * Kieu nguoi mau.
+ *
+ * NGAU NHIEN LA MAC DINH, theo yeu cau cua chu website. Mot trang thoi trang
+ * chi co mot kieu nguoi mau thi nguoi xem khong thay minh trong do.
+ *
+ * "Ngau nhien" o day KHONG phai Math.random(): no xoay theo so `variation`,
+ * giong cach goc nguoi mau dang lam. Nho vay cung mot cau lenh luon cho ra
+ * cung mot ket qua — bam "doi cach dien dat" thi doi nguoi, con bam lai dung
+ * cau lenh cu thi ra dung anh cu. Ngau nhien that se lam khong ai lap lai duoc
+ * mot tam anh da thich.
+ */
 export const MODEL_TYPES = [
+  { id: 'ngau-nhien', label: 'Ngẫu nhiên (mặc định)', en: '' },
   { id: 'gay', label: 'Gầy, cao', en: 'slim build, tall' },
   { id: 'can-doi', label: 'Cân đối', en: 'average athletic build' },
   { id: 'to', label: 'Vai rộng', en: 'broad-shouldered, solid build' },
 ] as const;
+
+/** Cac dang nguoi that su dung duoc khi chon "ngau nhien". */
+const MODEL_TYPES_THAT = MODEL_TYPES.filter((m) => m.en !== '');
+
+/** Chon dang nguoi mau: theo lua chon cua nguoi dung, hoac xoay theo variation. */
+function chonDangNguoi(modelTypeId: string, variation: number) {
+  const chon = MODEL_TYPES.find((m) => m.id === modelTypeId);
+  if (chon && chon.en) return chon;
+  return MODEL_TYPES_THAT[variation % MODEL_TYPES_THAT.length];
+}
 
 export interface PromptInput {
   outfitTitle: string;
@@ -107,10 +136,10 @@ export interface PromptInput {
 }
 
 /** Vai tro can co de mot bo do trong hoan chinh trong anh. */
-const CORE_ROLES: Array<{ key: string; match: RegExp; filler: string }> = [
-  { key: 'top',    match: /áo|ao/i,          filler: 'a plain well-fitted top in a neutral tone' },
-  { key: 'bottom', match: /quần|quan/i,      filler: 'plain straight-leg trousers in a neutral tone' },
-  { key: 'shoes',  match: /giày|giay/i,      filler: 'simple low-profile sneakers in a neutral tone' },
+const CORE_ROLES: Array<{ key: string; match: RegExp; filler: string; vi: string }> = [
+  { key: 'top',    match: /áo|ao/i,     filler: 'top',      vi: 'áo' },
+  { key: 'bottom', match: /quần|quan/i, filler: 'trousers', vi: 'quần' },
+  { key: 'shoes',  match: /giày|giay/i, filler: 'footwear', vi: 'giày' },
 ];
 
 /**
@@ -139,11 +168,11 @@ const MODEL_ORIGIN_VI = [
   'Mỹ Latinh', 'Tây Phi', 'Trung Đông',
 ] as const;
 
-/** Ban tieng Viet cua cac mon duoc bu them, de khung giai thich khong lan tieng Anh. */
+/** Ban tieng Viet cua ten vai tro duoc bu them. */
 const FILLER_VI: Record<string, string> = {
-  'a plain crew-neck t-shirt in a neutral tone': 'một áo thun cổ tròn trơn, màu trung tính',
-  'plain straight-leg trousers in a neutral tone': 'một quần ống suông trơn, màu trung tính',
-  'simple low-profile sneakers in a neutral tone': 'một đôi giày đế thấp đơn giản, màu trung tính',
+  top: 'áo',
+  trousers: 'quần',
+  footwear: 'giày',
 };
 
 /** Cach dien dat khac nhau cho tung lan bam "tao lai". */
@@ -171,7 +200,7 @@ export function monChuaCoAnh(input: PromptInput): string[] {
  */
 export function buildImagePrompt(input: PromptInput): string {
   const scene = SCENES.find((s) => s.id === input.sceneId) ?? SCENES[0];
-  const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
+  const model = chonDangNguoi(input.modelTypeId, input.variation ?? 0);
   const goc = MODEL_ORIGINS[(input.variation ?? 0) % MODEL_ORIGINS.length];
   const variation = VARIATIONS[(input.variation ?? 0) % VARIATIONS.length];
   const soCoAnh = input.items.filter((it) => coAnh(it, input)).length;
@@ -191,18 +220,36 @@ export function buildImagePrompt(input: PromptInput): string {
     khong ta bang chu. Mot cau chu khong bao gio ta noi mot hoa tiet hay mot
     duong may; anh thi ta duoc, va ta chinh xac.
   */
+  /*
+    HAI LOAI DONG, VA CHI HAI.
+
+      CO ANH     -> "dung nhu anh dinh kem". Het. KHONG ta ten, khong ta mau.
+      KHONG ANH  -> "tu chon cho hop bo do".
+
+    VI SAO BO HAN PHAN TA BANG CHU
+      Mot cau chu khong bao giờ ta noi mot hoa tiet, mot duong may, mot sac
+      xam cu the. Dua ten hang vao chi lam mo hinh doc mot chuoi tu khoa quang
+      cao roi ve theo tri tuong tuong cua no — ket qua KHONG giong mon do that,
+      ma lai trong nhu that. Do la kieu sai nguy hiem nhat cho mot trang gan
+      link mua hang.
+
+      Anh thi ta duoc, va ta chinh xac. Mon nao co anh thi de anh noi; mon nao
+      khong co thi noi thang la de mo hinh tu chon, dung gia vo la biet.
+  */
   const dongMon = input.items.map((it) => {
     const ten = it.roleLabel.toLowerCase();
-    if (coAnh(it, input)) {
-      return `* ${ten}: exactly as shown in the attached image`;
-    }
-    return `* ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''}`;
+    return coAnh(it, input)
+      ? `* ${ten}: exactly as shown in the attached image`
+      : `* ${ten}: your choice — pick something that suits the rest of the outfit, `
+        + 'plain and understated';
   });
 
-  // Vai tro con thieu thi noi ro la "tu chon cho hop", kem rang buoc de phan
-  // bu do khong cuop mat su chu y khoi nhung mon that su co trong set.
+  // Vai tro con THIEU HAN trong set (khong co dong nao) cung de mo hinh tu
+  // chon. Truoc day cho nay ta san "giay de thap mau trung tinh" — mot mo ta
+  // ma khong ai yeu cau, va no cuop mat su chu y khoi nhung mon that.
   const buThem = fillersFor(input.items).map(
-    (f) => `* complete the look with ${f} — keep it simple and unobtrusive`,
+    (f) => `* ${f}: your choice — pick something that suits the rest of the outfit, `
+      + 'plain and understated',
   );
 
   return [
@@ -279,7 +326,7 @@ export function buildImagePrompt(input: PromptInput): string {
  */
 export function explainPromptVi(input: PromptInput): string[] {
   const scene = SCENES.find((s) => s.id === input.sceneId) ?? SCENES[0];
-  const model = MODEL_TYPES.find((m) => m.id === input.modelTypeId) ?? MODEL_TYPES[1];
+  const model = chonDangNguoi(input.modelTypeId, input.variation ?? 0);
   const goc = MODEL_ORIGIN_VI[(input.variation ?? 0) % MODEL_ORIGIN_VI.length];
   const soCoAnh = input.items.filter((it) => coAnh(it, input)).length;
 
@@ -287,13 +334,13 @@ export function explainPromptVi(input: PromptInput): string[] {
     ? input.items.map((it) => {
         const ten = it.roleLabel.toLowerCase();
         return coAnh(it, input)
-          ? `   * ${ten}: theo hình đính kèm`
-          : `   * ${ten}: ${it.name}${it.colorLabel ? ` (${it.colorLabel})` : ''} — tả bằng chữ, chưa có ảnh`;
+          ? `   * ${ten}: đúng như ảnh đính kèm`
+          : `   * ${ten}: để AI tự chọn cho hợp bộ đồ (món này chưa có ảnh)`;
       })
     : ['   * (chưa nhập món nào)'];
 
   const buThem = fillersFor(input.items).map(
-    (f) => `   * hoàn thiện bằng ${FILLER_VI[f] ?? f} — thiết kế đơn giản, màu trung tính`,
+    (f) => `   * ${FILLER_VI[f] ?? f}: set chưa có món này — để AI tự chọn cho hợp`,
   );
 
   return [
@@ -301,14 +348,14 @@ export function explainPromptVi(input: PromptInput): string[] {
     // Phai khop tung nhanh voi buildImagePrompt o tren. Nguoi dung tin dong nay
     // chu khong doc cau lenh tieng Anh, nen lech mot nhanh la noi doi voi ho.
     soCoAnh === 0
-      ? 'Không có ảnh đính kèm, nên toàn bộ trang phục chỉ được mô tả bằng chữ — '
-        + 'kết quả sẽ không giống sản phẩm thật.'
+      ? 'Không món nào có ảnh đính kèm, nên AI tự dựng toàn bộ bộ đồ — kết quả sẽ '
+        + 'không liên quan gì tới sản phẩm thật.'
       : soCoAnh === input.items.length
         ? 'Ảnh của từng món được ĐÍNH KÈM cùng câu lệnh; AI được yêu cầu vẽ lại đúng '
           + 'màu, phom, chất vải và hoạ tiết trong những ảnh đó.'
-        : `Chỉ ${soCoAnh}/${input.items.length} món có ảnh đính kèm. Những món đó được `
-          + 'yêu cầu vẽ đúng theo ảnh; các món còn lại chỉ tả bằng chữ nên sẽ không '
-          + 'giống sản phẩm thật.',
+        : `${soCoAnh}/${input.items.length} món có ảnh đính kèm và được vẽ đúng theo ảnh. `
+          + 'Các món còn lại để AI tự chọn cho hợp bộ đồ — không tả bằng chữ, vì một câu '
+          + 'chữ không bao giờ tả đúng được một món đồ cụ thể.',
     `Chủ thể: một nam giới ${goc}, khoảng 25 tuổi, ${model.label.toLowerCase()}, `
       + 'biểu cảm tự nhiên, đứng tạo dáng.',
     'Trang phục cần thể hiện:',

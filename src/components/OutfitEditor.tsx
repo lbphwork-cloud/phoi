@@ -41,6 +41,7 @@ import { formatVnd, IMAGE_LIMITS, validateImageFile } from '@/lib/format';
 import { uploadImage } from '@/lib/storage';
 import { UploadButton } from '@/components/UploadButton';
 import { ImagePicker, laAnhMauTrong } from '@/components/ImagePicker';
+import { ColorPicker } from '@/components/ColorPicker';
 import {
   SCENES, MODEL_TYPES, buildImagePrompt, requestAiImage,
   buildDescriptionPrompt, requestAiDescription, explainPromptVi,
@@ -198,7 +199,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
   // Storage roi nen khong phai tai len lai luc luu.
   const [aiProvider, setAiProvider] = useState<AiProviderId>('xai');
   const [sceneId, setSceneId] = useState<string>(SCENES[0].id);
-  const [modelTypeId, setModelTypeId] = useState<string>(MODEL_TYPES[1].id);
+  const [modelTypeId, setModelTypeId] = useState<string>(MODEL_TYPES[0].id);
   const [aiBusy, setAiBusy] = useState(false);
   // Ket qua lan goi AI gan nhat. Giu ca CO THANH CONG HAY KHONG chu khong
   // chi giu chu: that bai ma hien bang mot dong chu xam nho nhu luc thanh
@@ -989,41 +990,27 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                   tra ve nhung set khong he co mau trang, hoac nguoi mua khong
                   biet mon do con mau nao khac.
                 */}
-                <div>
+                <div className="sm:col-span-2">
                   <label className="label">Màu dùng trong set</label>
-                  <select
-                    value={it.colorSlug}
-                    onChange={(e) => patch(it.key, { colorSlug: e.target.value })}
-                    className="field"
-                  >
-                    <option value="">— Không rõ —</option>
-                    {tax.colors.map((c) => <option key={c.slug} value={c.slug}>{c.label}</option>)}
-                  </select>
-                  <p className="hint">Màu thật sự có trong bộ đồ này. Chọn một.</p>
+                  <ColorPicker
+                    colors={tax.colors}
+                    selected={it.colorSlug ? [it.colorSlug] : []}
+                    onChange={(xs) => patch(it.key, { colorSlug: xs[0] ?? '' })}
+                  />
+                  <p className="hint">
+                    Màu thật sự có trong bộ đồ này. Chọn một — bấm lại để bỏ chọn.
+                    Bấm nút ▾ để xem các sắc độ.
+                  </p>
                 </div>
 
                 <div className="sm:col-span-2">
                   <label className="label">Các màu còn bán trên sàn</label>
-                  <div className="flex flex-wrap gap-2">
-                    {tax.colors.map((c) => (
-                      <button
-                        key={c.slug}
-                        type="button"
-                        className="chip"
-                        aria-pressed={it.availableColorSlugs.includes(c.slug)}
-                        onClick={() =>
-                          patch(it.key, {
-                            availableColorSlugs: it.availableColorSlugs.includes(c.slug)
-                              ? it.availableColorSlugs.filter((x) => x !== c.slug)
-                              : [...it.availableColorSlugs, c.slug],
-                          })
-                        }
-                      >
-                        <span className="swatch" style={{ background: c.hex }} />
-                        {c.label}
-                      </button>
-                    ))}
-                  </div>
+                  <ColorPicker
+                    colors={tax.colors}
+                    selected={it.availableColorSlugs}
+                    onChange={(xs) => patch(it.key, { availableColorSlugs: xs })}
+                    multiple
+                  />
                   <p className="hint">
                     Cùng một link thường bán nhiều màu. Tích những màu link đó đang có —
                     người xem sẽ biết còn lựa chọn nào. Không bắt buộc, và không ảnh hưởng
@@ -1076,6 +1063,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
                     urls={it.imageChoices}
                     selected={it.imageUrl}
                     onPick={(u) => patch(it.key, { imageUrl: u })}
+                    nutXacNhan="Đặt làm ảnh món"
                   />
                 </div>
               )}
@@ -1268,24 +1256,16 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
         </div>
 
         <p className="label">Màu chủ đạo</p>
-        <div className="flex flex-wrap gap-2">
-          {tax.colors.map((c) => (
-            <button
-              key={c.slug}
-              type="button"
-              className="chip"
-              aria-pressed={colorSlugs.includes(c.slug)}
-              onClick={() =>
-                setColorSlugs((xs) =>
-                  xs.includes(c.slug) ? xs.filter((x) => x !== c.slug) : [...xs, c.slug],
-                )
-              }
-            >
-              <span className="swatch" style={{ background: c.hex }} />
-              {c.label}
-            </button>
-          ))}
-        </div>
+        {/* Toi da 3 mau: "chu dao" la thu noi bat, khong phai thu liet ke.
+            Bon mau tro len thi bo loc tra ve set nay o moi mau va no mat y
+            nghia — dung nhu cot color_slugs dang duoc dung o trang kham pha. */}
+        <ColorPicker
+          colors={tax.colors}
+          selected={colorSlugs}
+          onChange={setColorSlugs}
+          multiple
+          max={3}
+        />
         <p className="hint">Bộ lọc và gợi ý theo mệnh dùng đúng các màu bạn chọn ở đây.</p>
       </Block>
 

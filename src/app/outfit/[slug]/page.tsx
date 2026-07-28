@@ -15,6 +15,7 @@
  * `npm run dev` thi moi slug van chay binh thuong.
  */
 
+import type { Metadata } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import OutfitDetail from './detail';
 
@@ -45,6 +46,82 @@ import OutfitDetail from './detail';
  * Cloudflare Pages chua co bien moi truong Supabase.
  */
 const PLACEHOLDER_SLUG = '_khong-co-du-lieu';
+
+/*
+  =============================================================================
+  TIEU DE VA ANH XEM TRUOC RIENG CHO TUNG SET DO
+
+  VAN DE
+    Truoc day moi trang chi tiet deu mang dung mot tieu de: ten chung cua
+    website. Gui link mot bo do cho ban be qua Zalo hay Facebook thi ban xem
+    truoc hien "PHOOIS — phoi dao, phoi tao lao..." kem anh chung — khong ai
+    biet minh sap bam vao cai gi.
+
+    Ma phan lon nguoi vao website nay se vao THANG mot trang chi tiet qua duong
+    dan ban be gui. Do la cua truoc, khong phai cua sau.
+
+  LAY DU LIEU LUC BUILD, khong phai luc nguoi dung mo trang.
+    Cac the meta phai nam san trong HTML: bot cua Facebook/Zalo khong chay
+    JavaScript, no doc HTML tho roi di. Noi dung do trinh duyet tai ve sau
+    khong bao gio den duoc mat no.
+
+  DANH DOI, noi ro: sua ten bai trong trang quan tri thi ban xem truoc chi doi
+  sau lan DUNG LAI WEB ke tiep. Doi lai la mot ban xem truoc dung — va mot bai
+  vua sua ten van con dung ten cu trong ban xem truoc vai gio thi khong ai
+  thiet hai gi.
+  =============================================================================
+*/
+export async function generateMetadata(
+  { params }: { params: Promise<{ slug: string }> },
+): Promise<Metadata> {
+  const { slug } = await params;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return {};
+
+  try {
+    const sb = createClient(url, key);
+    const { data } = await sb
+      .from('outfits')
+      .select('title, description, hero_image_url, total_price_vnd')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (!data) return {};
+
+    const o = data as {
+      title: string; description: string | null;
+      hero_image_url: string | null; total_price_vnd: number | null;
+    };
+
+    const gia = o.total_price_vnd
+      ? ` Tổng khoảng ${o.total_price_vnd.toLocaleString('vi-VN')}đ.`
+      : '';
+    const moTa = (o.description?.trim() || 'Gợi ý phối đồ nam.') + gia;
+
+    return {
+      title: `${o.title} — PHỐI`,
+      description: moTa.slice(0, 200),
+      openGraph: {
+        title: o.title,
+        description: moTa.slice(0, 200),
+        type: 'article',
+        ...(o.hero_image_url ? { images: [{ url: o.hero_image_url }] } : {}),
+      },
+      twitter: {
+        card: o.hero_image_url ? 'summary_large_image' : 'summary',
+        title: o.title,
+        description: moTa.slice(0, 200),
+        ...(o.hero_image_url ? { images: [o.hero_image_url] } : {}),
+      },
+    };
+  } catch {
+    // Khong doc duoc thi de trang dung the mac dinh cua ca website. Mot ban
+    // xem truoc chung van hon mot lan build that bai.
+    return {};
+  }
+}
+
 
 export async function generateStaticParams(): Promise<Array<{ slug: string }>> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

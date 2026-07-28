@@ -533,6 +533,22 @@ async function generateText(
   return text;
 }
 
+/**
+ * Chi phi mot tam anh, theo don vi rieng cua tung nha cung cap.
+ *
+ * KHONG QUY DOI RA DO LA. Ty gia quy doi la thu cua nha cung cap va co the
+ * doi; con so ho cong bo thi khong. Luu nguyen don vi goc roi doi luc HIEN la
+ * cach duy nhat khong lam sai lich su chi tieu.
+ *
+ * Con so lay tu chinh API: xAI bao `image_price` cho grok-imagine-image la
+ * 200.000.000 don vi. Cac nha cung cap khac chua do duoc thi de 0 — mot con
+ * so bia ra con te hon khong co con so nao.
+ */
+function chiPhiMoiAnh(provider: string): number {
+  if (provider === 'xai') return 200_000_000;
+  return 0;
+}
+
 const DEFAULT_MODEL: Record<string, string> = {
   gemini: 'gemini-2.5-flash-image',
   openai: 'gpt-image-1',
@@ -617,6 +633,31 @@ Deno.serve(async (req) => {
       },
       403,
     );
+  }
+
+  /*
+    HAN MUC DUNG ANH — DEM O DATABASE, khong o trinh duyet.
+
+    Lop chan cu (useRateLimit) dem trong localStorage. Ai mo cong cu nha phat
+    trien xoa mot dong la dem lai tu dau, ma moi lan dung anh la tien that
+    (~0,2 USD voi Grok). Mot lop chan ma nguoi bi chan tu go duoc thi khong
+    phai lop chan, no la mot loi nhac.
+
+    Ham ai_image_quota_left() tra -1 cho quan tri vien = khong gioi han.
+  */
+  if (mode === 'image') {
+    const { data: conLai } = await userClient.rpc('ai_image_quota_left', { p_user: uid });
+    if (typeof conLai === 'number' && conLai === 0) {
+      return json(
+        {
+          ok: false,
+          error: 'Bạn đã dùng hết lượt dựng ảnh hôm nay (5 ảnh). '
+            + 'Mai lại dùng tiếp được — giới hạn này để không ai vô tình đốt hết '
+            + 'tín dụng của cả website trong một buổi.',
+        },
+        429,
+      );
+    }
   }
   const referenceUrls = Array.isArray(body.referenceUrls)
     ? body.referenceUrls.filter((x): x is string => typeof x === 'string')
@@ -788,6 +829,29 @@ Deno.serve(async (req) => {
       .eq('owner_id', uid)
       .eq('provider', provider)
       .eq('purpose', mode);
+
+    /*
+      GHI MOT DONG VAO ai_usage CHO MOI ANH.
+
+      Hai viec cung mot cho:
+        1. Dem han muc hom nay (ai_image_quota_left doc chinh bang nay).
+        2. Cong don chi phi de chu website biet thang nay da tieu bao nhieu.
+
+      GHI SAU KHI DA CO ANH, khong ghi truoc. Mot lan goi that bai thi khong
+      ai bi tru luot va khong ai bi tinh tien — day la loi cua nha cung cap
+      hoac cua mang, khong phai cua nguoi bam nut.
+
+      Moi ANH mot dong chu khong phai moi LAN GOI mot dong: nha cung cap tinh
+      tien theo anh.
+    */
+    for (let i = 0; i < urls.length; i++) {
+      await admin.from('ai_usage').insert({
+        user_id: uid,
+        provider,
+        purpose: 'image',
+        cost_units: chiPhiMoiAnh(provider),
+      });
+    }
 
     // CO Y khong tu gan anh vao outfit. Quan tri vien phai xem roi tu chon —
     // day la mot phan cua quy tac "anh AI luon qua kiem duyet tay".
