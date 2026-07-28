@@ -21,7 +21,7 @@
 
 import { useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
-import { useAuth } from '@/lib/hooks';
+import { useAuth, useTaxonomy } from '@/lib/hooks';
 import { useContent, heroAppearance, type ContentRow } from '@/lib/content';
 import { uploadImage } from '@/lib/storage';
 import { IMAGE_LIMITS } from '@/lib/format';
@@ -85,6 +85,7 @@ const PAGE_ORDER = Object.keys(PAGE_LABELS);
 export default function ContentAdminPage() {
   const { session } = useAuth();
   const c = useContent();
+  const tax = useTaxonomy();
 
   // Gia tri dang go, chua luu. Chi chua nhung o nguoi dung da dong vao.
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -341,6 +342,106 @@ export default function ContentAdminPage() {
    */
   const focusedRow = focusedKey ? c.rows.find((r) => r.key === focusedKey) : undefined;
   const focusedIsHero = Boolean(focusedKey && focusedKey.startsWith('home.hero.'));
+
+  /*
+    XEM TRUOC KHOI PHONG CACH — anh, ten va mo ta CUNG MOT KHUNG.
+
+    LOI DA SUA: cac o anh khong thuoc phan mo dau chi duoc ve bang mot the <img>
+    tran. Voi anh khoi phong cach thi buc anh do la ANH NEN, va tren no con ten
+    phong cach, cau mo ta va mot cai nut — nen nhin mot tam anh tran khong noi
+    duoc gi ve ket qua that. Chu website mo ta dung hien tuong: doi anh o cac
+    khoi trang chu thi "chi hien 1 anh bia".
+
+    Ba o cua cung mot phong cach (anh, ten, mo ta) deu mo ra CHINH khoi nay, nen
+    sua o nao cung thay ngay no nam o dau trong bo cuc that.
+  */
+  const khoaPhongCach = focusedKey?.match(/^home\.style\.([a-z0-9-]+)\.(image|label|desc)$/);
+  const styleSlug = khoaPhongCach?.[1] ?? null;
+
+  const stylePreview = (() => {
+    if (!styleSlug) return null;
+    const anhRow = c.rows.find((r) => r.key === `home.style.${styleSlug}.image`);
+    const tenRow = c.rows.find((r) => r.key === `home.style.${styleSlug}.label`);
+    const moTaRow = c.rows.find((r) => r.key === `home.style.${styleSlug}.desc`);
+
+    const anh = anhRow ? val(anhRow) : '';
+    const meta = tax.styles.find((s) => s.slug === styleSlug);
+    const ten = (tenRow ? val(tenRow) : '').trim() || meta?.label || styleSlug;
+    const moTa = moTaRow ? val(moTaRow) : '';
+
+    return (
+      <div>
+        <div className="hero-media flex items-end" style={{ minHeight: '26rem' }}>
+          {anh ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={anh} alt="" aria-hidden="true" />
+          ) : (
+            <div className="frame frame-empty absolute inset-0">
+              Ô ảnh đang trống — trang chủ sẽ tự lấy ảnh của một outfit thuộc phong cách này
+            </div>
+          )}
+          {/* Dung dung mau chu va bong chu cua trang that: chu trang tren anh,
+              mot lop bong sat chan chu. */}
+          <div
+            className="hero-body flex w-full flex-col items-center px-6 pb-10 text-center"
+            style={{ color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}
+          >
+            <p className="display-sm mb-3">
+              <span style={tenRow ? styleOf(tenRow.key) : undefined}>{ten}</span>
+            </p>
+            {moTa && <p className="mb-5 max-w-xs text-sm leading-relaxed">{moTa}</p>}
+            <span className="btn btn-sm btn-onmedia">Khám phá</span>
+          </div>
+        </div>
+        <p className="muted-2 mt-2 px-1 text-xs">
+          Khối phong cách trên trang chủ. Năm phong cách đầu danh sách hiện khối lớn
+          như thế này, các phong cách sau hiện khối nhỏ hơn.
+        </p>
+      </div>
+    );
+  })();
+
+  /*
+    XEM TRUOC LOGO tren dung nen ma no se nam: thanh dieu huong.
+
+    Logo la anh trong suot, va gan nhu bao gio cung la chu mau sang hoac mau
+    toi. Ve no tren nen trang cua khung xem truoc thi mot logo chu trang se
+    bien mat hoan toan — nguoi dung ket luan la anh hong, trong khi no dung.
+  */
+  const laLogo = Boolean(focusedKey?.startsWith('site.logo.'));
+  const logoPreview =
+    laLogo && focusedRow ? (
+      <div>
+        {(['sang', 'toi'] as const).map((nen) => (
+          <div
+            key={nen}
+            className="flex items-center gap-4 px-6 py-5"
+            style={{
+              background: nen === 'sang' ? '#fff' : '#111',
+              color: nen === 'sang' ? '#111' : '#fff',
+            }}
+          >
+            {val(focusedRow) ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={val(focusedRow)}
+                alt=""
+                style={{ height: '2rem', width: 'auto', objectFit: 'contain' }}
+              />
+            ) : (
+              <span className="text-sm opacity-60">(ô này chưa có ảnh)</span>
+            )}
+            <span className="ml-auto text-xs opacity-60">
+              nền {nen === 'sang' ? 'sáng' : 'tối'}
+            </span>
+          </div>
+        ))}
+        <p className="muted-2 mt-2 px-1 text-xs">
+          Logo hiện trên thanh điều hướng. Xem cả hai nền vì người dùng có thể đang bật
+          chế độ sáng hoặc tối.
+        </p>
+      </div>
+    ) : null;
 
   return (
     <div>
@@ -621,7 +722,10 @@ export default function ContentAdminPage() {
             Mac dinh cung hien no, vi do la thu duoc sua nhieu nhat. */}
         {(focusedIsHero || !focusedRow) && heroPreview}
 
-        {focusedRow && !focusedIsHero && (
+        {stylePreview}
+        {logoPreview}
+
+        {focusedRow && !focusedIsHero && !stylePreview && !logoPreview && (
           <div className="p-6" style={{ background: 'var(--bg)' }}>
             <p className="eyebrow mb-3">{focusedRow.label}</p>
 

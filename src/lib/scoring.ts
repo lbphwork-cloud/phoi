@@ -84,27 +84,47 @@ export interface ScorableOutfit {
   colorSlugs: string[];
   totalPriceVnd: number | null;
   publishedAt: string | null;
+  /**
+   * Bai do he thong dung san de lam day catalog, khong phai nguoi that dang.
+   *
+   * Dung de XEP XUONG DUOI chu khong de loai bo: chung van la goi y hop le,
+   * chi la khong nen che mat bai ma nguoi ta bo cong lam.
+   */
+  isSeed?: boolean;
 }
 
 /** Ban do slug mau -> hanh, lay tu bang colors trong database. */
 export type ColorElementMap = Record<string, NguHanh | null>;
 
 /**
- * PHAI DU HAI MAU HOP MOI COI LA HOP MENH.
+ * BA BAC, KHONG PHAI HAI.
  *
- * VI SAO KHONG PHAI MOT
- *   Mau chu dao cua mot set do gio chi con la mau AO va mau QUAN (xem migration
- *   0039). Neu chi mot trong hai hop menh thi nua bo do van thuoc hanh khac —
- *   goi ca set la "hop menh" la noi qua ve dieu ma nguoi dung nhin thay.
+ *   2 — ca ao lan quan deu hop menh
+ *   1 — mot trong hai mon hop
+ *   0 — khong mon nao hop
  *
- *   Voi nguong mot mau, gan nhu moi set deu hop voi gan nhu moi menh: ao trang
- *   quan den thi hop ca Kim (trang) lan Thuy (den) lan moi menh duoc hai mau do
- *   tuong sinh. Mot nhan dung cho tat ca thi khong con la thong tin.
+ * VI SAO KHONG KHOA CUNG O HAI MAU
+ *   Ban dau luat la "phai du hai mau moi tinh la hop". Chu website bac lai, va
+ *   ly do dung: khoa cung nhu vay thi rat kho phoi do, va nguoi ta co the chi
+ *   thich DUNG MOT MON trong bo — mot chiec ao mau hop menh van la mot goi y
+ *   that, du chiec quan di kem thuoc hanh khac.
  *
- * Con so nay la mot LUAT, khong phai mot tham so de tinh chinh. Doi no la doi
- * y nghia cua chu "hop menh" tren toan bo website.
+ *   Nguong hai mau van con y nghia, nhung la de XEP TREN chu khong phai de
+ *   loai bo. Ba bac giu duoc ca hai dieu: khong bo sot goi y that, ma van noi
+ *   duoc set nao hop hon set nao.
  */
-export const HOP_MENH_TOI_THIEU = 2;
+export const BAC_HOP_CA_BO = 2;
+export const BAC_HOP_MOT_MON = 1;
+
+/** Bac hop menh cua mot set: 2 (ca bo), 1 (mot mon), 0 (khong). */
+export function bacHopMenh(
+  colorSlugs: string[],
+  colorElements: ColorElementMap,
+  element: NguHanh,
+): 0 | 1 | 2 {
+  const n = demMauHopMenh(colorSlugs, colorElements, element);
+  return n >= 2 ? 2 : n === 1 ? 1 : 0;
+}
 
 /** Dem so mau chu dao thuoc hanh ban menh hoac hanh tuong sinh. */
 export function demMauHopMenh(
@@ -132,13 +152,19 @@ export function mauHopMenh(
   });
 }
 
-/** Mot set co duoc coi la hop menh hay khong. Dung chung o moi noi. */
+/**
+ * Co hop menh khong — tu MOT mau tro len la co.
+ *
+ * Cau hoi "co hop khong" va cau hoi "hop den dau" la hai cau khac nhau. Ham
+ * nay tra loi cau thu nhat (dung cho bo loc va cho nhan tren the); `bacHopMenh`
+ * tra loi cau thu hai (dung cho thu tu sap xep).
+ */
 export function laHopMenh(
   colorSlugs: string[],
   colorElements: ColorElementMap,
   element: NguHanh,
 ): boolean {
-  return demMauHopMenh(colorSlugs, colorElements, element) >= HOP_MENH_TOI_THIEU;
+  return demMauHopMenh(colorSlugs, colorElements, element) >= BAC_HOP_MOT_MON;
 }
 
 export interface ScoreBreakdown {
@@ -226,24 +252,18 @@ export function scoreOutfit(
     }
 
     /*
-      DIEM CONG CHI DUOC TINH KHI DU HAI MAU HOP.
+      KHONG CO NGUONG O DAY NUA.
 
-      Mot mau hop mot mau khong thi nua bo do van thuoc hanh khac — khong du de
-      goi la hop menh, nen cung khong du de duoc cong diem. Xem HOP_MENH_TOI_THIEU.
-
-      Phan TRU diem thi khong theo nguong: mot mau nen han che van la mot mau
-      nen han che, du cac mau con lai co the nao. Hai chieu nay khong doi xung
-      vi ho khong hoi cung mot cau: cong diem hoi "ca bo do co hop khong",
-      tru diem hoi "co mau nao nen tranh khong".
+      Mot mau hop van duoc cong diem cua rieng no; hai mau hop duoc cong ca hai
+      nen tu nhien nhieu diem hon. Phep cong san co da xep dung thu tu ma khong
+      can dat nguong — va dat nguong chinh la thu vua bi bo, vi no lam mot set
+      co dung mot mon hop menh bien mat khoi goi y.
     */
-    if (demMauHopMenh(outfit.colorSlugs, colorElements, ctx.element) < HOP_MENH_TOI_THIEU) {
-      pos = 0;
-    }
-
     pos = clamp(pos, 0, ELEM_POSITIVE_CAP);
     neg = clamp(neg, ELEM_NEGATIVE_CAP, 0);
 
-    add('Cả áo và quần đều hợp mệnh', pos);
+    const bac = bacHopMenh(outfit.colorSlugs, colorElements, ctx.element);
+    add(bac === 2 ? 'Cả áo và quần đều hợp mệnh' : 'Có một món hợp mệnh', pos);
     if (!isPhaCach) add('Có màu nên hạn chế theo mệnh', neg);
   }
 
@@ -301,17 +321,34 @@ export function rankOutfits<T extends ScorableOutfit>(
 ): Array<T & { score: ScoreBreakdown }> {
   const hidden = new Set(ctx.hiddenOutfitIds);
   const menh = uuTienMenh && ctx.elementEnabled ? ctx.element : null;
-  const bac = (o: ScorableOutfit) =>
-    menh && laHopMenh(o.colorSlugs, colorElements, menh) ? 1 : 0;
+
+  /*
+    CAC BAC XEP TREN DIEM, theo dung thu tu quan trong.
+
+    Gom vao MOT cho thay vi rai ra tung nhanh if trong ham so sanh. Truoc day
+    chi co mot bac (menh) va no nam thang trong `sort`; them bac thu hai kieu do
+    la bat dau co ba bien `ba`, `bb`, `ba2`, `bb2` va khong ai doc ra duoc thu
+    tu uu tien nua.
+
+    Bac dau danh sach = bac quan trong nhat. Doi thu tu hai dong duoi la doi
+    han cach xep trang, nen chung nam canh nhau de thay ngay.
+  */
+  const cacBac: Array<(o: ScorableOutfit) => number> = [
+    // 1. BAI CUA NGUOI THAT TRUOC BAI DUNG SAN.
+    //    Bai do toi dung de lam day catalog khong duoc dung tren bai ma nguoi
+    //    that bo cong dang — du no co hop menh hay dung phong cach den dau.
+    (o) => (o.isSeed ? 0 : 1),
+    // 2. Hop menh, chi khi nguoi dung dang bat nut uu tien.
+    (o) => (menh ? bacHopMenh(o.colorSlugs, colorElements, menh) : 0),
+  ];
 
   return outfits
     .filter((o) => !hidden.has(o.id))
     .map((o) => ({ ...o, score: scoreOutfit(o, ctx, colorElements, now) }))
     .sort((a, b) => {
-      if (menh) {
-        const ba = bac(a);
-        const bb = bac(b);
-        if (ba !== bb) return bb - ba;
+      for (const bac of cacBac) {
+        const d = bac(b) - bac(a);
+        if (d !== 0) return d;
       }
       if (b.score.total !== a.score.total) return b.score.total - a.score.total;
       // Bang diem thi uu tien bai moi hon, roi den id de thu tu on dinh

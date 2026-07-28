@@ -18,7 +18,9 @@ import {
   derivePreferencesFromFeedback,
   laHopMenh,
   demMauHopMenh,
-  HOP_MENH_TOI_THIEU,
+  bacHopMenh,
+  BAC_HOP_CA_BO,
+  BAC_HOP_MOT_MON,
   type UserContext,
   type ScorableOutfit,
   type ColorElementMap,
@@ -326,41 +328,44 @@ check('moi ten mien goc deu suy ra duoc nen tang',
       ALLOWED_ROOT_DOMAINS.every((d) => platformOfHost(d) !== null));
 
 // ---------------------------------------------------------------------------
-console.log('\n=== 6b. Luat "phai du hai mau hop moi tinh la hop menh" ===');
+console.log('\n=== 6b. Luat hop menh BA BAC ===');
 
 /*
   Menh Kim: ban menh Kim (trang, xam), tuong sinh Tho (kem, be, nau, vang).
   Han che Hoa (do, cam, hong, tim).
 */
-check('hai mau deu hop  ->  hop menh',
-      laHopMenh(['trang', 'kem'], COLOR_ELEMENTS, 'kim' as NguHanh));
+const bac = (cs: string[]) => bacHopMenh(cs, COLOR_ELEMENTS, 'kim' as NguHanh);
 
-check('mot mau hop mot mau khong  ->  KHONG hop menh',
-      !laHopMenh(['trang', 'den'], COLOR_ELEMENTS, 'kim' as NguHanh),
+check('ca ao lan quan hop  ->  bac 2', bac(['trang', 'kem']) === BAC_HOP_CA_BO);
+check('mot mon hop  ->  bac 1', bac(['trang', 'den']) === BAC_HOP_MOT_MON,
       'trang hop Kim, den thuoc Thuy');
+check('khong mon nao hop  ->  bac 0', bac(['do', 'cam']) === 0);
 
-check('mot mau duy nhat va no hop  ->  van KHONG hop menh',
-      !laHopMenh(['trang'], COLOR_ELEMENTS, 'kim' as NguHanh),
-      'nua bo do khong duoc ke ra thi khong ket luan duoc ca bo');
+/*
+  Mot mau hop VAN LA HOP.
 
-check('khong mau nao hop  ->  khong hop menh',
+  Day la luat chu website sua lai sau khi thu: khoa cung o hai mau thi rat kho
+  phoi do, va nguoi ta co the chi thich dung mot mon trong bo. Phep kiem nay
+  giu cho khong ai vo tinh dat lai nguong cu.
+*/
+check('mot mau hop  ->  van tinh la hop menh',
+      laHopMenh(['trang', 'den'], COLOR_ELEMENTS, 'kim' as NguHanh));
+check('khong mau nao hop  ->  khong hop',
       !laHopMenh(['do', 'cam'], COLOR_ELEMENTS, 'kim' as NguHanh));
-
-check('nguong dung la 2', HOP_MENH_TOI_THIEU === 2, `dang la ${HOP_MENH_TOI_THIEU}`);
 
 check('dem dung so mau hop',
       demMauHopMenh(['trang', 'kem', 'do'], COLOR_ELEMENTS, 'kim' as NguHanh) === 2,
       'trang (Kim) + kem (Tho) hop, do (Hoa) khong');
 
-// Diem menh phai bang 0 khi chi mot mau hop — day la cho de vo nhat neu sau
-// nay co ai sua lai vong cong diem.
 const motMau = scoreOutfit(outfit('m1', null, ['trang', 'den']), kimUser, COLOR_ELEMENTS);
 const haiMau = scoreOutfit(outfit('m2', null, ['trang', 'kem']), kimUser, COLOR_ELEMENTS);
 const diemMenh = (s: typeof motMau) =>
-  s.parts.find((p) => p.label === 'Cả áo và quần đều hợp mệnh')?.points ?? 0;
+  s.parts.find((p) => /hợp mệnh$/.test(p.label))?.points ?? 0;
 
-check('mot mau hop  ->  khong duoc cong diem menh', diemMenh(motMau) === 0);
-check('hai mau hop  ->  co cong diem menh', diemMenh(haiMau) > 0, `+${diemMenh(haiMau)}`);
+check('mot mau hop  ->  VAN duoc cong diem menh', diemMenh(motMau) > 0,
+      `+${diemMenh(motMau)}`);
+check('hai mau hop  ->  duoc cong nhieu hon', diemMenh(haiMau) > diemMenh(motMau),
+      `+${diemMenh(haiMau)} > +${diemMenh(motMau)}`);
 check('bai hai mau hop xep tren bai mot mau hop', haiMau.total > motMau.total,
       `${haiMau.total} > ${motMau.total}`);
 
@@ -369,20 +374,34 @@ check('bai hai mau hop xep tren bai mot mau hop', haiMau.total > motMau.total,
 // Bai hop menh phai len dau NGAY CA KHI bai kia dung phong cach yeu thich —
 // nut co chu "uu tien" ma khong day len dau duoc thi no khong lam gi ca.
 const dsXep = rankOutfits(
-  [outfit('kem-hop', 'toi-gian', ['trang', 'den']),   // dung phong cach, 1 mau hop
-   outfit('hop', 'streetwear', ['trang', 'kem'])],    // sai phong cach, 2 mau hop
+  [outfit('mot-mon', 'toi-gian', ['trang', 'den']),   // dung phong cach, bac 1
+   outfit('ca-bo', 'streetwear', ['trang', 'kem'])],  // sai phong cach, bac 2
   kimUser, COLOR_ELEMENTS, 0, true,
 );
-check('bat uu tien  ->  bai hop menh len dau du sai phong cach',
-      dsXep[0].id === 'hop', `dau danh sach: ${dsXep[0].id}`);
+check('bat uu tien  ->  bai hop ca bo len dau du sai phong cach',
+      dsXep[0].id === 'ca-bo', `dau danh sach: ${dsXep[0].id}`);
 
 const dsThuong = rankOutfits(
-  [outfit('kem-hop', 'toi-gian', ['trang', 'den']),
-   outfit('hop', 'streetwear', ['trang', 'kem'])],
+  [outfit('mot-mon', 'toi-gian', ['trang', 'den']),
+   outfit('ca-bo', 'streetwear', ['trang', 'kem'])],
   kimUser, COLOR_ELEMENTS, 0, false,
 );
 check('tat uu tien  ->  so thich phong cach van thang',
-      dsThuong[0].id === 'kem-hop', `dau danh sach: ${dsThuong[0].id}`);
+      dsThuong[0].id === 'mot-mon', `dau danh sach: ${dsThuong[0].id}`);
+
+// --- Bai nguoi that xep tren bai dung san (muc 4) --------------------------
+//
+// Bac nay nam TREN bac menh: mot bai dung san hop ca bo van khong duoc dung
+// tren bai nguoi that. Kiem ca truong hop bat uu tien menh, vi do la luc de
+// vo nhat.
+const dsThat = rankOutfits(
+  [{ ...outfit('dung-san', 'toi-gian', ['trang', 'kem']), isSeed: true },
+   { ...outfit('nguoi-that', 'streetwear', ['do', 'cam']), isSeed: false }],
+  kimUser, COLOR_ELEMENTS, 0, true,
+);
+check('bai nguoi that len tren bai dung san',
+      dsThat[0].id === 'nguoi-that', `dau danh sach: ${dsThat[0].id}`);
+check('bai dung san xuong duoi', dsThat[1].id === 'dung-san');
 
 // ---------------------------------------------------------------------------
 console.log('\n=== 7. Vi du giai thich diem cho nguoi dung ===');

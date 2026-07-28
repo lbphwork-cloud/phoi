@@ -11,7 +11,9 @@ import { OutfitCard } from '@/components/outfit';
 import { ColorPicker } from '@/components/ColorPicker';
 import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
-import { laHopMenh, mauHopMenh } from '@/lib/scoring';
+import {
+  laHopMenh, mauHopMenh, bacHopMenh, BAC_HOP_CA_BO, BAC_HOP_MOT_MON,
+} from '@/lib/scoring';
 import { formatVnd } from '@/lib/format';
 
 /**
@@ -126,8 +128,22 @@ function Discover() {
     ? [...locMenh.filter((o) => !boSet.has(o.id)), ...locMenh.filter((o) => boSet.has(o.id))]
     : locMenh;
 
-  /** Bao nhieu bai DU HAI mau hop menh — dung cho con so ngay tren nut. */
-  const soHopMenh = element ? outfits.filter(hopMenhCuaBai).length : 0;
+  /*
+    HAI CON SO, vi gio co HAI BAC.
+
+    Mot con so gop lai se giau mat dieu nguoi dung can biet nhat: co bao nhieu
+    bai hop ca bo. Bai hop mot mon nhieu gap may lan nen con so gop luon trong
+    to dep, va bam nut uu tien xong thi khong khop voi thu minh vua doc.
+  */
+  const soHopCaBo = element
+    ? outfits.filter((o) => bacHopMenh(o.color_slugs, tax.colorElements, element) === BAC_HOP_CA_BO)
+        .length
+    : 0;
+  const soHopMotMon = element
+    ? outfits.filter(
+        (o) => bacHopMenh(o.color_slugs, tax.colorElements, element) === BAC_HOP_MOT_MON,
+      ).length
+    : 0;
 
   /*
     TAI THEO TUNG DOT, khong bay het mot luc.
@@ -349,15 +365,12 @@ function Discover() {
 
               Truoc day bam nut xong chi thay danh sach doi — khong biet no bo
               bao nhieu bai, va neu danh sach ngan san thi khong biet nut co
-              chay khong. Mot con so tra loi ca hai cau hoi truoc khi bam.
-
-              Cau "ca ao va quan" la phan quan trong: khong co no thi nguoi dung
-              thay 23/72 va tuong website dem thieu, trong khi that ra no dang
-              dem theo mot luat chat hon.
+              chay khong. Con so tra loi truoc khi bam.
             */}
             <span className="muted-2 self-center text-xs">
-              {soHopMenh}/{outfits.length} bài có cả áo và quần hợp mệnh ·
-              {' '}Tương sinh: {NGU_HANH_LABEL[guidance.tuongSinh]} · Bản mệnh:{' '}
+              {soHopCaBo} bài hợp cả bộ · {soHopMotMon} bài hợp một món · trên{' '}
+              {outfits.length} bài ·{' '}
+              Tương sinh: {NGU_HANH_LABEL[guidance.tuongSinh]} · Bản mệnh:{' '}
               {NGU_HANH_LABEL[guidance.banMenh]} · Hạn chế: {NGU_HANH_LABEL[guidance.hanChe]}
             </span>
           </Group>

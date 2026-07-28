@@ -267,10 +267,35 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
    * GHI NHAT KY TRUOC KHI XOA, khong phai sau. Xoa xong moi ghi ma ghi that
    * bai thi con lai mot lan xoa khong ai truy duoc.
    */
-  const removeItem = async (item: OutfitWithItems['outfit_items'][number]) => {
+  /**
+   * Go mot mon — phan viec THAT SU, khong hoi han gi.
+   *
+   * Tach ra khoi phan hoi xac nhan de duong go MOT mon va duong go NHIEU mon
+   * dung chung dung mot cach lam: cung ghi nhat ky, cung thu tu, cung cach bao
+   * loi. Hai ban sao cua doan nay se lech nhau ngay lan sua dau tien.
+   */
+  const goMon = async (
+    item: OutfitWithItems['outfit_items'][number],
+  ): Promise<{ ok: boolean; message?: string }> => {
     const sb = getSupabase();
-    if (!sb) return;
+    if (!sb) return { ok: false, message: 'Chưa cấu hình Supabase.' };
 
+    const ten = item.products?.name ?? 'món này';
+
+    const { error: eLog } = await sb.rpc('log_admin_action', {
+      p_action: 'outfit_item.delete',
+      p_entity_type: 'outfit_item',
+      p_entity_id: item.id,
+      p_detail: { outfit_id: outfitId, product_name: ten, role: item.role },
+    });
+    if (eLog) return { ok: false, message: `Không ghi được nhật ký nên chưa xoá: ${eLog.message}` };
+
+    const { error } = await sb.from('outfit_items').delete().eq('id', item.id);
+    if (error) return { ok: false, message: `Không gỡ được "${ten}": ${error.message}` };
+    return { ok: true };
+  };
+
+  const removeItem = async (item: OutfitWithItems['outfit_items'][number]) => {
     const ten = item.products?.name ?? 'món này';
     if (!window.confirm(
       `Gỡ "${ten}" khỏi set đồ?\n\n`
@@ -283,21 +308,51 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
     setBusyId(item.id);
     setSaveError(null);
 
-    const { error: eLog } = await sb.rpc('log_admin_action', {
-      p_action: 'outfit_item.delete',
-      p_entity_type: 'outfit_item',
-      p_entity_id: item.id,
-      p_detail: { outfit_id: outfitId, product_name: ten, role: item.role },
+    const r = await goMon(item);
+
+    setBusyId(null);
+    if (!r.ok) { setSaveError(r.message ?? 'Không gỡ được món.'); return; }
+    reload();
+  };
+
+  /** Cac mon dang duoc tich de go mot lan. */
+  const [chonMon, setChonMon] = useState<Set<string>>(new Set());
+  const [goNhieuBusy, setGoNhieuBusy] = useState(false);
+
+  const doiChonMon = (id: string) =>
+    setChonMon((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
     });
-    if (eLog) {
-      setBusyId(null);
-      setSaveError(`Không ghi được nhật ký nên chưa xoá: ${eLog.message}`);
-      return;
+
+  const goCacMonDaChon = async () => {
+    const ds = items.filter((x) => chonMon.has(x.id));
+    if (ds.length === 0) return;
+
+    const ten = ds.map((x) => x.products?.name ?? '(chưa có tên)');
+    if (!window.confirm(
+      `Gỡ ${ds.length} món khỏi set đồ?\n\n`
+      + ten.slice(0, 8).map((t) => `· ${t}`).join('\n')
+      + (ten.length > 8 ? `\n· … và ${ten.length - 8} món nữa` : '')
+      + '\n\nSản phẩm và link tiếp thị vẫn được giữ lại.',
+    )) return;
+
+    setGoNhieuBusy(true);
+    setSaveError(null);
+
+    let xong = 0;
+    for (const it of ds) {
+      const r = await goMon(it);
+      if (!r.ok) {
+        setSaveError(`Đã gỡ ${xong}/${ds.length} món rồi thì dừng: ${r.message}`);
+        break;
+      }
+      xong++;
     }
 
-    const { error } = await sb.from('outfit_items').delete().eq('id', item.id);
-    setBusyId(null);
-    if (error) { setSaveError(`Không gỡ được món: ${error.message}`); return; }
+    setGoNhieuBusy(false);
+    setChonMon(new Set());
     reload();
   };
 
@@ -935,7 +990,26 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        {/*
+          THANH LUU BAM DINH DAY KHOI.
+
+          Nut nay von nam o cuoi khoi "Thong tin set do" — sau o ten, o mo ta,
+          hai o chon va ca bang mau 18 mau co the xo ra. Nguoi sua ten set do
+          go xong o tren cung thi nut Luu nam ngoai man hinh, va ket luan hop
+          ly la "khong co nut luu" — dung nhu chu website bao.
+
+          `sticky bottom-0` giu no dinh day khoi trong luc cuon, nen sua o nao
+          cung thay duoc nut. Chi to nen khi CO thay doi chua luu: khong thi
+          no chi la mot thanh thua che mat noi dung.
+        */}
+        <div
+          className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap items-center gap-3 px-4 py-3"
+          style={
+            outfitDirty
+              ? { background: 'var(--bg)', borderTop: '1px solid var(--line)' }
+              : undefined
+          }
+        >
           <button
             type="button"
             className="btn btn-sm"
@@ -944,6 +1018,11 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
           >
             {outfitBusy ? 'Đang lưu…' : 'Lưu thông tin set'}
           </button>
+          {outfitDirty && !outfitBusy && (
+            <span className="text-xs" style={{ color: 'var(--color-warn, var(--fg))' }}>
+              Có thay đổi chưa lưu
+            </span>
+          )}
           {outfitDirty && !outfitBusy && (
             <button type="button" className="btn btn-sm btn-quiet"
                     onClick={() => setOutfitDraft({})}>
@@ -1235,6 +1314,32 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
         <p className="muted-2 text-sm">Set này chưa có sản phẩm nào.</p>
       )}
 
+      {/* Thanh go nhieu mon, chi hien khi co tich. */}
+      {chonMon.size > 0 && (
+        <div
+          className="sticky top-0 z-10 flex flex-wrap items-center gap-3 border px-4 py-3"
+          style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
+        >
+          <span className="text-sm font-medium">Đã chọn {chonMon.size} món</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-danger"
+            disabled={goNhieuBusy}
+            onClick={() => void goCacMonDaChon()}
+          >
+            {goNhieuBusy ? 'Đang gỡ…' : `Gỡ ${chonMon.size} món`}
+          </button>
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            disabled={goNhieuBusy}
+            onClick={() => setChonMon(new Set())}
+          >
+            Bỏ chọn
+          </button>
+        </div>
+      )}
+
       {items.map((it, index) => {
         const p = it.products;
         const d = draft[it.id] ?? {};
@@ -1266,6 +1371,18 @@ export function AdminOutfitItems({ outfitId }: { outfitId: string }) {
                 )}
               </div>
               <p className="muted-2 mt-2 text-center text-xs">{ITEM_ROLE_LABEL[it.role]}</p>
+              {/* O tich de go NHIEU mon mot lan. Mon nao cung co nut "Go mon
+                  nay" rieng o duoi; o tich la duong danh cho luc phai go ba
+                  bon mon, khi bam tung nut mot va xac nhan tung lan la met. */}
+              <label className="muted-2 mt-2 flex items-center justify-center gap-1.5 text-xs">
+                <input
+                  type="checkbox"
+                  checked={chonMon.has(it.id)}
+                  onChange={() => doiChonMon(it.id)}
+                  aria-label={`Chọn ${name || 'món này'} để gỡ`}
+                />
+                Chọn
+              </label>
             </div>
 
             <div className="grid flex-1 gap-3 sm:grid-cols-2">

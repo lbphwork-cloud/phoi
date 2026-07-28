@@ -618,29 +618,62 @@ function notify(key: string) {
   for (const fn of LISTENERS.get(key) ?? []) fn();
 }
 
+/**
+ * So doi cua tung khoa. Tang len moi lan co ai goi reload().
+ *
+ * VI SAO CAN — DAY LA MOT LOI THAT, khong phai phong xa.
+ *   Truoc day reload() goi runQuery(), ma runQuery() lai thoat ngay khi thay
+ *   khoa do DANG co truy van chay do. Trinh tu that hay xay ra trong trang
+ *   quan tri:
+ *
+ *     1. Mo trang  -> truy van A chay, doc du lieu CU
+ *     2. Sua va bam Luu (A chua ve)
+ *     3. reload()  -> thay INFLIGHT co A nen KHONG goi truy van moi
+ *     4. A ve      -> ghi du lieu CU vao bo nho
+ *
+ *   Ket qua: sua xong nhung man hinh van hien ban cu, va khong co gi tai lai
+ *   nua cho den khi nguoi dung tu tai lai ca trang. Dung nhu chu website mo ta:
+ *   "phai load may phut moi thay ban chinh moi".
+ *
+ *   So doi chua duoc dieu do: ket qua ve muon hon mot lan reload se bi bo di
+ *   thay vi ghi de len du lieu moi.
+ */
+const VERSION = new Map<string, number>();
+
 function runQuery(
   key: string,
   query: (sb: NonNullable<ReturnType<typeof getSupabase>>) => PromiseLike<{
     data: unknown; error: { message: string } | null;
   }>,
+  /** Bat khi nguoi dung CHU DONG yeu cau tai lai — bo qua truy van dang chay. */
+  batBuoc = false,
 ): void {
   // Da co nguoi goi cung khoa dang chay thi khong goi them. Day chinh la cho
-  // bo di 5 luot goi thua moi trang.
-  if (INFLIGHT.has(key)) return;
+  // bo di 5 luot goi thua moi trang. Nhung reload() thi phai di tiep: cai dang
+  // chay doc du lieu tu TRUOC khi sua.
+  if (!batBuoc && INFLIGHT.has(key)) return;
 
   const sb = getSupabase();
   if (!sb) return;
 
-  const p = Promise.resolve(query(sb))
+  const doiCuaToi = VERSION.get(key) ?? 0;
+  const conMoi = () => (VERSION.get(key) ?? 0) === doiCuaToi;
+
+  const p: Promise<void> = Promise.resolve(query(sb))
     .then(({ data, error }) => {
+      if (!conMoi()) return;
       CACHE.set(key, { data: data ?? null, error: error?.message ?? null });
     })
     .catch((e: unknown) => {
+      if (!conMoi()) return;
       CACHE.set(key, { data: null, error: (e as Error).message });
     })
     .finally(() => {
-      INFLIGHT.delete(key);
-      notify(key);
+      // Chi go danh dau neu CHINH truy van nay con la truy van dang chay.
+      // Khong kiem thi mot ket qua ve muon se go danh dau cua truy van moi, va
+      // lan reload ke tiep lai chay chong len nhau.
+      if (INFLIGHT.get(key) === p) INFLIGHT.delete(key);
+      if (conMoi()) notify(key);
     });
 
   INFLIGHT.set(key, p);
@@ -715,10 +748,20 @@ export function useAsyncData<T>(
     runQuery(key, queryRef.current as never);
   }, [key, enabled]);
 
+  /*
+    TAI LAI MA KHONG XOA DU LIEU CU.
+
+    Ban truoc xoa bo nho truoc khi goi truy van. Hau qua: `loading` bat len,
+    ca khoi dang sua bi thay bang mot vong xoay, roi ve lai — mat vi tri cuon
+    va nhap nhay o dung luc nguoi dung vua bam Luu.
+
+    Gio du lieu cu o nguyen tren man hinh cho den khi du lieu moi ve, roi thay
+    tai cho. Cai gia phai tra: trong khoang do man hinh hien ban cu — nhung
+    khoang do tinh bang tram mili giay, va no van dung hon mot vong xoay.
+  */
   const reload = useCallback(() => {
-    CACHE.delete(key);
-    runQuery(key, queryRef.current as never);
-    notify(key);
+    VERSION.set(key, (VERSION.get(key) ?? 0) + 1);
+    runQuery(key, queryRef.current as never, true);
   }, [key]);
 
   return {

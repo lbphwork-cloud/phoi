@@ -30,6 +30,16 @@ export default function AdminOutfitsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  /**
+   * Cac bai dang duoc tich de xoa mot lan.
+   *
+   * Giu ID chu khong giu ca dong du lieu: danh sach co the duoc tai lai giua
+   * chung, va luc do cac dong cu tro thanh doi tuong khac. ID thi khong doi.
+   */
+  const [chon, setChon] = useState<Set<string>>(new Set());
+  const [xoaNhieuBusy, setXoaNhieuBusy] = useState(false);
+  const [tienDo, setTienDo] = useState<string | null>(null);
+
   const { data, loading, error: loadError, reload } = useAsyncData<Outfit[]>(
     'admin-outfits',
     (sb) =>
@@ -109,6 +119,62 @@ export default function AdminOutfitsPage() {
     reload();
   };
 
+  const doiChon = (id: string) =>
+    setChon((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+
+  const dangHienDuocChonHet = visible.length > 0 && visible.every((o) => chon.has(o.id));
+
+  /**
+   * Xoa tat ca bai dang duoc tich.
+   *
+   * XOA LAN LUOT, KHONG SONG SONG. Moi lan xoa con ghi mot dong nhat ky quan
+   * tri va go cac ban ghi lien quan; ban ra hai chuc yeu cau cung luc chi de
+   * xong nhanh hon vai giay la doi lay nguy co dinh gioi han goi va bo lai
+   * mot nua cong viec do dang.
+   *
+   * BAO SO DA XOA KHI CO LOI. Dung lai giua chung ma khong noi da xoa duoc bao
+   * nhieu thi nguoi dung khong biet minh dang o dau, va bam lai lan nua la xoa
+   * chong len.
+   */
+  const xoaCacBaiDaChon = async () => {
+    const ds = visible.filter((o) => chon.has(o.id));
+    if (ds.length === 0) return;
+
+    const ok = window.confirm(
+      `Xoá ${ds.length} bài? Không khôi phục được.\n\n`
+        + ds.slice(0, 8).map((o) => `· ${o.title}`).join('\n')
+        + (ds.length > 8 ? `\n· … và ${ds.length - 8} bài nữa` : ''),
+    );
+    if (!ok) return;
+
+    setXoaNhieuBusy(true);
+    setActionError(null);
+
+    let xong = 0;
+    for (const o of ds) {
+      setTienDo(`Đang xoá ${xong + 1}/${ds.length}: ${o.title}`);
+      const r = await deleteOutfit(o);
+      if (!r.ok) {
+        setActionError(
+          `Đã xoá ${xong}/${ds.length} bài rồi thì dừng vì lỗi ở "${o.title}": `
+            + (r.message ?? 'không rõ nguyên nhân'),
+        );
+        break;
+      }
+      xong++;
+    }
+
+    setTienDo(null);
+    setXoaNhieuBusy(false);
+    setChon(new Set());
+    setOpenId(null);
+    reload();
+  };
+
   if (loading) return <Spinner />;
 
   return (
@@ -183,6 +249,39 @@ export default function AdminOutfitsPage() {
 
       {error && <div className="notice notice-danger mb-6">{error}</div>}
 
+      {/*
+        THANH THAO TAC HANG LOAT, chi hien khi CO tich.
+
+        Bam dinh dau danh sach: tich mot bai o dau bang roi cuon xuong tich
+        them bai o cuoi, nut xoa van o trong tam mat. Neu de no o mot cho co
+        dinh thi voi 400 dong no se nam ngoai man hinh gan nhu ca thoi gian.
+      */}
+      {chon.size > 0 && (
+        <div
+          className="sticky top-0 z-10 mb-4 flex flex-wrap items-center gap-3 border px-4 py-3"
+          style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
+        >
+          <span className="text-sm font-medium">Đã chọn {chon.size} bài</span>
+          <button
+            type="button"
+            className="btn btn-sm btn-danger"
+            disabled={xoaNhieuBusy}
+            onClick={() => void xoaCacBaiDaChon()}
+          >
+            {xoaNhieuBusy ? 'Đang xoá…' : `Xoá ${chon.size} bài`}
+          </button>
+          <button
+            type="button"
+            className="btn btn-quiet btn-sm"
+            disabled={xoaNhieuBusy}
+            onClick={() => setChon(new Set())}
+          >
+            Bỏ chọn
+          </button>
+          {tienDo && <span className="muted-2 text-xs">{tienDo}</span>}
+        </div>
+      )}
+
       {visible.length === 0 ? (
         <EmptyState title="Không có outfit nào khớp" />
       ) : (
@@ -190,6 +289,19 @@ export default function AdminOutfitsPage() {
           <table className="data">
             <thead>
               <tr>
+                {/* Tich het / bo tich het cho nhung dong DANG HIEN, khong phai
+                    toan bo 400 bai: nguoi dung loc lai roi tich "tat ca" ma no
+                    om ca nhung bai dang bi loc di la mot cai bay that su. */}
+                <th style={{ width: '1%' }}>
+                  <input
+                    type="checkbox"
+                    aria-label="Chọn tất cả bài đang hiện"
+                    checked={dangHienDuocChonHet}
+                    onChange={() =>
+                      setChon(dangHienDuocChonHet ? new Set() : new Set(visible.map((o) => o.id)))
+                    }
+                  />
+                </th>
                 <th>Ảnh</th>
                 <SortHeader sort={sort} colKey="title">Tên</SortHeader>
                 <SortHeader sort={sort} colKey="style">Phong cách</SortHeader>
@@ -206,6 +318,16 @@ export default function AdminOutfitsPage() {
                   className="cursor-pointer"
                   onClick={() => setOpenId((x) => (x === o.id ? null : o.id))}
                 >
+                  {/* O tich khong duoc lam mo/dong dong — bam vao no la dang
+                      chon bai, khong phai dang muon xem cac mon ben trong. */}
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Chọn ${o.title}`}
+                      checked={chon.has(o.id)}
+                      onChange={() => doiChon(o.id)}
+                    />
+                  </td>
                   <td>
                     <div className="frame frame-square w-14">
                       {o.hero_image_url ? (
@@ -279,7 +401,7 @@ export default function AdminOutfitsPage() {
                     lam hong bai nao. */}
                 {openId === o.id && (
                   <tr>
-                    <td colSpan={7} className="bg-transparent">
+                    <td colSpan={8} className="bg-transparent">
                       <div className="py-4">
                         <p className="eyebrow mb-4">Sản phẩm trong set</p>
                         <AdminOutfitItems outfitId={o.id} />

@@ -10,7 +10,7 @@ import { EmptyState, SetupNotice, Spinner } from '@/components/site';
 import { SaveButton } from '@/components/SaveButton';
 import { formatVnd, formatRelative } from '@/lib/format';
 import { colorGuidanceFor, NGU_HANH_LABEL } from '@/lib/nguhanh';
-import { HOP_MENH_TOI_THIEU } from '@/lib/scoring';
+import { BAC_HOP_CA_BO } from '@/lib/scoring';
 
 export default function OutfitDetail({ slug }: { slug: string }) {
   if (!isSupabaseConfigured) return <SetupNotice />;
@@ -129,20 +129,19 @@ function Detail({ slug }: { slug: string }) {
                   </p>
                 )}
                 {/*
-                  NOI RO KET LUAN, khong bat nguoi doc tu suy.
+                  NOI RO BAC, khong bat nguoi doc tu suy.
 
-                  Trang nay dem tung mau, con trang kham pha chi goi mot set la
-                  hop menh khi DU HAI mau. Khong viet ket luan ra thi mot set co
-                  dung mot mau hop se hien "co 1 mau hop menh" o day nhung khong
-                  co nhan nao o trang kia — doc nhu website tu mau thuan.
+                  Mot mau hop va hai mau hop deu duoc coi la hop, nhung xep khac
+                  nhau tren trang kham pha. Khong viet ra thi nguoi dung thay
+                  hai bai cung "hop menh" ma khong hieu vi sao mot bai nam tren.
                 */}
                 {menhMatch.length === 1 && (
                   <p className="muted mt-1 text-sm">
-                    Mới một màu hợp nên set này chưa được tính là hợp mệnh — cần cả
-                    màu áo và màu quần đều hợp.
+                    Một món hợp mệnh. Set này vẫn được coi là hợp, chỉ xếp sau những
+                    set có cả áo lẫn quần hợp.
                   </p>
                 )}
-                {menhMatch.length >= HOP_MENH_TOI_THIEU && (
+                {menhMatch.length >= BAC_HOP_CA_BO && (
                   <p className="mt-1 text-sm">
                     Cả áo và quần đều hợp mệnh, nên set này được ưu tiên khi bạn bật
                     nút ưu tiên ở trang khám phá.

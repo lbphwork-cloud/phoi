@@ -7,7 +7,7 @@ import { AFFILIATE_LINK_ATTRS } from '@/lib/affiliate';
 import { formatVnd, formatVndShort, priceFreshnessNote } from '@/lib/format';
 import { useReveal, useTaxonomy } from '@/lib/hooks';
 import { SaveButton } from '@/components/SaveButton';
-import type { ScoreBreakdown } from '@/lib/scoring';
+import { BAC_HOP_CA_BO, type ScoreBreakdown } from '@/lib/scoring';
 import type {
   AffiliateLink, Outfit, OutfitStatus, Product,
 } from '@/lib/supabase/types';
@@ -254,14 +254,17 @@ export function OutfitCard({
             );
           })}
           {/*
-            Viet ro "ca ao va quan", khong chi mot chu "hop menh".
+            Nhan noi RO BAC, khong chi noi "hop menh".
 
-            Nhan cu khong noi duoc dieu gi khac nhau giua mot set hop nua voi
-            mot set hop ca bo — ma gio hai truong hop do duoc doi xu khac han:
-            chi truong hop thu hai moi duoc goi la hop menh.
+            Ca hai truong hop deu la hop, nhung mot cai hop ca bo va mot cai hop
+            dung mot mon — va thu tu tren trang phan anh dung khac biet do. Nhan
+            chung chung se lam nguoi dung khong hieu vi sao hai the cung "hop"
+            ma lai khong dung nhau.
           */}
           {hopMenh && hopMenh.length > 0 && (
-            <span className="muted-2 ml-1 text-xs">cả áo và quần hợp mệnh</span>
+            <span className="muted-2 ml-1 text-xs">
+              {hopMenh.length >= BAC_HOP_CA_BO ? 'hợp cả bộ' : 'hợp một món'}
+            </span>
           )}
         </div>
       </Link>

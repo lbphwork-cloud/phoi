@@ -76,7 +76,16 @@ function Home() {
 
       return {
         slug,
-        label: meta.label,
+        /*
+          TEN LAY TU O NOI DUNG TRUOC, roi moi den bang `styles`.
+
+          De trong o noi dung thi ten van bam theo trang Phong cach — nen doi
+          ten o mot noi la moi noi doi theo. Chi khi nguoi dung CO Y go mot ten
+          khac vao o noi dung thi trang chu moi tach ra.
+        */
+        label: c.t(`home.style.${slug}.label`, '').trim() || meta.label,
+        /** Dinh dang rieng cho ten phong cach nay: font, co, dam, mau, in hoa. */
+        labelStyle: c.s(`home.style.${slug}.label`),
         desc: c.t(`home.style.${slug}.desc`, meta.description ?? ''),
         image: c.t(`home.style.${slug}.image`, '') || fromOutfit?.hero_image_url || '',
       };
@@ -306,7 +315,11 @@ function StyleBlock({
   flip,
   isMobile,
 }: {
-  style: { slug: string; label: string; desc: string; image: string };
+  style: {
+    slug: string; label: string; desc: string; image: string;
+    /** Dinh dang rieng cua ten phong cach, do trang Noi dung dat. */
+    labelStyle?: React.CSSProperties;
+  };
   flip: boolean;
   isMobile: boolean;
 }) {
@@ -361,7 +374,7 @@ function StyleBlock({
                  tot hon ma khong dong vao hinh dang chu. */
               style={{ color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.45)' }}
             >
-              <p className="display-sm mb-3">{style.label}</p>
+              <p className="display-sm mb-3" style={style.labelStyle}>{style.label}</p>
               {style.desc && (
                 <p className="mb-6 max-w-xs text-sm leading-relaxed">{style.desc}</p>
               )}
@@ -398,7 +411,7 @@ function StyleBlock({
         </Link>
 
         <div>
-          <h2 className="display-sm mb-4">{style.label}</h2>
+          <h2 className="display-sm mb-4" style={style.labelStyle}>{style.label}</h2>
           {style.desc && (
             <p className="muted mb-8 max-w-md text-base leading-relaxed">{style.desc}</p>
           )}
@@ -431,7 +444,11 @@ function StyleTile({
   style,
   isMobile,
 }: {
-  style: { slug: string; label: string; desc: string; image: string };
+  style: {
+    slug: string; label: string; desc: string; image: string;
+    /** Dinh dang rieng cua ten phong cach, do trang Noi dung dat. */
+    labelStyle?: React.CSSProperties;
+  };
   isMobile: boolean;
 }) {
   const href = `/kham-pha?style=${encodeURIComponent(style.slug)}`;
@@ -461,7 +478,7 @@ function StyleTile({
               textShadow: '0 1px 2px rgba(0,0,0,0.5)',
             }}
           >
-            <p className="display-xs">{style.label}</p>
+            <p className="display-xs" style={style.labelStyle}>{style.label}</p>
           </div>
         </div>
       </Link>
@@ -480,7 +497,7 @@ function StyleTile({
           />
         )}
       </div>
-      <p className="display-xs">{style.label}</p>
+      <p className="display-xs" style={style.labelStyle}>{style.label}</p>
       {style.desc && (
         <p className="muted-2 mt-1 line-clamp-2 text-xs leading-relaxed">{style.desc}</p>
       )}

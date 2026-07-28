@@ -101,6 +101,7 @@ export function useOutfits(
       colorSlugs: o.color_slugs,
       totalPriceVnd: o.total_price_vnd,
       publishedAt: o.published_at,
+      isSeed: o.is_seed,
       raw: o,
     })),
     ctx,
