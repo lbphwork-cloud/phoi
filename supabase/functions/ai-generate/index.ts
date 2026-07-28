@@ -195,10 +195,23 @@ async function generateWithGemini(
       throw new Error('API key của Gemini không hợp lệ. Kiểm tra lại key trong trang AI.');
     }
     if (res.status === 429) {
-      throw new Error(
-        'Đã hết hạn mức Gemini cho hôm nay (gói miễn phí khoảng 500 ảnh/ngày, ' +
-          'reset theo giờ Thái Bình Dương). Thử lại sau, hoặc tải ảnh lên tay.',
-      );
+      /*
+        GIU NGUYEN VAN CAU CUA GOOGLE, khong viet lai thanh "het han muc hom nay".
+
+        Cau cu doan sai theo hai huong cung mot luc:
+
+          1. No khang dinh "goi mien phi khoang 500 anh/ngay". Sai: han muc anh
+             cua goi mien phi bang 0. Khong phai it — la khong co.
+          2. No noi "thu lai sau", trong khi truong hop pho bien nhat la du an
+             cua key KHONG CO han muc nao ca. Doi den sang mai cung khong doi.
+
+        Phan biet hai truong hop do nam trong chinh chuoi tra ve cua Google —
+        `limit: 0` hay `limit: <so duong>` — va ben client (withQuotaHelp trong
+        src/lib/aiImage.ts) doc duoc no de noi dung viec can lam. Viet de len
+        cau goc o day la XOA MAT thu duy nhat phan biet duoc, va client chi con
+        cach doan.
+      */
+      throw new Error(`Gemini từ chối vì hạn mức (429): ${detail}`);
     }
     if (res.status === 404) {
       throw new Error(

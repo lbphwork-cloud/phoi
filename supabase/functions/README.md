@@ -132,7 +132,7 @@ trong `/admin/ai`.
 
 | Nhà cung cấp | Mô hình mặc định | Chi phí |
 |---|---|---|
-| Gemini | `gemini-2.5-flash-image` | Gói miễn phí ~500 ảnh/ngày, không cần thẻ |
+| Gemini | `gemini-2.5-flash-image` | Hạn mức ảnh của gói miễn phí bằng **0** — phải bật thanh toán |
 | OpenAI | `gpt-image-1` | Trả tiền theo từng ảnh |
 
 **Tên mô hình nhận từ tham số.** Google đổi tên mô hình ảnh khá thường xuyên
