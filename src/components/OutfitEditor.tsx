@@ -1431,8 +1431,7 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           <p className="hint mb-4">
             AI dựng một ảnh minh hoạ theo phong cách, màu và các món bạn đã nhập.
             Ảnh sinh ra là <strong>ảnh minh hoạ</strong>, không phải ảnh sản phẩm thật:
-            nó không giữ đúng logo, chữ in hay hoạ tiết nhỏ. Ảnh luôn được gắn nhãn
-            &ldquo;Ảnh tạo bởi AI&rdquo; và vẫn phải qua kiểm duyệt.
+            nó không giữ đúng logo, chữ in hay hoạ tiết nhỏ, và vẫn phải qua kiểm duyệt.
           </p>
 
           <AiKeyBox
@@ -1708,8 +1707,8 @@ export function OutfitEditor({ asAdmin = false }: { asAdmin?: boolean }) {
           <span className="text-sm">
             Ảnh này do AI tạo ra
             <span className="muted-2 block text-xs">
-              Bắt buộc đánh dấu nếu đúng. Bài sẽ hiện nhãn &quot;Ảnh tạo bởi AI&quot; và
-              một dòng lưu ý rằng ảnh không đảm bảo giống tuyệt đối sản phẩm thật.
+              Đánh dấu nếu đúng. Ghi nhận này chỉ hiện trong trang quản trị, để phân
+              biệt bài nào dùng ảnh AI; người xem không thấy nhãn nào.
             </span>
           </span>
         </label>

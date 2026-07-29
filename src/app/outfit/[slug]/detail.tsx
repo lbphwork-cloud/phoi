@@ -214,15 +214,6 @@ function Detail({ slug }: { slug: string }) {
         />
       </div>
 
-      {outfit.ai_generated && (
-        <div className="shell mt-12">
-          <div className="notice notice-warn">
-            Ảnh trong bài này do AI tạo ra. Ảnh chỉ mô tả tinh thần của cách phối —
-            không đảm bảo giống tuyệt đối sản phẩm thật về màu sắc, hoạ tiết hay
-            chi tiết in. Xem ảnh gốc của từng sản phẩm trên sàn trước khi mua.
-          </div>
-        </div>
-      )}
     </article>
   );
 }

@@ -40,9 +40,25 @@ export function StatusTag({ status }: { status: OutfitStatus }) {
   kiem "dem dung du lieu mau" mat cho dua, ma chung dang bao ve nhung thu that.
 */
 
-/** Nhan bat buoc cho anh do AI tao (de bai muc 7). */
+/*
+  NHAN "Anh tao boi AI" DA BO KHOI CAC TRANG NGUOI XEM, theo yeu cau cua chu
+  website.
+
+  Ban dau day la mot rang buoc trong de bai ("co nhan thong bao anh duoc tao
+  boi AI") va toi da viet no nhu vay. Chu website chot bo — do la quyet dinh
+  cua nguoi so huu website.
+
+  CAN NOI RO DIEU BI MAT DI: anh AI dung trong bai la anh mo ta bo do gan voi
+  link mua hang. Khong con nhan thi nguoi xem khong co cach nao biet tam anh ho
+  dang nhin la dung san pham hay la anh dung lai. Neu sau nay muon bat lai, chi
+  can tra ham nay ve nhu cu — moi cho goi no van con nguyen.
+
+  Cot `ai_generated` GIU NGUYEN trong database, va cac trang QUAN TRI van hien
+  nhan: do la cho chu website phan biet bai nao dung anh AI, khong phai cho
+  nguoi mua.
+*/
 export function AiTag() {
-  return <span className="tag tag-warn">Ảnh tạo bởi AI</span>;
+  return null;
 }
 
 export function OutfitCard({

@@ -191,10 +191,10 @@ export default function AdminAiPage() {
         <div className="notice mb-8">
           <p className="eyebrow mb-2">Ảnh AI luôn phải qua kiểm duyệt</p>
           <p className="muted text-sm leading-relaxed">
-            Mọi ảnh do AI tạo đều lưu ở dạng bản nháp, phải được duyệt tay trước khi
-            đăng, và bài hiển thị nhãn &quot;Ảnh tạo bởi AI&quot; kèm lưu ý rằng ảnh không
-            đảm bảo giống tuyệt đối sản phẩm thật. Đây là quy tắc cố định, không có
-            công tắc tắt.
+            Mọi ảnh do AI tạo đều lưu ở dạng bản nháp và phải được duyệt tay trước khi
+            đăng. Đây là quy tắc cố định, không có công tắc tắt. Bài được ghi nhận là
+            dùng ảnh AI và hiện dấu đó trong các trang quản trị; người xem không thấy
+            nhãn nào.
           </p>
         </div>
       </section>
@@ -464,7 +464,7 @@ function ImageGenerator({ activeProviders }: { activeProviders: AiProvider[] }) 
 
     if (error) { setErr(error.message); return; }
     setMsg(
-      `Đã gán ảnh vào "${selected.title}". Bài mang nhãn "Ảnh tạo bởi AI". ` +
+      `Đã gán ảnh vào "${selected.title}". Bài được ghi nhận là dùng ảnh AI. ` +
         'Kiểm tra lại trong trang Kiểm duyệt trước khi đăng.',
     );
   };

@@ -16,7 +16,7 @@ export default function MyPostsPage() {
 }
 
 function MyPosts() {
-  const { session, loading: authLoading } = useAuth();
+  const { session, isAdmin, loading: authLoading } = useAuth();
   const tax = useTaxonomy();
   const c = useContent();
 
@@ -57,17 +57,41 @@ function MyPosts() {
     );
   }
 
-  /** Gui duyet lai. Tac gia chi duoc dat 'pending' — trigger database chan
-      moi trang thai khac, nen day la thao tac duy nhat co the lam. */
+  /**
+   * Dua bai len.
+   *
+   * ADMIN DANG THANG, KHONG QUA BUOC DUYET.
+   *   Quan tri vien la nguoi duyet. Bat ho gui bai cho chinh minh duyet la mot
+   *   vong thua: bam "Gui duyet", sang trang kiem duyet, tim lai bai vua gui,
+   *   bam duyet — ba thao tac cho mot viec ma ho toan quyen quyet dinh ngay tu
+   *   dau. Trang tao bai da lam dung dieu nay tu truoc; rieng trang nay con sot.
+   *
+   *   Trigger enforce_outfit_status() trong database chi cho dat 'published'
+   *   khi is_admin() dung, nen nut nay khong the tu no mo them quyen gi.
+   */
   const resubmit = async (o: Outfit) => {
     const sb = getSupabase()!;
     setBusyId(o.id);
     setActionError(null);
 
-    const { error: e } = await sb.from('outfits').update({ status: 'pending' }).eq('id', o.id);
+    const { error: e } = await sb
+      .from('outfits')
+      .update({ status: isAdmin ? 'published' : 'pending' })
+      .eq('id', o.id);
 
     setBusyId(null);
     if (e) { setActionError(e.message); return; }
+
+    // Dau vet van con: bai admin tu dang cung duoc ghi vao nhat ky quan tri.
+    if (isAdmin && !e) {
+      await sb.rpc('log_admin_action', {
+        p_action: 'outfit.status.published',
+        p_entity_type: 'outfit',
+        p_entity_id: o.id,
+        p_detail: { from: o.status, to: 'published', tu_trang: 'bai-cua-toi' },
+      });
+    }
+
     reload();
   };
 
@@ -167,7 +191,6 @@ function MyPosts() {
                       <div className="min-w-0 flex-1">
                         <div className="mb-1 flex flex-wrap items-center gap-2">
                           <StatusTag status={o.status} />
-                          {o.ai_generated && <span className="tag tag-warn">Ảnh AI</span>}
                         </div>
 
                         <p className="font-medium">{o.title}</p>
@@ -196,7 +219,7 @@ function MyPosts() {
                             disabled={busyId === o.id}
                             onClick={() => resubmit(o)}
                           >
-                            Gửi duyệt
+                            {isAdmin ? 'Đăng ngay' : 'Gửi duyệt'}
                           </button>
                         )}
                         {o.status === 'pending' && (
@@ -232,14 +255,27 @@ function MyPosts() {
         </div>
       )}
 
+      {/* Doan nay noi ve quy trinh duyet, nen no chi co nghia voi nguoi PHAI di
+          qua quy trinh do. Voi quan tri vien thi ca doan la thong tin sai — ho
+          dang thang, khong co buoc cho duyet nao. */}
       <div className="notice mt-16">
-        <p className="eyebrow mb-2">Về quy trình duyệt</p>
+        <p className="eyebrow mb-2">{isAdmin ? 'Về việc đăng bài' : 'Về quy trình duyệt'}</p>
         <p className="muted text-sm leading-relaxed">
-          Bản nháp → Chờ duyệt → Cần sửa / Duyệt / Từ chối → Công khai. Sau khi bài
-          đã được duyệt, nếu bạn sửa ảnh đại diện, thêm bớt sản phẩm hoặc đổi link
-          affiliate thì bài tự động quay lại trạng thái chờ duyệt. Quy tắc này được
-          thực thi ngay trong database, không phải ở giao diện — nên nó áp dụng kể
-          cả khi gọi trực tiếp qua API.
+          {isAdmin ? (
+            <>
+              Bạn là quản trị viên nên bài đăng thẳng, không qua bước chờ duyệt. Mỗi
+              lần đăng đều được ghi vào nhật ký quản trị. Bài hiện ngay trong trang
+              khám phá; riêng trang chi tiết của bài cần lần dựng trang kế tiếp mới có.
+            </>
+          ) : (
+            <>
+              Bản nháp → Chờ duyệt → Cần sửa / Duyệt / Từ chối → Công khai. Sau khi bài
+              đã được duyệt, nếu bạn sửa ảnh đại diện, thêm bớt sản phẩm hoặc đổi link
+              affiliate thì bài tự động quay lại trạng thái chờ duyệt. Quy tắc này được
+              thực thi ngay trong database, không phải ở giao diện — nên nó áp dụng kể
+              cả khi gọi trực tiếp qua API.
+            </>
+          )}
         </p>
       </div>
     </div>
